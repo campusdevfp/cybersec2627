@@ -1,0 +1,395 @@
+/* ==========================================================================
+   CMO-313 · Tema profesional
+   Paleta: azul tinta + verde azulado · tipografía de sistema (100 % offline)
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ FUENTES */
+:root {
+  --cmo-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+              "Liberation Sans", Arial, sans-serif;
+  --cmo-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", "Fira Code",
+              Menlo, Consolas, "Liberation Mono", monospace;
+  --md-text-font-family: var(--cmo-sans);
+  --md-code-font-family: var(--cmo-mono);
+}
+
+/* --------------------------------------------------------- MODO CLARO */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:        #1b3a57;
+  --md-primary-fg-color--light: #2c5678;
+  --md-primary-fg-color--dark:  #12293e;
+  --md-accent-fg-color:         #1d7a6c;
+
+  --md-default-bg-color:        #fcfcfb;
+  --md-default-fg-color:        #1c2430;
+  --md-default-fg-color--light: #5a6572;
+  --md-default-fg-color--lighter: #8a939e;
+  --md-typeset-color:           #232c38;
+  --md-typeset-a-color:         #1d6b8f;
+
+  --md-code-bg-color:           #f4f5f3;
+  --md-code-fg-color:           #2b3440;
+
+  --cmo-rule:      #e3e5e1;
+  --cmo-rule-soft: #eceee9;
+  --cmo-surface:   #ffffff;
+  --cmo-quote-bg:  #f7f8f6;
+  --cmo-shadow:    0 1px 2px rgba(28, 36, 48, .06), 0 4px 12px rgba(28, 36, 48, .04);
+}
+
+/* --------------------------------------------------------- MODO OSCURO */
+[data-md-color-scheme="slate"] {
+  --md-hue: 215;
+  --md-primary-fg-color:        #14202b;
+  --md-primary-fg-color--light: #22333f;
+  --md-primary-fg-color--dark:  #0d1720;
+  --md-accent-fg-color:         #4ec5b2;
+
+  --md-default-bg-color:        #0e1419;
+  --md-default-fg-color:        #d7dee4;
+  --md-default-fg-color--light: #9aa6b2;
+  --md-default-fg-color--lighter: #6c7885;
+  --md-typeset-color:           #cdd6de;
+  --md-typeset-a-color:         #6fb3d6;
+
+  --md-code-bg-color:           #161d24;
+  --md-code-fg-color:           #cfd8e0;
+
+  --cmo-rule:      #232d37;
+  --cmo-rule-soft: #1b242c;
+  --cmo-surface:   #131a21;
+  --cmo-quote-bg:  #141b22;
+  --cmo-shadow:    0 1px 2px rgba(0, 0, 0, .4);
+}
+
+/* ------------------------------------------------------------ TIPOGRAFÍA */
+.md-typeset {
+  font-size: .78rem;
+  line-height: 1.72;
+  letter-spacing: .002em;
+}
+
+.md-typeset h1 {
+  font-weight: 600;
+  font-size: 1.85rem;
+  letter-spacing: -.022em;
+  line-height: 1.22;
+  color: var(--md-default-fg-color);
+  margin: 0 0 1.4rem;
+  padding-bottom: .7rem;
+  border-bottom: 1px solid var(--cmo-rule);
+}
+
+.md-typeset h2 {
+  font-weight: 600;
+  font-size: 1.28rem;
+  letter-spacing: -.014em;
+  line-height: 1.3;
+  margin: 2.6rem 0 .9rem;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: -.008em;
+  margin: 1.9rem 0 .6rem;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset h4 {
+  font-weight: 600;
+  font-size: .86rem;
+  text-transform: none;
+  letter-spacing: .01em;
+  color: var(--md-default-fg-color--light);
+  margin: 1.5rem 0 .5rem;
+}
+
+.md-typeset p { margin: 0 0 1.05em; }
+.md-typeset strong { font-weight: 650; color: var(--md-default-fg-color); }
+
+/* Enlaces discretos */
+.md-typeset a {
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--md-typeset-a-color) 32%, transparent);
+  transition: border-color .15s, color .15s;
+}
+.md-typeset a:hover {
+  color: var(--md-accent-fg-color);
+  border-bottom-color: var(--md-accent-fg-color);
+}
+
+/* Separadores finos */
+.md-typeset hr {
+  border-bottom: 1px solid var(--cmo-rule);
+  margin: 2.4rem 0;
+}
+
+/* ------------------------------------------------------------------ LISTAS */
+.md-typeset ul li,
+.md-typeset ol li { margin-bottom: .38em; }
+.md-typeset ul li::marker { color: var(--md-default-fg-color--lighter); }
+.md-typeset ol li::marker { color: var(--md-default-fg-color--light); font-weight: 600; }
+
+/* ------------------------------------------------------------------ TABLAS */
+.md-typeset table:not([class]) {
+  border: 1px solid var(--cmo-rule);
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: .70rem;
+  overflow: hidden;
+}
+.md-typeset table:not([class]) th {
+  background: var(--cmo-quote-bg);
+  color: var(--md-default-fg-color);
+  font-weight: 620;
+  font-size: .66rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: .62em .9em;
+  border-bottom: 1px solid var(--cmo-rule);
+}
+.md-typeset table:not([class]) td {
+  padding: .58em .9em;
+  border-top: 1px solid var(--cmo-rule-soft);
+}
+.md-typeset table:not([class]) tr:hover td {
+  background: color-mix(in srgb, var(--md-accent-fg-color) 4%, transparent);
+}
+
+/* ------------------------------------------------------------------ CÓDIGO */
+.md-typeset code {
+  font-size: .84em;
+  padding: .12em .38em;
+  border-radius: 4px;
+  border: 1px solid var(--cmo-rule-soft);
+  background: var(--md-code-bg-color);
+}
+.md-typeset pre > code {
+  border: none;
+  padding: .9rem 1rem;
+  font-size: .70rem;
+  line-height: 1.62;
+}
+.md-typeset .highlight {
+  border: 1px solid var(--cmo-rule);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 1.1em 0;
+}
+.md-typeset .highlight pre { margin: 0; }
+.md-typeset .highlight > .filename {
+  background: var(--cmo-quote-bg);
+  border-bottom: 1px solid var(--cmo-rule);
+  font-size: .66rem;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------ ADMONICIONES */
+.md-typeset .admonition,
+.md-typeset details {
+  border: 1px solid var(--cmo-rule);
+  border-left: 3px solid var(--md-accent-fg-color);
+  border-radius: 5px;
+  box-shadow: none;
+  font-size: .74rem;
+  background: var(--cmo-surface);
+  margin: 1.2em 0;
+}
+.md-typeset .admonition-title,
+.md-typeset summary {
+  background: var(--cmo-quote-bg);
+  font-weight: 620;
+  letter-spacing: .005em;
+  padding: .5rem .8rem .5rem 2.1rem;
+  border: none;
+}
+.md-typeset .admonition-title::before,
+.md-typeset summary::before { top: .55rem; left: .7rem; }
+.md-typeset summary { cursor: pointer; }
+.md-typeset summary:hover { background: color-mix(in srgb, var(--md-accent-fg-color) 7%, var(--cmo-quote-bg)); }
+
+/* Colores por tipo, sin estridencias */
+.md-typeset .admonition.tip,     .md-typeset details.tip     { border-left-color: #1d7a6c; }
+.md-typeset .admonition.note,    .md-typeset details.note    { border-left-color: #2c5678; }
+.md-typeset .admonition.warning, .md-typeset details.warning { border-left-color: #b7791f; }
+.md-typeset .admonition.danger,  .md-typeset details.danger  { border-left-color: #a8342a; }
+.md-typeset .admonition.success, .md-typeset details.success { border-left-color: #2f7d4f; }
+.md-typeset .admonition.info,    .md-typeset details.info    { border-left-color: #2c6e8f; }
+
+/* Citas */
+.md-typeset blockquote {
+  border-left: 2px solid var(--md-accent-fg-color);
+  color: var(--md-default-fg-color--light);
+  background: var(--cmo-quote-bg);
+  padding: .55rem .95rem;
+  border-radius: 0 4px 4px 0;
+  margin: 1.15em 0;
+}
+.md-typeset blockquote > :last-child { margin-bottom: 0; }
+
+/* --------------------------------------------------------------- CABECERA */
+.md-header {
+  box-shadow: none;
+  border-bottom: 1px solid var(--cmo-rule);
+  background: var(--md-primary-fg-color);
+}
+.md-header__title { font-weight: 600; letter-spacing: -.008em; }
+.md-tabs { background: var(--md-primary-fg-color); border-bottom: 1px solid var(--cmo-rule); }
+
+/* ------------------------------------------------------------- NAVEGACIÓN */
+.md-nav { font-size: .70rem; }
+.md-nav__title { font-weight: 640; font-size: .66rem; letter-spacing: .07em; text-transform: uppercase; color: var(--md-default-fg-color--light); }
+.md-nav__link { padding: .22rem 0; transition: color .12s; }
+.md-nav__link--active, .md-nav__link:focus, .md-nav__link:hover { color: var(--md-accent-fg-color); }
+.md-nav__item--active > .md-nav__link { font-weight: 620; }
+.md-sidebar--secondary .md-nav__link--active { border-left: 2px solid var(--md-accent-fg-color); padding-left: .5rem; margin-left: -.62rem; }
+
+/* Índice lateral derecho */
+.md-sidebar--secondary .md-nav__title { margin-bottom: .4rem; }
+
+/* --------------------------------------------------------------- DIAGRAMAS */
+.md-typeset figure {
+  margin: 1.6em auto;
+  text-align: center;
+}
+.md-typeset figure img,
+.md-typeset p > img[src$=".svg"] {
+  max-width: 100%;
+  height: auto;
+}
+.md-typeset figcaption {
+  font-size: .68rem;
+  color: var(--md-default-fg-color--light);
+  margin-top: .5em;
+  font-style: italic;
+}
+
+/* --------------------------------------------------------------- DETALLES */
+.md-typeset kbd {
+  border-radius: 4px;
+  box-shadow: 0 1px 0 var(--cmo-rule);
+  font-size: .74em;
+}
+.md-typeset .task-list-control .task-list-indicator::before { background: var(--md-accent-fg-color); }
+
+/* Barra de desplazamiento discreta */
+* { scrollbar-width: thin; scrollbar-color: var(--cmo-rule) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: var(--cmo-rule); border-radius: 5px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Botón de copiar código */
+.md-clipboard { color: var(--md-default-fg-color--lighter); }
+.md-clipboard:hover { color: var(--md-accent-fg-color); }
+
+/* Ancho de lectura más cómodo */
+.md-grid { max-width: 68rem; }
+
+/* ------------------------------------------------- PÁGINA «TODO EL MATERIAL» */
+.barra-pdf {
+  display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+  margin: 0 0 1.4rem; padding: .8rem 1rem;
+  background: var(--cmo-quote-bg);
+  border: 1px solid var(--cmo-rule);
+  border-radius: 6px;
+}
+.boton-pdf {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--md-primary-fg-color); color: #fff;
+  border: none; border-radius: 5px; cursor: pointer;
+  padding: .5rem .95rem; font-size: .72rem; font-weight: 600;
+  font-family: inherit; letter-spacing: .01em;
+  transition: background .15s, transform .08s;
+}
+.boton-pdf::before { content: "⇩"; font-size: .85rem; }
+.boton-pdf:hover { background: var(--md-accent-fg-color); }
+.boton-pdf:active { transform: translateY(1px); }
+.nota-pdf { font-size: .68rem; color: var(--md-default-fg-color--light); }
+
+/* separador entre las secciones concatenadas */
+.md-typeset hr.salto { border-top: 2px solid var(--cmo-rule); margin: 3rem 0; }
+
+/* --------------------------------------------------------------- IMPRESIÓN */
+@media print {
+  /* fuera todo lo que no es contenido */
+  .md-header, .md-tabs, .md-sidebar, .md-footer, .md-nav,
+  .md-search, .md-dialog, .md-top, .barra-pdf, .md-clipboard,
+  .headerlink, .md-content__button { display: none !important; }
+
+  .md-main__inner, .md-content, .md-grid { margin: 0 !important; max-width: 100% !important; }
+  .md-content__inner { padding: 0 !important; margin: 0 !important; }
+
+  @page { size: A4; margin: 18mm 16mm; }
+
+  body, .md-typeset { color: #1a1a1a !important; background: #fff !important; }
+  .md-typeset { font-size: 10.2pt; line-height: 1.5; }
+
+  .md-typeset h1 { font-size: 19pt; page-break-after: avoid; }
+  .md-typeset h2 { font-size: 14pt; page-break-after: avoid; margin-top: 1.3em; }
+  .md-typeset h3 { font-size: 11.5pt; page-break-after: avoid; }
+  .md-typeset h4 { font-size: 10.4pt; page-break-after: avoid; }
+
+  .md-typeset pre, .md-typeset table, .md-typeset .admonition,
+  .md-typeset figure, .md-typeset blockquote, .md-typeset details {
+    page-break-inside: avoid;
+  }
+  .md-typeset hr.salto { page-break-after: always; border: none; margin: 0; }
+
+  /* las soluciones desplegables se abren solas al imprimir (javascripts/imprimir.js) */
+  .md-typeset details { border: 1px solid #ccc !important; }
+  .md-typeset details > summary { font-weight: 600; list-style: none; }
+
+  .md-typeset img, .md-typeset svg { max-width: 100% !important; }
+  a { text-decoration: none !important; border: none !important; color: #1a4f6b !important; }
+}
+
+
+/* ==========================================================================
+   Sistema de iconografía académica — sustituye emoji decorativos
+   Callouts propios (reto, analogia), insignias del banco y bloques de solución.
+   Iconos = SVG (Material Design Icons) vía máscara CSS. Sin dependencias online.
+   ========================================================================== */
+
+/* ---- Reto rápido / laboratorio (diana) ---- */
+:root {
+  --md-admonition-icon--reto: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11 2v2.07C7.38 4.53 4.53 7.38 4.07 11H2v2h2.07c.46 3.62 3.31 6.47 6.93 6.93V22h2v-2.07c3.62-.46 6.47-3.31 6.93-6.93H22v-2h-2.07c-.46-3.62-3.31-6.47-6.93-6.93V2m0 4.08V8h2V6.09c2.5.41 4.5 2.41 4.92 4.91H16v2h1.91c-.41 2.5-2.41 4.5-4.91 4.92V16h-2v1.91c-2.5-.41-4.5-2.41-4.92-4.91H8v-2H6.09C6.5 8.5 8.5 6.5 11 6.08Z"/></svg>');
+  --md-admonition-icon--analogia: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1Z"/></svg>');
+}
+.md-typeset .admonition.reto,
+.md-typeset details.reto { border-color: #0f766e; }
+.md-typeset .reto > .admonition-title,
+.md-typeset .reto > summary { background-color: rgba(15,118,110,.1); }
+.md-typeset .reto > .admonition-title::before,
+.md-typeset .reto > summary::before {
+  background-color: #0f766e;
+  -webkit-mask-image: var(--md-admonition-icon--reto);
+          mask-image: var(--md-admonition-icon--reto);
+}
+.md-typeset .admonition.analogia,
+.md-typeset details.analogia { border-color: #7c3aed; }
+.md-typeset .analogia > .admonition-title,
+.md-typeset .analogia > summary { background-color: rgba(124,58,237,.1); }
+.md-typeset .analogia > .admonition-title::before,
+.md-typeset .analogia > summary::before {
+  background-color: #7c3aed;
+  -webkit-mask-image: var(--md-admonition-icon--analogia);
+          mask-image: var(--md-admonition-icon--analogia);
+}
+
+/* ---- Insignias del banco (aula / examen) ---- */
+.tg {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  line-height: 1; padding: .18em .5em; border-radius: 1em;
+  vertical-align: middle; letter-spacing: .02em; text-transform: uppercase;
+}
+.tg-a { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.tg-e { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+
+/* ---- Bloque de solución (marcador de solución) ---- */
+.md-typeset details.sol { border-color: #64748b; }
+.md-typeset details.sol > summary { background-color: rgba(100,116,139,.08); font-weight: 600; }
+
+/* ---- Cita de metadatos algo más marcada ---- */
+.md-typeset blockquote { border-left-width: 3px; }

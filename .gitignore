@@ -1,0 +1,11 @@
+site/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.cache/
+notas.csv
+notas.xlsx
+informes/
+correccion/entregas/
