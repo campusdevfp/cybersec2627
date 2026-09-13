@@ -41,6 +41,6 @@ mypy src      # comprueba los tipos
 !!! warning "Los tests son la especificación"
     No los modifiques para que pasen: describen lo que tu código debe hacer, y el examen usará una batería equivalente.
 
-## Criterio específico del RA2 (rúbrica, punto 2)
+## Técnica propia del RA2 (buena práctica que verás en el informe)
 
 El código debe usar **`re`** (expresiones regulares) para analizar el log.

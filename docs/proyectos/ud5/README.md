@@ -41,6 +41,6 @@ mypy src      # comprueba los tipos
 !!! warning "Los tests son la especificación"
     No los modifiques para que pasen: describen lo que tu código debe hacer, y el examen usará una batería equivalente.
 
-## Criterio específico del RA5 (rúbrica, punto 2)
+## Técnica propia del RA5 (buena práctica que verás en el informe)
 
 El código debe usar **`socket`** para el sondeo de red.

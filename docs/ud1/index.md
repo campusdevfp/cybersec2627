@@ -7,6 +7,9 @@ Esta es la unidad de cimientos. Aquí entiendes **qué protege la ciberseguridad
 
 ---
 
+!!! reto "El reto de la unidad"
+    Garantiza que unos ficheros no han sido alterados: construye un **verificador de integridad** con hashes. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el proyecto) y demuéstralo en el examen.
+
 ## Mapa de la unidad
 
 ```mermaid
@@ -480,14 +483,10 @@ Amplía el anterior con **Docker Compose**: un contenedor que cada 10 s modifica
 
 ## Cómo se evalúa esta unidad (RA1)
 
-Se evalúa con un **examen 100 % práctico**: escribir en Python un programa que cumpla una especificación, corregido de forma **automática**.
 
-| # | Qué se valora | Cómo se mide | Puntos |
-|:---:|---|---|:---:|
-| 1 | **Que el programa funcione** | `(casos superados ÷ total) × 7` | **7,0** |
-| 2 | **Criptografía** | Usa `hashlib` para el hash | **1,0** |
-| 3 | **Tipado** | Anotaciones y `mypy` sin errores | **1,0** |
-| 4 | **Documentación** | Docstrings/comentarios con contenido | **1,0** |
-| | | **TOTAL** | **10** |
+Se evalúa con un **examen por retos 100 % práctico**: resuelves en Python un reto parecido al de clase y se corrige **solo con su batería de tests**.
 
-**Se supera con 5.** Los criterios 2–4 son **todo o nada** y se comprueban por programa. La rúbrica no cambia: la conoces desde el primer día.
+!!! reto "La nota, sin sorpresas"
+    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.
+
+El informe además te marca, **sin puntuar**, tres buenas prácticas que conviene cuidar: usar la técnica del RA (aquí, `hashlib`), pasar `mypy` y documentar el código.

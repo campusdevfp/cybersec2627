@@ -7,6 +7,9 @@ La seguridad **activa** es la que actúa mientras el sistema funciona: detectar 
 
 ---
 
+!!! reto "El reto de la unidad"
+    Caza un **ataque de fuerza bruta** escondido en un registro de accesos. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el proyecto) y demuéstralo en el examen.
+
 ## Mapa de la unidad
 
 ```mermaid
@@ -373,12 +376,10 @@ Con Docker Compose: un contenedor **produce** un log de accesos web en streaming
 
 ## Cómo se evalúa esta unidad (RA2)
 
-| # | Qué se valora | Cómo se mide | Puntos |
-|:---:|---|---|:---:|
-| 1 | **Que funcione** | `(casos superados ÷ total) × 7` | **7,0** |
-| 2 | **Librería estándar** | Usa `re` (o `collections`) | **1,0** |
-| 3 | **Tipado** | `mypy` sin errores | **1,0** |
-| 4 | **Documentación** | Docstrings/comentarios | **1,0** |
-| | | **TOTAL** | **10** |
 
-**Se supera con 5.** Criterios 2–4 todo o nada, comprobados por programa.
+Se evalúa con un **examen por retos 100 % práctico**: resuelves en Python un reto parecido al de clase y se corrige **solo con su batería de tests**.
+
+!!! reto "La nota, sin sorpresas"
+    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.
+
+El informe además te marca, **sin puntuar**, tres buenas prácticas que conviene cuidar: usar la técnica del RA (aquí, `re`), pasar `mypy` y documentar el código.

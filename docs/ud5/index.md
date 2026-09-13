@@ -10,6 +10,9 @@ La unidad con más peso del módulo. Aprendes a pensar como un atacante **para d
 
 ---
 
+!!! reto "El reto de la unidad"
+    Descubre, **con permiso y en el laboratorio**, qué puertos abiertos esconde un objetivo. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el proyecto) y demuéstralo en el examen.
+
 ## Mapa de la unidad
 
 ```mermaid
@@ -344,12 +347,10 @@ Amplía el laboratorio: en el mismo `docker-compose` añade **dos objetivos** (u
 
 ## Cómo se evalúa esta unidad (RA5)
 
-| # | Qué se valora | Cómo se mide | Puntos |
-|:---:|---|---|:---:|
-| 1 | **Que funcione** | `(casos superados ÷ total) × 7` | **7,0** |
-| 2 | **Programación de red** | Usa `socket` (o estructura el escaneo) | **1,0** |
-| 3 | **Tipado** | `mypy` sin errores | **1,0** |
-| 4 | **Documentación** | Docstrings/comentarios | **1,0** |
-| | | **TOTAL** | **10** |
 
-**Se supera con 5.** Criterios 2–4 todo o nada, comprobados por programa.
+Se evalúa con un **examen por retos 100 % práctico**: resuelves en Python un reto parecido al de clase y se corrige **solo con su batería de tests**.
+
+!!! reto "La nota, sin sorpresas"
+    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.
+
+El informe además te marca, **sin puntuar**, tres buenas prácticas que conviene cuidar: usar la técnica del RA (aquí, `socket`), pasar `mypy` y documentar el código.

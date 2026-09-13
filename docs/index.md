@@ -24,14 +24,9 @@ El módulo tiene **6 unidades**, una por cada **Resultado de Aprendizaje (RA)**.
 
 ## Cómo se evalúa
 
-Cada RA se evalúa con un **examen 100 % práctico** que se corrige de forma automática con una rúbrica pública:
+Cada RA se evalúa con un **reto en formato examen** que se corrige **solo con sus tests**:
 
-| # | Criterio | Puntos |
-|:---:|---|:---:|
-| 1 | Que el programa funcione (casos de prueba) | 7,0 |
-| 2 | Criterio específico del RA | 1,0 |
-| 3 | Tipado (`mypy` sin errores) | 1,0 |
-| 4 | Documentación (docstrings/comentarios) | 1,0 |
+> **Nota = (tests superados ÷ total) × 10** · se aprueba con 5.
 
 **Se supera con 5, y hay que aprobar los seis RAs**: no hay compensación entre ellos.
 

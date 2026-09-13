@@ -6,6 +6,8 @@
 
 **Ciberseguridad (CMO-314)** son **90 horas** en las que aprendes a **proteger sistemas y datos**, y a hacerlo **programando**. La herramienta principal es **Python 3** (con tipos), y nos apoyamos en **Docker** para montar laboratorios reproducibles y en las herramientas que usa la industria (`requests`, `BeautifulSoup`, `hashlib`, `re`, `socket`…). No se trata de memorizar amenazas, sino de **construir** las defensas y entender por dentro cómo funcionan los ataques para poder pararlos.
 
+El curso está **guiado por retos**: cada unidad es una **misión** que resuelves programando, y los ejercicios y laboratorios son tu **entrenamiento** para lograrla.
+
 !!! info "Idea central"
     Cada unidad termina con **algo que tú programas y se corrige solo**: un pequeño proyecto en Python. La teoría está al servicio de ese proyecto, no al revés.
 
@@ -61,44 +63,21 @@ Este módulo funciona con **aula invertida**: la teoría **se lee antes** de cla
 
 ## Cómo se aprueba
 
-La nota **no** sale de la impresión de quien corrige: sale de **criterios medibles y automáticos**. Cada RA se evalúa con su **examen práctico** (escribir un programa que cumpla una especificación) sobre **10 puntos**:
+Cada RA se supera con **un reto en formato examen**: resuelves un problema en Python y se corrige **solo con su batería de tests**. Sin interpretaciones ni sorpresas.
 
-| Criterio | Qué mide **exactamente** | Puntos |
-|---|---|:---:|
-| **1 · Funcionamiento** | `puntos = (tests que pasan ÷ total) × 7`. Es **proporcional**: si pasas 12 de 17, son `12÷17×7 = 4,94`. | 0 – 7 |
-| **2 · Criterio del RA** | **Todo o nada.** Que tu código use la técnica propia del RA (ver tabla abajo). Se comprueba leyendo el código, no ejecutándolo. | 0 **o** 1 |
-| **3 · Tipado** | **Todo o nada.** `mypy src` termina **sin ningún error** de tipos. Un solo error → 0. | 0 **o** 1 |
-| **4 · Documentación** | **Todo o nada.** Al menos **2** docstrings o comentarios con contenido real (los `# TODO` no cuentan). | 0 **o** 1 |
+!!! reto "La regla de la nota"
+    **Nota del examen = (tests superados ÷ total) × 10.**  Se aprueba con **5**.
+    Ejemplo: si tu solución pasa **8 de 10** tests, tu nota es **8**.
 
-**El criterio 2, RA por RA:**
-
-| RA | Se te da el punto si tu código… |
-|:--:|---|
-| RA1 | usa **`hashlib`** |
-| RA2 | usa **`re`** (expresiones regulares) |
-| RA3 | define **al menos una clase** (POO) |
-| RA4 | **valida** con al menos un `try` o un `raise` |
-| RA5 | usa **`socket`** |
-| RA6 | usa **`hashlib` o `re`** para proteger los datos |
-
-!!! reto "Ejemplo de nota"
-    Pasas **15 de 17** tests, usas `hashlib`, `mypy` no da errores, pero solo escribiste **1** comentario: `6,18 + 1 + 1 + 0 = ` **8,18**. Con los 2 comentarios habrían sido 9,18.
+Recibes un **informe** con la salida real de `pytest` (qué pasó y qué no) y, **sin que puntúe**, un recordatorio de tres buenas prácticas que conviene cuidar: usar la técnica propia del RA (p. ej. `hashlib`, `re`, clases, `socket`…), pasar `mypy src` y documentar el código.
 
 !!! warning "La regla que hay que tener clarísima"
     Para superar el módulo necesitas **todos los RA con nota ≥ 5**. **No hay compensación**: un RA suspenso no se salva con otro muy alto. Si al final del curso queda alguno por debajo de 5, el módulo no está superado.
 
-La nota final del módulo combina los seis RA (90 %) con la **FFE** —Formación y Fomento del Emprendimiento—, que es **una única nota (0–10)** evaluada en la **última unidad (RA6)** y aporta el **10 %** restante: `NOTA = 0,90·(media ponderada de los RA) + 0,10·FFE`. Si suspendes algún RA en la evaluación continua, tienes las convocatorias **ordinaria** y **extraordinaria**, donde te examinas **solo de los RA pendientes**.
+La nota final del módulo combina los seis RA (90 %) con la **FFE** —Formación y Fomento del Emprendimiento—, que es **una única nota (0–10)** evaluada en la **última unidad (RA6)** y aporta el **10 %** restante. Si suspendes algún RA en la evaluación continua, tienes las convocatorias **ordinaria** y **extraordinaria**, donde te examinas **solo de los RA pendientes**.
 
-### Cómo se corrige tu examen
-
-Entregas **un fichero de Python** (el de `src/`). El profesor lo pone junto a una **batería de tests** equivalente a la del proyecto que ya hiciste y lo corrige con un script, así que la nota es **la misma la corrija quien la corrija**. Recibes un **informe** con:
-
-- la salida real de `pytest` (qué tests pasaron y cuáles no y por qué),
-- y el desglose de los 4 criterios con tu puntuación en cada uno.
-
-!!! tip "Cómo llegar con ventaja al examen"
-    El examen usa el **mismo mecanismo** que el proyecto de la unidad. Si tu proyecto pasa `pytest` y `mypy src` sin errores y está documentado, ya sabes exactamente cómo se verá tu examen. Practica ejecutando esos dos comandos hasta que salgan limpios.
-
+!!! tip "Cómo llegar con ventaja"
+    El examen usa el **mismo mecanismo** que el reto de la unidad. Si tu proyecto pasa `pytest` y `mypy src` sin errores, ya sabes exactamente cómo se verá tu examen. Practica ejecutando esos comandos hasta dejarlo en verde.
 ## Qué necesitas para empezar
 
 === "Software"
