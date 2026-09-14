@@ -3,7 +3,7 @@
 > **Módulo:** CMO-314 · Ciberseguridad · **Resultado de aprendizaje:** RA6 · **Duración:** 8 h · **Peso:** 10 %
 > **Herramienta principal:** Python 3 (`re`, `hashlib`) · **Nivel:** ciclo superior
 
-La técnica no basta: hay que cumplir la ley. En esta unidad conoces el **RGPD/LOPDGDD**, las figuras del tratamiento, la **LSSI-CE**, los estándares (**ISO 27000**, ENS) y la responsabilidad penal. El proyecto es un **verificador de cumplimiento RGPD** y un **anonimizador** de datos personales en Python.
+La técnica no basta: hay que cumplir la ley. En esta unidad conoces el **RGPD/LOPDGDD**, las figuras del tratamiento, la **LSSI-CE**, los estándares (**ISO 27000**, ENS) y la responsabilidad penal. El reto es un **verificador de cumplimiento RGPD** y un **anonimizador** de datos personales en Python.
 
 !!! note "Aviso"
     Esta unidad es una panorámica formativa; no sustituye al asesoramiento jurídico. Verifica siempre la versión consolidada de las normas en el BOE o EUR-Lex.
@@ -11,7 +11,7 @@ La técnica no basta: hay que cumplir la ley. En esta unidad conoces el **RGPD/L
 ---
 
 !!! reto "El reto de la unidad"
-    Haz que un **volcado de datos** cumpla el RGPD sin exponer a nadie. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el proyecto) y demuéstralo en el examen.
+    Haz que un **volcado de datos** cumpla el RGPD sin exponer a nadie. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el reto) y demuéstralo en el examen.
 
 ## Mapa de la unidad
 
@@ -22,7 +22,7 @@ flowchart TB
     D[LSSI-CE / cookies] --> E[Cumplimiento web]
     F[ISO 27000 / ENS / NIS2] --> G[Gestión]
     H[Responsabilidad penal]
-    A --> P[Proyecto:<br/>verificador RGPD + anonimizador]
+    A --> P[Reto:<br/>verificador RGPD + anonimizador]
     style P fill:#1d7a6c,color:#fff
 ```
 
@@ -173,19 +173,13 @@ def notificable(riesgo_alto: bool) -> str:
 
 ---
 
-## Proyecto de la unidad
+## Resuelve el reto
 
-Construyes un **verificador de cumplimiento RGPD** (comprueba base de licitud, plazo y minimización de cada tratamiento) y un **anonimizador** (enmascara correos, seudonimiza DNIs y limpia textos).
+Aquí está el **reto de la unidad** en formato de código: un módulo con la estructura y los **tests** ya escritos (los tests son la especificación). Complétalo hasta dejarlos en verde.
 
-**[Proyecto Cumplimiento y anonimización →](../proyectos/ud6/README.md)**
+**[Abre el reto: protector de datos (RGPD) (código y tests) →](../proyectos/ud6/README.md)**
 
-```bash
-pip install -r requirements.txt
-pytest
-mypy src
-```
-
----
+> Trabaja con `pytest` (te dice qué falta) y `mypy` (revisa los tipos). Así es exactamente como se te evaluará: con un **test práctico** sobre un reto equivalente.
 
 ## Retos de ampliación
 
@@ -222,11 +216,102 @@ def anon_tel(texto: str) -> str:
 
 ---
 
-## Laboratorio
+## Ejercicios en progresión
+
+> De fácil a retante. Librerías: `re`, `hashlib`, y `json`/`csv` para datos reales.
+
+**1 · 🟢 Validar DNI** — `dni_valido(dni: str) -> bool` (8 cifras + letra de control).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def dni_valido(dni: str) -> bool:
+    dni = dni.strip().upper()
+    if len(dni) != 9 or not dni[:8].isdigit():
+        return False
+    return dni[8] == "TRWAGMYFPDXBNJZSQVHLCKE"[int(dni[:8]) % 23]
+```
+</details>
+
+**2 · 🟢 Enmascarar correos** — `anon_email(texto: str) -> str` sustituye correos por `[EMAIL]`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+def anon_email(texto: str) -> str:
+    return re.sub(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b", "[EMAIL]", texto)
+```
+</details>
+
+**3 · 🟡 Seudónimo estable** — `seudonimo(dni: str, sal: str = "cmo314") -> str` irreversible con `hashlib`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import hashlib
+def seudonimo(dni: str, sal: str = "cmo314") -> str:
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
+```
+</details>
+
+**4 · 🟡 Leer tratamientos (JSON)** — `bases_invalidas(txt: str) -> list[str]`: nombres de tratamientos con base de licitud no válida.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import json
+BASES = {"consentimiento", "contrato", "obligacion_legal",
+         "interes_vital", "interes_publico", "interes_legitimo"}
+def bases_invalidas(txt: str) -> list[str]:
+    datos = json.loads(txt)
+    return [t["nombre"] for t in datos if t.get("base", "").lower() not in BASES]
+```
+</details>
+
+**5 · 🟠 Anonimizar un CSV** — `anon_csv(texto: str) -> str` seudonimiza la columna `dni` y enmascara `email`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import csv, io
+def anon_csv(texto: str) -> str:
+    lector = csv.DictReader(io.StringIO(texto))
+    salida = io.StringIO()
+    campos = lector.fieldnames or []
+    escritor = csv.DictWriter(salida, fieldnames=campos)
+    escritor.writeheader()
+    for fila in lector:
+        if "dni" in fila:
+            fila["dni"] = seudonimo(fila["dni"])
+        if "email" in fila:
+            fila["email"] = "[EMAIL]"
+        escritor.writerow(fila)
+    return salida.getvalue()
+```
+</details>
+
+**6 · 🔴 Informe de cumplimiento** — `cumple(tratamientos: list[dict]) -> list[dict]` marca cada tratamiento como OK o con sus fallos (base válida y plazo ≤ 60 meses).
+<details class="sol"><summary>Solución</summary>
+
+```python
+BASES = {"consentimiento", "contrato", "obligacion_legal",
+         "interes_vital", "interes_publico", "interes_legitimo"}
+def cumple(tratamientos: list[dict]) -> list[dict]:
+    out = []
+    for t in tratamientos:
+        fallos = []
+        if t.get("base", "").lower() not in BASES:
+            fallos.append("base no válida")
+        if t.get("plazo_meses", 0) > 60:
+            fallos.append("plazo > 60 meses")
+        out.append({"nombre": t.get("nombre"), "ok": not fallos, "fallos": fallos})
+    return out
+```
+</details>
+
+---
+
+## Retos de la unidad
 
 > Trabajamos sobre datos **ficticios** en un contenedor. Nunca uses datos reales de personas.
 
-### Laboratorio guiado (resuelto) — Anonimizar un volcado antes de compartirlo
+### Reto resuelto (de principio a fin) — Anonimizar un volcado antes de compartirlo
 
 Un contenedor genera un CSV con datos personales de prueba; lo anonimizamos antes de "compartirlo" con soporte.
 
@@ -267,7 +352,7 @@ cliente,dni,email
 El DNI se sustituye por un **seudónimo estable** (el mismo DNI da siempre el mismo, pero no se puede revertir sin la sal) y el correo se enmascara. Ya puedes compartir el CSV sin exponer datos personales: es la minimización del RGPD en la práctica.
 </details>
 
-### Laboratorio propuesto (entregable) — Verificador de cumplimiento desde JSON
+### Reto para ti (propuesto) — Verificador de cumplimiento desde JSON
 
 Un contenedor te da un `tratamientos.json` con varios tratamientos de datos (nombre, base de licitud, plazo en meses, campos). Escribe un script Python que **valide cada uno** contra el RGPD (base válida, plazo ≤ 60 meses, categoría especial solo con consentimiento) y saque un informe de cumplimiento, y que además **anonimice** un `registros.csv` asociado.
 
@@ -304,7 +389,7 @@ Un contenedor te da un `tratamientos.json` con varios tratamientos de datos (nom
 ## Cómo se evalúa esta unidad (RA6)
 
 
-Se evalúa con un **examen por retos 100 % práctico**: resuelves en Python un reto parecido al de clase y se corrige **solo con su batería de tests**.
+El instrumento principal es un **test práctico**: resuelves en Python un **reto** parecido al de clase y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún **ejercicio práctico**).
 
 !!! reto "La nota, sin sorpresas"
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.

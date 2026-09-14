@@ -3,12 +3,12 @@
 > **Módulo:** CMO-314 · Ciberseguridad · **Resultado de aprendizaje:** RA4 · **Duración:** 12 h · **Peso:** 15 %
 > **Herramienta principal:** Python 3 · **Nivel:** ciclo superior
 
-Aquí pasas de reaccionar a **planificar**: identificar qué proteger, medir el **riesgo**, y aplicar **bastionado** y **autenticación multifactor (MFA)** para reducirlo. El proyecto reúne dos herramientas del analista: un **calculador de riesgo (ALE)** y un **verificador de políticas de contraseñas**.
+Aquí pasas de reaccionar a **planificar**: identificar qué proteger, medir el **riesgo**, y aplicar **bastionado** y **autenticación multifactor (MFA)** para reducirlo. El reto reúne dos herramientas del analista: un **calculador de riesgo (ALE)** y un **verificador de políticas de contraseñas**.
 
 ---
 
 !!! reto "El reto de la unidad"
-    Pon **nota al riesgo** de una organización y obliga a usar contraseñas decentes. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el proyecto) y demuéstralo en el examen.
+    Pon **nota al riesgo** de una organización y obliga a usar contraseñas decentes. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el reto) y demuéstralo en el examen.
 
 ## Mapa de la unidad
 
@@ -19,7 +19,7 @@ flowchart TB
     C --> D[Tratamiento]
     D --> E[Bastionado]
     D --> F[Autenticación / MFA]
-    C --> P[Proyecto:<br/>riesgo + política de contraseñas]
+    C --> P[Reto:<br/>riesgo + política de contraseñas]
     style P fill:#1d7a6c,color:#fff
 ```
 
@@ -205,19 +205,13 @@ def larga(c: str) -> bool:
 
 ---
 
-## Proyecto de la unidad
+## Resuelve el reto
 
-Construyes el kit del analista: **nivel de riesgo**, **ALE**, decisión de **salvaguarda rentable**, **evaluación de contraseñas** contra política y lista de filtradas, y comprobación de **MFA**.
+Aquí está el **reto de la unidad** en formato de código: un módulo con la estructura y los **tests** ya escritos (los tests son la especificación). Complétalo hasta dejarlos en verde.
 
-**[Proyecto Riesgo y contraseñas →](../proyectos/ud4/README.md)**
+**[Abre el reto: medidor de riesgo y contraseñas (código y tests) →](../proyectos/ud4/README.md)**
 
-```bash
-pip install -r requirements.txt
-pytest
-mypy src
-```
-
----
+> Trabaja con `pytest` (te dice qué falta) y `mypy` (revisa los tipos). Así es exactamente como se te evaluará: con un **test práctico** sobre un reto equivalente.
 
 ## Retos de ampliación
 
@@ -258,11 +252,85 @@ def celda(impacto: int, prob: int) -> str:
 
 ---
 
-## Laboratorio
+## Ejercicios en progresión
+
+> De fácil a retante. Librerías: `secrets` (aleatoriedad segura), `math` y `statistics`.
+
+**1 · 🟢 Nivel de riesgo** — `nivel(impacto: int, prob: int) -> str` → `BAJO`/`MEDIO`/`ALTO`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def nivel(impacto: int, prob: int) -> str:
+    v = impacto * prob
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
+```
+</details>
+
+**2 · 🟢 Pérdida anual esperada** — `ale(sle: float, aro: float) -> float`, con `ValueError` si algo es negativo.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def ale(sle: float, aro: float) -> float:
+    if sle < 0 or aro < 0:
+        raise ValueError("valores negativos")
+    return sle * aro
+```
+</details>
+
+**3 · 🟡 Generar contraseña fuerte** — `genera(n: int = 16) -> str` con `secrets.choice` (no uses `random`).
+<details class="sol"><summary>Solución</summary>
+
+```python
+import secrets, string
+def genera(n: int = 16) -> str:
+    alf = string.ascii_letters + string.digits + "!@#$%*-_"
+    return "".join(secrets.choice(alf) for _ in range(n))
+```
+</details>
+
+**4 · 🟡 Entropía aproximada** — `entropia(pwd: str) -> float` en bits con `math.log2`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import math
+def entropia(pwd: str) -> float:
+    alf = 0
+    if any(c.islower() for c in pwd): alf += 26
+    if any(c.isupper() for c in pwd): alf += 26
+    if any(c.isdigit() for c in pwd): alf += 10
+    if any(not c.isalnum() for c in pwd): alf += 32
+    return round(len(pwd) * math.log2(alf), 1) if alf else 0.0
+```
+</details>
+
+**5 · 🟠 Riesgo medio del inventario** — `riesgo_medio(valores: list[float]) -> float` con `statistics.mean`; `ValueError` si está vacío.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import statistics
+def riesgo_medio(valores: list[float]) -> float:
+    if not valores:
+        raise ValueError("lista vacía")
+    return round(statistics.mean(valores), 2)
+```
+</details>
+
+**6 · 🔴 Priorizar activos** — `prioriza(activos: list[dict]) -> list[dict]` ordenados por `impacto*prob` descendente.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def prioriza(activos: list[dict]) -> list[dict]:
+    return sorted(activos, key=lambda a: a["impacto"] * a["prob"], reverse=True)
+```
+</details>
+
+---
+
+## Retos de la unidad
 
 > Auditamos un despliegue real en **Docker** y puntuamos su riesgo con Python.
 
-### Laboratorio guiado (resuelto) — Auditar contraseñas de un contenedor
+### Reto resuelto (de principio a fin) — Auditar contraseñas de un contenedor
 
 Un contenedor trae un fichero de usuarios con contraseñas de ejemplo; evaluamos cuáles cumplen la política.
 
@@ -305,7 +373,7 @@ sara: corta, sin mayúscula, sin dígito, sin símbolo
 Solo `ana` cumple. Es el tipo de auditoría que hace un administrador antes de forzar el cambio de las débiles (y activar MFA).
 </details>
 
-### Laboratorio propuesto (entregable) — Semáforo de riesgo de un `docker-compose`
+### Reto para ti (propuesto) — Semáforo de riesgo de un `docker-compose`
 
 Te damos un `docker-compose.yml` con varios servicios (puertos expuestos, contraseñas por defecto, imágenes `:latest`). Escribe un script Python que lea el YAML y **puntúe el riesgo** de cada servicio (impacto × probabilidad) según reglas simples (puerto sensible expuesto, contraseña débil, imagen sin fijar versión) y saque un informe con <span class="tg tg-a">aula</span>🟡🔴 y el ALE estimado del conjunto.
 
@@ -342,7 +410,7 @@ Te damos un `docker-compose.yml` con varios servicios (puertos expuestos, contra
 ## Cómo se evalúa esta unidad (RA4)
 
 
-Se evalúa con un **examen por retos 100 % práctico**: resuelves en Python un reto parecido al de clase y se corrige **solo con su batería de tests**.
+El instrumento principal es un **test práctico**: resuelves en Python un **reto** parecido al de clase y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún **ejercicio práctico**).
 
 !!! reto "La nota, sin sorpresas"
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.

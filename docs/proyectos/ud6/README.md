@@ -1,4 +1,4 @@
-# Proyecto Cumplimiento y anonimización · UD6 (RA6)
+# Reto Cumplimiento y anonimización · UD6 (RA6)
 
 Verifica que cada tratamiento de datos cumple el RGPD (base de licitud, plazo, minimización) y anonimiza datos personales (enmascara correos, seudonimiza DNIs, limpia textos).
 

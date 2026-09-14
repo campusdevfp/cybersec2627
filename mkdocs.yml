@@ -55,7 +55,7 @@ nav:
       - Entorno y laboratorio: recursos/entorno.md
       - Uso ético y legal: recursos/uso-etico.md
       - Python para ciberseguridad: recursos/python-ciberseguridad.md
-      - Proyectos: proyectos/index.md
+      - Retos (código y tests): proyectos/index.md
   - Retos de programación: retos/index.md
   - Todo el material (PDF): completo.md
 

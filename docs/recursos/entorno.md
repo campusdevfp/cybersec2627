@@ -52,6 +52,10 @@ Patrón que usaremos todo el curso: un `docker-compose.yml` levanta uno o varios
 !!! warning "Atención"
     Los laboratorios ofensivos usan redes con `internal: true` (sin salida a Internet) para que nada escape del laboratorio.
 
+
+!!! warning "Nunca uses `sudo`: usa Docker"
+    Si un reto necesita permisos de administrador o levantar servicios (un servidor, un objetivo de escaneo, una base de datos), **no toques tu sistema con `sudo`**: móntalo en un **contenedor** con `docker` / `docker compose`. Es reproducible, aislado y se borra con `docker compose down`. Así nadie se carga su equipo por error.
+
 ## 2. El laboratorio de ciberseguridad
 
 Las prácticas de ataque y defensa se hacen en un **laboratorio aislado** de máquinas virtuales, **nunca** sobre sistemas reales ajenos.

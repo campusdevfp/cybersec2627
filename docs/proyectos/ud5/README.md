@@ -1,4 +1,4 @@
-# Proyecto Escáner de puertos · UD5 (RA5)
+# Reto Escáner de puertos · UD5 (RA5)
 
 Sondea puertos TCP de localhost con sockets y clasifica los abiertos por severidad. **Solo apunta a 127.0.0.1 / laboratorio.**
 

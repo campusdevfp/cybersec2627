@@ -54,3 +54,20 @@ mypy src        # comprobación de tipos
 
 !!! warning "No toques los tests"
     Si un test falla, arregla tu código, no el test. En el examen se usa una batería equivalente que tú no puedes modificar.
+
+---
+
+## Librerías profesionales por área
+
+Python trae mucho "de serie", y el ecosistema añade herramientas que se usan en el trabajo real. Estas son las que irás tocando a lo largo del curso; instálalas con `pip install -r requirements-retos.txt`.
+
+| Área | De la biblioteca estándar | Del ecosistema (pip) |
+|---|---|---|
+| Criptografía e integridad | `hashlib`, `hmac`, `secrets` | `cryptography` (cifrado y certificados serios) |
+| Texto y logs | `re`, `collections`, `csv`, `json` | — |
+| Red y servicios | `socket`, `ssl`, `ipaddress`, `concurrent.futures` | `requests` (HTTP), `dnspython` (DNS) |
+| Web / OSINT | `urllib.parse` | `beautifulsoup4`, `lxml` (parsear HTML) |
+| Autenticación / tokens | `hmac`, `base64`, `struct` | `PyJWT` (JWT), `bcrypt`, `argon2-cffi` (contraseñas) |
+| Datos y evidencias | `pathlib`, `datetime` | `Pillow` (metadatos de imagen) |
+
+> **Regla:** usa siempre la herramienta adecuada. No reinventes un parser de HTML con `re` si tienes BeautifulSoup, ni generes contraseñas con `random` cuando existe `secrets`. Aprender a elegir la librería correcta es parte de ser "pro".

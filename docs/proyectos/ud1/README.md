@@ -1,4 +1,4 @@
-# Proyecto Verificador de integridad · UD1 (RA1)
+# Reto Verificador de integridad · UD1 (RA1)
 
 Comprueba si algún fichero ha sido modificado comparando su hash SHA-256 con un manifiesto de referencia. Es la herramienta de la cadena de custodia forense y de la verificación de descargas.
 

@@ -3,7 +3,7 @@
 > **Módulo:** CMO-314 · Ciberseguridad · **Resultado de aprendizaje:** RA5 · **Duración:** 20 h · **Peso:** 25 %
 > **Herramienta principal:** Python 3 (`socket`) · **Nivel:** ciclo superior
 
-La unidad con más peso del módulo. Aprendes a pensar como un atacante **para defender mejor**: terminología, fases de una prueba de intrusión, y técnicas de Equipo Rojo y Azul, todo en un **laboratorio aislado**. El proyecto es un **escáner de puertos con sockets**, la base de herramientas como Nmap, que ejecutas **solo contra tu propia máquina**.
+La unidad con más peso del módulo. Aprendes a pensar como un atacante **para defender mejor**: terminología, fases de una prueba de intrusión, y técnicas de Equipo Rojo y Azul, todo en un **laboratorio aislado**. El reto es un **escáner de puertos con sockets**, la base de herramientas como Nmap, que ejecutas **solo contra tu propia máquina**.
 
 !!! danger "Esto es lo más importante de la unidad"
     Escanear, acceder o atacar sistemas ajenos sin **autorización escrita y con alcance definido** es delito (arts. 197 bis y 264 del Código Penal), con penas de prisión. La autorización es lo único que separa una prueba de intrusión de un delito. Todo el trabajo de esta unidad es **exclusivamente** sobre el laboratorio o `localhost`. Lee [Uso ético y legal](../recursos/uso-etico.md).
@@ -11,7 +11,7 @@ La unidad con más peso del módulo. Aprendes a pensar como un atacante **para d
 ---
 
 !!! reto "El reto de la unidad"
-    Descubre, **con permiso y en el laboratorio**, qué puertos abiertos esconde un objetivo. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el proyecto) y demuéstralo en el examen.
+    Descubre, **con permiso y en el laboratorio**, qué puertos abiertos esconde un objetivo. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el reto) y demuéstralo en el examen.
 
 ## Mapa de la unidad
 
@@ -20,7 +20,7 @@ flowchart TB
     A[Terminología y ética] --> B[Alcance y permiso]
     B --> C[Fases: recon → enum → análisis → informe]
     C --> D[Equipo Rojo / Azul]
-    C --> P[Proyecto:<br/>escáner de puertos socket]
+    C --> P[Reto:<br/>escáner de puertos socket]
     style P fill:#1d7a6c,color:#fff
 ```
 
@@ -110,7 +110,7 @@ print(puerto_abierto("127.0.0.1", 22))  # (4)!
 `connect_ex` devuelve `0` si conecta (puerto abierto) y un código de error si no. El `timeout` evita que el escaneo se cuelgue.
 
 !!! warning "Atención"
-    El destino por defecto de tu proyecto es `127.0.0.1`. **No** cambies eso para apuntar a máquinas que no sean tuyas o del laboratorio.
+    El destino por defecto de tu reto es `127.0.0.1`. **No** cambies eso para apuntar a máquinas que no sean tuyas o del reto.
 
 !!! reto "Reto rápido 3"
     ¿Por qué conviene un `timeout` corto al escanear muchos puertos?
@@ -208,22 +208,13 @@ def linea(puerto: int, estado: str) -> str:
 
 ---
 
-## Proyecto de la unidad
+## Resuelve el reto
 
-Construyes un **escáner de puertos** con `socket` que sondea `localhost`, más las funciones puras que **clasifican** los puertos abiertos por severidad y generan el informe. Es un ejercicio de programación de red seguro y legal.
+Aquí está el **reto de la unidad** en formato de código: un módulo con la estructura y los **tests** ya escritos (los tests son la especificación). Complétalo hasta dejarlos en verde.
 
-**[Proyecto Escáner de puertos →](../proyectos/ud5/README.md)**
+**[Abre el reto: escáner de puertos (código y tests) →](../proyectos/ud5/README.md)**
 
-```bash
-pip install -r requirements.txt
-pytest
-mypy src
-```
-
-!!! danger "Solo localhost / laboratorio"
-    El escáner apunta a `127.0.0.1` por defecto. Úsalo solo contra tus máquinas.
-
----
+> Trabaja con `pytest` (te dice qué falta) y `mypy` (revisa los tipos). Así es exactamente como se te evaluará: con un **test práctico** sobre un reto equivalente.
 
 ## Retos de ampliación
 
@@ -261,12 +252,91 @@ def informe(estados: dict[int, str]) -> list[str]:
 
 ---
 
-## Laboratorio
+## Ejercicios en progresión
+
+> De fácil a retante. **Siempre contra tu laboratorio Docker.** Herramientas: `socket`, `concurrent.futures` (velocidad) y `ssl`.
+
+**1 · 🟢 Severidad de un puerto** — `severidad(p: int) -> str` (`INSEGURO`/`REVISAR`/`OK`).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def severidad(p: int) -> str:
+    if p in {21, 23, 25, 135, 445, 3389}: return "INSEGURO"
+    if p in {80, 8080, 110, 143}: return "REVISAR"
+    return "OK"
+```
+</details>
+
+**2 · 🟢 Rango de puertos** — `rango(ini: int, fin: int) -> list[int]` validado (`ValueError` si `ini>fin`).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def rango(ini: int, fin: int) -> list[int]:
+    if ini > fin:
+        raise ValueError("ini > fin")
+    return list(range(ini, fin + 1))
+```
+</details>
+
+**3 · 🟡 ¿Puerto abierto?** — `abierto(host: str, puerto: int, t: float = 0.5) -> bool` con `socket`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import socket
+def abierto(host: str, puerto: int, t: float = 0.5) -> bool:
+    with socket.socket() as s:
+        s.settimeout(t)
+        return s.connect_ex((host, puerto)) == 0
+```
+</details>
+
+**4 · 🟡 Escaneo concurrente** — `escanea(host: str, puertos: list[int]) -> list[int]` en paralelo con hilos.
+<details class="sol"><summary>Solución</summary>
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+def escanea(host: str, puertos: list[int]) -> list[int]:
+    with ThreadPoolExecutor(max_workers=50) as ex:
+        res = ex.map(lambda p: (p, abierto(host, p)), puertos)
+    return sorted(p for p, ok in res if ok)
+```
+</details>
+
+**5 · 🟠 ¿Caduca el certificado?** — `dias_cert(host: str, puerto: int = 443) -> int` con `ssl` (contra tu contenedor HTTPS).
+<details class="sol"><summary>Solución</summary>
+
+```python
+import ssl, socket
+from datetime import datetime, timezone
+def dias_cert(host: str, puerto: int = 443) -> int:
+    ctx = ssl.create_default_context()
+    with socket.create_connection((host, puerto), timeout=5) as s:
+        with ctx.wrap_socket(s, server_hostname=host) as ss:
+            cert = ss.getpeercert()
+    vence = datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+    return (vence - datetime.now(timezone.utc)).days
+```
+</details>
+
+**6 · 🔴 Informe por severidad** — `informe(host: str, puertos: list[int]) -> list[str]` ordenado de más grave a menos.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def informe(host: str, puertos: list[int]) -> list[str]:
+    orden = {"INSEGURO": 0, "REVISAR": 1, "OK": 2}
+    abiertos = escanea(host, puertos)
+    return [f"{p}: {severidad(p)}" for p in sorted(abiertos, key=lambda p: (orden[severidad(p)], p))]
+```
+</details>
+
+---
+
+## Retos de la unidad
 
 !!! danger "Solo dentro del laboratorio Docker"
     El escaneo se hace **exclusivamente** contra contenedores de tu propio `docker-compose`, en una red con `internal: true` (sin salida a Internet). Escanear fuera de ahí es delito. Ver [Uso ético y legal](../recursos/uso-etico.md).
 
-### Laboratorio guiado (resuelto) — Escanear un objetivo del laboratorio
+### Reto resuelto (de principio a fin) — Escanear un objetivo del laboratorio
 
 Levantamos un "objetivo" con un par de puertos abiertos y lo escaneamos con sockets desde otro contenedor, todo en una red Docker aislada.
 
@@ -310,7 +380,7 @@ objetivo:5432 -> cerrado
 Solo el 80 está abierto (nginx). Es lo mismo que hace Nmap, pero escrito por ti y **contra tu propio contenedor**. Cambia la imagen del objetivo (por ejemplo `postgres`) y verás abrirse el 5432.
 </details>
 
-### Laboratorio propuesto (entregable) — Escáner con informe y severidad
+### Reto para ti (propuesto) — Escáner con informe y severidad
 
 Amplía el laboratorio: en el mismo `docker-compose` añade **dos objetivos** (uno con un servicio "inseguro" como telnet/ftp y otro con web) y escribe un escáner en Python que recorra un **rango** de puertos de ambos, clasifique cada puerto abierto por **severidad** (INSEGURO/REVISAR/OK) y genere un **informe** ordenado por gravedad.
 
@@ -348,7 +418,7 @@ Amplía el laboratorio: en el mismo `docker-compose` añade **dos objetivos** (u
 ## Cómo se evalúa esta unidad (RA5)
 
 
-Se evalúa con un **examen por retos 100 % práctico**: resuelves en Python un reto parecido al de clase y se corrige **solo con su batería de tests**.
+El instrumento principal es un **test práctico**: resuelves en Python un **reto** parecido al de clase y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún **ejercicio práctico**).
 
 !!! reto "La nota, sin sorpresas"
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.

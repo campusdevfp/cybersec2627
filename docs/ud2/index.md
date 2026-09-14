@@ -3,12 +3,12 @@
 > **Módulo:** CMO-314 · Ciberseguridad · **Resultado de aprendizaje:** RA2 · **Duración:** 16 h · **Peso:** 20 %
 > **Herramienta principal:** Python 3 (`re`, `collections`) · **Nivel:** ciclo superior
 
-La seguridad **activa** es la que actúa mientras el sistema funciona: detectar y frenar amenazas, malware y ataques. En esta unidad conoces las familias de malware y los ataques más comunes en la red, y aprendes a **detectar un ataque leyendo logs con Python**. El proyecto es un **detector de fuerza bruta**: la misma lógica que una regla de `fail2ban` o un SIEM.
+La seguridad **activa** es la que actúa mientras el sistema funciona: detectar y frenar amenazas, malware y ataques. En esta unidad conoces las familias de malware y los ataques más comunes en la red, y aprendes a **detectar un ataque leyendo logs con Python**. El reto es un **detector de fuerza bruta**: la misma lógica que una regla de `fail2ban` o un SIEM.
 
 ---
 
 !!! reto "El reto de la unidad"
-    Caza un **ataque de fuerza bruta** escondido en un registro de accesos. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el proyecto) y demuéstralo en el examen.
+    Caza un **ataque de fuerza bruta** escondido en un registro de accesos. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el reto) y demuéstralo en el examen.
 
 ## Mapa de la unidad
 
@@ -20,7 +20,7 @@ flowchart TB
     C --> C2[Fuerza bruta]
     C --> C3[DoS/DDoS]
     B --> D[Defensa activa:<br/>antivirus, IDS, SIEM]
-    C2 --> P[Proyecto:<br/>detector de fuerza bruta]
+    C2 --> P[Reto:<br/>detector de fuerza bruta]
     style P fill:#1d7a6c,color:#fff
 ```
 
@@ -35,7 +35,7 @@ flowchart TB
 
 ### Cómo se trabaja esta unidad
 
-Igual que la UD1: explicación → lectura y ejemplos → retos rápidos → ejercicios con solución → proyecto → examen.
+Igual que la UD1: explicación → lectura y ejemplos → retos rápidos → ejercicios con solución → reto → examen.
 
 !!! danger "Recordatorio ético"
     Las técnicas de ataque se estudian **para defender**. Se practican solo en el laboratorio. Ver [Uso ético y legal](../recursos/uso-etico.md).
@@ -226,22 +226,13 @@ def familia(desc: str) -> str:
 
 ---
 
-## Proyecto de la unidad
+## Resuelve el reto
 
-Construyes un **detector de fuerza bruta**: lee un log de autenticación, cuenta los fallos por IP, y lista las IP sospechosas señalando las que pudieron llegar a autenticarse.
+Aquí está el **reto de la unidad** en formato de código: un módulo con la estructura y los **tests** ya escritos (los tests son la especificación). Complétalo hasta dejarlos en verde.
 
-**[Proyecto Detector de fuerza bruta →](../proyectos/ud2/README.md)**
+**[Abre el reto: detector de fuerza bruta (código y tests) →](../proyectos/ud2/README.md)**
 
-```bash
-pip install -r requirements.txt
-pytest
-mypy src
-```
-
-!!! warning "Los tests son la especificación"
-    Describen exactamente el comportamiento esperado. El examen usará una batería equivalente.
-
----
+> Trabaja con `pytest` (te dice qué falta) y `mypy` (revisa los tipos). Así es exactamente como se te evaluará: con un **test práctico** sobre un reto equivalente.
 
 ## Retos de ampliación
 
@@ -285,11 +276,96 @@ def spraying(eventos: list[dict]) -> list[str]:
 
 ---
 
-## Laboratorio
+## Ejercicios en progresión
+
+> De fácil a retante. Herramientas: `re`, `collections.Counter` e `ipaddress` (para razonar sobre IPs como lo hace un analista).
+
+**1 · 🟢 Extraer IPs** — `ips(texto: str) -> list[str]` con una expresión regular.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+def ips(texto: str) -> list[str]:
+    return re.findall(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", texto)
+```
+</details>
+
+**2 · 🟢 Contar códigos de estado** — `codigos(lineas: list[str]) -> Counter` cuenta 200/404/500…
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+from collections import Counter
+def codigos(lineas: list[str]) -> "Counter[str]":
+    c: Counter[str] = Counter()
+    for ln in lineas:
+        m = re.search(r'"\s+(\d{3})', ln) or re.search(r"\b(\d{3})\b\s*$", ln)
+        if m:
+            c[m.group(1)] += 1
+    return c
+```
+</details>
+
+**3 · 🟡 ¿IP privada o pública?** — `es_privada(ip: str) -> bool` con `ipaddress`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import ipaddress
+def es_privada(ip: str) -> bool:
+    return ipaddress.ip_address(ip).is_private
+```
+</details>
+
+**4 · 🟡 Top de IPs** — `top_ips(lineas: list[str], n: int = 3) -> list[tuple[str, int]]`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+from collections import Counter
+def top_ips(lineas: list[str], n: int = 3) -> list[tuple[str, int]]:
+    c: Counter[str] = Counter()
+    for ln in lineas:
+        import re
+        m = re.match(r"(\d{1,3}(?:\.\d{1,3}){3})", ln)
+        if m:
+            c[m.group(1)] += 1
+    return c.most_common(n)
+```
+</details>
+
+**5 · 🟠 Ráfaga de fallos** — `fuerza_bruta(eventos: list[dict], umbral: int = 5) -> list[str]`: IPs con ≥ umbral `FALLO`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+from collections import Counter
+def fuerza_bruta(eventos: list[dict], umbral: int = 5) -> list[str]:
+    c: Counter[str] = Counter(e["ip"] for e in eventos if e.get("estado") == "FALLO")
+    return sorted(ip for ip, n in c.items() if n >= umbral)
+```
+</details>
+
+**6 · 🔴 Escaneo de rutas** — `escaneo(lineas: list[str], umbral: int = 10) -> list[str]`: IP que toca muchas rutas distintas devolviendo 404.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+from collections import defaultdict
+def escaneo(lineas: list[str], umbral: int = 10) -> list[str]:
+    rutas: dict[str, set[str]] = defaultdict(set)
+    for ln in lineas:
+        m = re.search(r'(\d{1,3}(?:\.\d{1,3}){3}).*"(?:GET|POST)\s+(\S+)[^"]*"\s+404', ln)
+        if m:
+            rutas[m.group(1)].add(m.group(2))
+    return sorted(ip for ip, r in rutas.items() if len(r) >= umbral)
+```
+</details>
+
+---
+
+## Retos de la unidad
 
 > En contenedores Docker: no hay ataque real, se **generan logs** y tú los analizas.
 
-### Laboratorio guiado (resuelto) — Fábrica de logs de fuerza bruta
+### Reto resuelto (de principio a fin) — Fábrica de logs de fuerza bruta
 
 Un contenedor genera un log de autenticación con un ataque de fuerza bruta simulado; tú lo analizas con `deteccion.py`.
 
@@ -339,7 +415,7 @@ PY
 La IP `.5` supera el umbral **y** termina con un OK: el ataque pudo tener éxito. `.9` solo tiene un OK legítimo, no aparece. Esto es una regla de `fail2ban` en miniatura.
 </details>
 
-### Laboratorio propuesto (entregable) — Mini-SIEM en dos contenedores
+### Reto para ti (propuesto) — Mini-SIEM en dos contenedores
 
 Con Docker Compose: un contenedor **produce** un log de accesos web en streaming (una línea nueva cada segundo, con IPs y códigos 200/404) y **otro contenedor Python** (tuyo) lo **sigue en vivo** (`tail -f` sobre el volumen) y alerta cuando una IP supera **10 respuestas 404 en 60 s** (posible escaneo).
 
@@ -377,7 +453,7 @@ Con Docker Compose: un contenedor **produce** un log de accesos web en streaming
 ## Cómo se evalúa esta unidad (RA2)
 
 
-Se evalúa con un **examen por retos 100 % práctico**: resuelves en Python un reto parecido al de clase y se corrige **solo con su batería de tests**.
+El instrumento principal es un **test práctico**: resuelves en Python un **reto** parecido al de clase y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún **ejercicio práctico**).
 
 !!! reto "La nota, sin sorpresas"
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.

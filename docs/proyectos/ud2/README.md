@@ -1,4 +1,4 @@
-# Proyecto Detector de fuerza bruta · UD2 (RA2)
+# Reto Detector de fuerza bruta · UD2 (RA2)
 
 Lee un log de autenticación, cuenta los intentos fallidos por IP y señala las IP sospechosas, marcando las que pudieron llegar a autenticarse.
 

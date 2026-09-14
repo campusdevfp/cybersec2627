@@ -8,7 +8,7 @@ El **perímetro** es la frontera entre tu red y el mundo. Aquí aprendes a dise�
 ---
 
 !!! reto "El reto de la unidad"
-    Levanta un **cortafuegos** que decida, regla a regla, qué tráfico pasa y cuál no. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el proyecto) y demuéstralo en el examen.
+    Levanta un **cortafuegos** que decida, regla a regla, qué tráfico pasa y cuál no. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el reto) y demuéstralo en el examen.
 
 ## Mapa de la unidad
 
@@ -19,7 +19,7 @@ flowchart TB
     A --> D[Acceso remoto]
     D --> D1[VPN: IPsec/WireGuard]
     D --> D2[RADIUS / 802.1X]
-    B --> P[Proyecto:<br/>motor de cortafuegos POO]
+    B --> P[Reto:<br/>motor de cortafuegos POO]
     style P fill:#1d7a6c,color:#fff
 ```
 
@@ -207,19 +207,13 @@ def nivel(metodo: str) -> int:
 
 ---
 
-## Proyecto de la unidad
+## Resuelve el reto
 
-Construyes el **motor de un cortafuegos** con clases `Regla` y `Cortafuegos`: carga una ACL de texto, evalúa paquetes por primera coincidencia y aplica denegar por defecto.
+Aquí está el **reto de la unidad** en formato de código: un módulo con la estructura y los **tests** ya escritos (los tests son la especificación). Complétalo hasta dejarlos en verde.
 
-**[Proyecto Motor de cortafuegos →](../proyectos/ud3/README.md)**
+**[Abre el reto: motor de cortafuegos (código y tests) →](../proyectos/ud3/README.md)**
 
-```bash
-pip install -r requirements.txt
-pytest
-mypy src
-```
-
----
+> Trabaja con `pytest` (te dice qué falta) y `mypy` (revisa los tipos). Así es exactamente como se te evaluará: con un **test práctico** sobre un reto equivalente.
 
 ## Retos de ampliación
 
@@ -255,11 +249,94 @@ def tapada(previas: list[tuple[str, int]], nueva: tuple[str, int]) -> bool:
 
 ---
 
-## Laboratorio
+## Ejercicios en progresión
+
+> De fácil a retante. Practicas **POO** con `dataclasses` y razonas sobre redes con `ipaddress`.
+
+**1 · 🟢 Un servicio como objeto** — clase `Servicio(nombre, puerto)` con un `__str__` legible.
+<details class="sol"><summary>Solución</summary>
+
+```python
+from dataclasses import dataclass
+@dataclass
+class Servicio:
+    nombre: str
+    puerto: int
+    def __str__(self) -> str:
+        return f"{self.nombre}:{self.puerto}"
+```
+</details>
+
+**2 · 🟢 Regla simple** — `Regla(accion, puerto)` con `permite(puerto) -> bool`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+from dataclasses import dataclass
+@dataclass
+class Regla:
+    accion: str
+    puerto: int
+    def permite(self, puerto: int) -> bool:
+        return self.puerto == puerto and self.accion.upper() == "PERMITIR"
+```
+</details>
+
+**3 · 🟡 ¿La IP está en la red?** — `en_red(ip: str, cidr: str) -> bool` con `ipaddress`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import ipaddress
+def en_red(ip: str, cidr: str) -> bool:
+    return ipaddress.ip_address(ip) in ipaddress.ip_network(cidr)
+```
+</details>
+
+**4 · 🟡 Deny por defecto** — `Cortafuegos` que evalúa por primera coincidencia y deniega si nada casa.
+<details class="sol"><summary>Solución</summary>
+
+```python
+from dataclasses import dataclass, field
+@dataclass
+class ReglaFW:
+    accion: str; puerto: int
+@dataclass
+class Cortafuegos:
+    reglas: list[ReglaFW] = field(default_factory=list)
+    def evaluar(self, puerto: int) -> str:
+        for r in self.reglas:
+            if r.puerto == puerto:
+                return r.accion.upper()
+        return "DENEGAR"
+```
+</details>
+
+**5 · 🟠 Regla inalcanzable** — `tapada(reglas: list[tuple[str,int]], nueva: tuple[str,int]) -> bool` (comodín de puerto 0).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def tapada(reglas: list[tuple[str, int]], nueva: tuple[str, int]) -> bool:
+    _, p = nueva
+    return any(rp in (0, p) for _, rp in reglas)
+```
+</details>
+
+**6 · 🔴 Métricas de uso** — `impactos(cf, trafico: list[int]) -> dict[int,int]`: cuántas veces se aplica cada puerto-regla.
+<details class="sol"><summary>Solución</summary>
+
+```python
+from collections import Counter
+def impactos(cf, trafico: list[int]) -> dict[int, int]:
+    return dict(Counter(p for p in trafico if cf.evaluar(p) == "PERMITIR"))
+```
+</details>
+
+---
+
+## Retos de la unidad
 
 > Levantamos una pequeña red con **Docker Compose** y aplicamos un cortafuegos escrito en Python. Nada de esto toca tu red real.
 
-### Laboratorio guiado (resuelto) — ACL sobre una red Docker
+### Reto resuelto (de principio a fin) — ACL sobre una red Docker
 
 Dos servicios en una red Docker (`web` en el 80, `db` en el 5432) y un evaluador de ACL en Python que decide qué tráfico se permite.
 
@@ -302,7 +379,7 @@ docker compose down
 La LAN llega a la web; nadie llega a la base de datos; e Internet no llega a la web porque no hay regla que lo permita y la política por defecto es **denegar**. `internal: true` refuerza lo mismo a nivel de Docker.
 </details>
 
-### Laboratorio propuesto (entregable) — DMZ de tres segmentos
+### Reto para ti (propuesto) — DMZ de tres segmentos
 
 Con Docker Compose define **tres redes** (`internet`, `dmz`, `lan`) y coloca un `web` en la DMZ y una `db` en la LAN. Escribe una ACL en Python (con tus clases `Regla`/`Cortafuegos`) que cumpla: Internet→DMZ:443 permitido, DMZ→LAN:5432 permitido solo para el `web`, LAN→Internet permitido, y **DMZ no inicia** hacia la LAN salvo esa excepción.
 
@@ -339,7 +416,7 @@ Con Docker Compose define **tres redes** (`internet`, `dmz`, `lan`) y coloca un 
 ## Cómo se evalúa esta unidad (RA3)
 
 
-Se evalúa con un **examen por retos 100 % práctico**: resuelves en Python un reto parecido al de clase y se corrige **solo con su batería de tests**.
+El instrumento principal es un **test práctico**: resuelves en Python un **reto** parecido al de clase y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún **ejercicio práctico**).
 
 !!! reto "La nota, sin sorpresas"
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.

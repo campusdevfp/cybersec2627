@@ -63,7 +63,7 @@ Este módulo funciona con **aula invertida**: la teoría **se lee antes** de cla
 
 ## Cómo se aprueba
 
-Cada RA se supera con **un reto en formato examen**: resuelves un problema en Python y se corrige **solo con su batería de tests**. Sin interpretaciones ni sorpresas.
+Cada RA se supera con una **prueba práctica** (*test práctico*): resuelves un **reto** en Python y se corrige **solo con su batería de tests**. Sin interpretaciones ni sorpresas. De forma complementaria puede pedirse algún **ejercicio práctico** suelto, pero el peso está en el test.
 
 !!! reto "La regla de la nota"
     **Nota del examen = (tests superados ÷ total) × 10.**  Se aprueba con **5**.

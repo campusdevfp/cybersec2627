@@ -1,10 +1,10 @@
-# Proyectos
+# Retos por unidad (código y tests)
 
-Cada unidad se cierra con un **proyecto en Python** que reúne toda su práctica. Es la forma en que se evalúa el módulo: tú escribes el código, y una batería de **tests** te dice si funciona, igual que en el examen.
+Cada unidad se cierra con un **reto en Python** que reúne toda su práctica. Es la forma en que se evalúa el módulo: tú escribes el código, y una batería de **tests** te dice si funciona, igual que en el examen.
 
-## Los seis proyectos
+## Los seis retos
 
-| Unidad | Proyecto | Módulo | Qué practicas |
+| Unidad | Reto | Módulo | Qué practicas |
 |:---:|---|---|---|
 | [UD1](ud1/README.md) | Verificador de integridad | `integridad.py` | `hashlib`, integridad, forense |
 | [UD2](ud2/README.md) | Detector de fuerza bruta | `deteccion.py` | `re`, `Counter`, análisis de logs |
@@ -13,7 +13,7 @@ Cada unidad se cierra con un **proyecto en Python** que reúne toda su práctica
 | [UD5](ud5/README.md) | Escáner de puertos | `escaner.py` | `socket`, red (solo localhost) |
 | [UD6](ud6/README.md) | Cumplimiento y anonimización | `cumplimiento.py` | RGPD, `hashlib`, `re` |
 
-## Cómo se trabaja cualquier proyecto
+## Cómo se trabaja cualquier reto
 
 ```bash
 python -m venv .venv
@@ -32,4 +32,4 @@ mypy src                        # cuando todo esté verde, debe decir Success
     No se tocan. Describen exactamente el comportamiento esperado, y el examen usa una batería equivalente.
 
 !!! danger "Uso ético"
-    El proyecto de la UD5 (escáner de puertos) apunta a `127.0.0.1`. Úsalo solo contra tus máquinas o el laboratorio. Ver [Uso ético y legal](../recursos/uso-etico.md).
+    El reto de la UD5 (escáner de puertos) apunta a `127.0.0.1`. Úsalo solo contra tus máquinas o el laboratorio. Ver [Uso ético y legal](../recursos/uso-etico.md).

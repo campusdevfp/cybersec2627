@@ -8,7 +8,7 @@ Esta es la unidad de cimientos. Aquí entiendes **qué protege la ciberseguridad
 ---
 
 !!! reto "El reto de la unidad"
-    Garantiza que unos ficheros no han sido alterados: construye un **verificador de integridad** con hashes. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el proyecto) y demuéstralo en el examen.
+    Garantiza que unos ficheros no han sido alterados: construye un **verificador de integridad** con hashes. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el reto) y demuéstralo en el examen.
 
 ## Mapa de la unidad
 
@@ -20,7 +20,7 @@ flowchart TB
     C --> C2[Cifrado simétrico y asimétrico]
     C --> C3[Firma y certificados]
     C1 --> D[Análisis forense<br/>cadena de custodia]
-    C1 --> P[Proyecto:<br/>verificador de integridad]
+    C1 --> P[Reto:<br/>verificador de integridad]
     style P fill:#1d7a6c,color:#fff
 ```
 
@@ -42,7 +42,7 @@ flowchart TB
 | **2** | Tú **lees** el apartado y **ejecutas los ejemplos** en tu equipo. | tu editor |
 | **3** | Haces los **retos rápidos** que aparecen entre la teoría. | en el texto |
 | **4** | Practicas con **ejercicios que tienen la solución desplegable**. | sección 9 |
-| **5** | Trabajas el **proyecto** y ejecutas sus tests hasta tenerlo en verde. | `proyectos/ud1/` |
+| **5** | Trabajas el **reto** y ejecutas sus tests hasta tenerlo en verde. | `proyectos/ud1/` |
 | **6** | Examen práctico, con la misma mecánica del paso 5. | convocatoria |
 
 !!! danger "Antes de nada: uso ético y legal"
@@ -234,7 +234,7 @@ Cada evidencia debe poder demostrar que **no se ha alterado** desde su recogida.
 - Se registra quién la tuvo, cuándo y por qué, en todo momento.
 
 !!! analogia "Analogía"
-    Es la misma lógica del precinto: el hash de la evidencia es su precinto digital. Aquí conectas forense con lo que hará tu proyecto.
+    Es la misma lógica del precinto: el hash de la evidencia es su precinto digital. Aquí conectas forense con lo que hará tu reto.
 
 !!! example "Ejemplo: verificar una evidencia"
     ```python
@@ -328,28 +328,13 @@ def clasifica_medida(medida: str) -> str:
 
 ---
 
-## Proyecto de la unidad
+## Resuelve el reto
 
-Toda la práctica gruesa de la unidad se hace sobre un **proyecto real**: un **verificador de integridad de ficheros**. Detecta si algún fichero de un conjunto ha sido modificado, comparándolo con un **manifiesto** de hashes de referencia. Es la herramienta que usa un forense para la cadena de custodia y un administrador para vigilar ficheros críticos.
+Aquí está el **reto de la unidad** en formato de código: un módulo con la estructura y los **tests** ya escritos (los tests son la especificación). Complétalo hasta dejarlos en verde.
 
-**[Proyecto Verificador de integridad →](../proyectos/ud1/README.md)**
+**[Abre el reto: verificador de integridad (código y tests) →](../proyectos/ud1/README.md)**
 
-```
-proyecto-ud1/
-├── src/integridad.py   ← tu código (funciones con TODO)
-└── tests/              ← los tests que comprueban tu trabajo
-```
-
-```bash
-pip install -r requirements.txt
-pytest        # al principio falla casi todo: aún no has escrito nada
-mypy src      # cuando todo esté en verde, debe decir Success
-```
-
-!!! warning "Los tests son la especificación"
-    No los modifiques para que pasen: describen exactamente lo que tu código debe hacer, y el examen usará una batería equivalente.
-
----
+> Trabaja con `pytest` (te dice qué falta) y `mypy` (revisa los tipos). Así es exactamente como se te evaluará: con un **test práctico** sobre un reto equivalente.
 
 ## Retos de ampliación
 
@@ -390,11 +375,89 @@ def huellas(texto: str) -> dict[str, str]:
 
 ---
 
-## Laboratorio
+## Ejercicios en progresión
 
-> Todo el laboratorio se ejecuta en **contenedores Docker**, así no tocas tu sistema ni ningún sistema real. Necesitas Docker y Docker Compose (ver [Entorno y laboratorio](../recursos/entorno.md)).
+> De lo más sencillo a lo más retante. Intenta cada uno **antes** de abrir la solución. Usarás librerías estándar que se emplean en el mundo real: `hashlib`, `hmac` y `secrets`.
 
-### Laboratorio guiado (resuelto) — Cadena de custodia con Docker
+**1 · 🟢 Huella de un texto** — `sha256_hex(texto: str) -> str` devuelve el hash SHA-256 en hexadecimal.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import hashlib
+def sha256_hex(texto: str) -> str:
+    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+```
+</details>
+
+**2 · 🟢 Comparación segura** — `iguales(a: str, b: str) -> bool` compara dos hashes sin filtrar tiempos (ataques de temporización).
+<details class="sol"><summary>Solución</summary>
+
+```python
+import hmac
+def iguales(a: str, b: str) -> bool:
+    return hmac.compare_digest(a, b)   # no uses ==  con secretos/hashes
+```
+</details>
+
+**3 · 🟡 Hash por bloques** — `hash_por_bloques(datos: bytes, bloque: int = 1024) -> str` para no cargar en memoria un fichero enorme.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import hashlib
+def hash_por_bloques(datos: bytes, bloque: int = 1024) -> str:
+    h = hashlib.sha256()
+    for i in range(0, len(datos), bloque):
+        h.update(datos[i:i + bloque])
+    return h.hexdigest()
+```
+</details>
+
+**4 · 🟡 Sal aleatoria** — `con_sal(pwd: str) -> tuple[str, str]` devuelve `(sal, hash)` con una sal de `secrets`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import hashlib, secrets
+def con_sal(pwd: str) -> tuple[str, str]:
+    sal = secrets.token_hex(16)
+    return sal, hashlib.sha256((sal + pwd).encode()).hexdigest()
+```
+</details>
+
+**5 · 🟠 Verificar un manifiesto** — `verifica(man: dict[str, str], ahora: dict[str, str]) -> dict[str, str]` con estados `OK`/`MODIFICADO`/`AUSENTE`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def verifica(man: dict[str, str], ahora: dict[str, str]) -> dict[str, str]:
+    r: dict[str, str] = {}
+    for nombre, esperado in man.items():
+        if nombre not in ahora:
+            r[nombre] = "AUSENTE"
+        else:
+            r[nombre] = "OK" if ahora[nombre] == esperado else "MODIFICADO"
+    return r
+```
+</details>
+
+**6 · 🔴 Autenticar un mensaje (HMAC)** — `firma(clave: str, msg: str) -> str` y `valida(clave, msg, firma_recibida) -> bool`. Es cómo se firman webhooks y APIs.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import hmac, hashlib
+def firma(clave: str, msg: str) -> str:
+    return hmac.new(clave.encode(), msg.encode(), hashlib.sha256).hexdigest()
+
+def valida(clave: str, msg: str, firma_recibida: str) -> bool:
+    return hmac.compare_digest(firma(clave, msg), firma_recibida)
+```
+</details>
+
+---
+
+## Retos de la unidad
+
+> Todo el reto se ejecuta en **contenedores Docker**, así no tocas tu sistema ni ningún sistema real. Necesitas Docker y Docker Compose (ver [Entorno y laboratorio](../recursos/entorno.md)).
+
+### Reto resuelto (de principio a fin) — Cadena de custodia con Docker
 
 Un contenedor **publica** unos ficheros y su manifiesto de hashes; después alteramos uno y comprobamos que tu verificador lo detecta. Es la cadena de custodia en pequeño.
 
@@ -443,7 +506,7 @@ PY
 `app.conf` cambió **después** de generar el manifiesto, así que su hash ya no coincide. Es lo que hacen herramientas reales como `debsums`, `rpm -V` o un HIDS (AIDE, Tripwire). El contenedor es efímero (`--rm`); el estado vive en `./datos`.
 </details>
 
-### Laboratorio propuesto (entregable) — Vigilante de directorio
+### Reto para ti (propuesto) — Vigilante de directorio
 
 Amplía el anterior con **Docker Compose**: un contenedor que cada 10 s modifica al azar algún fichero de un directorio compartido, y **otro contenedor Python** (el tuyo) que genera el manifiesto **una sola vez** y luego, en bucle, **reverifica cada 10 s** e imprime una alerta con marca de tiempo cuando algo cambia.
 
@@ -484,7 +547,7 @@ Amplía el anterior con **Docker Compose**: un contenedor que cada 10 s modifica
 ## Cómo se evalúa esta unidad (RA1)
 
 
-Se evalúa con un **examen por retos 100 % práctico**: resuelves en Python un reto parecido al de clase y se corrige **solo con su batería de tests**.
+El instrumento principal es un **test práctico**: resuelves en Python un **reto** parecido al de clase y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún **ejercicio práctico**).
 
 !!! reto "La nota, sin sorpresas"
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.
