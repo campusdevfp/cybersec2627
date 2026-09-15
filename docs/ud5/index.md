@@ -1,262 +1,259 @@
 # Unidad 5 · Hacking ético en laboratorio
 
-> **Módulo:** CMO-314 · Ciberseguridad · **Resultado de aprendizaje:** RA5 · **Duración:** 20 h · **Peso:** 25 %
-> **Herramienta principal:** Python 3 (`socket`) · **Nivel:** ciclo superior
+> **Módulo:** CMO-314 · Ciberseguridad · **RA5** · **Duración:** 20 h · **Peso:** 25 % · **Herramienta:** Python 3 (tipado) + `socket`
 
-La unidad con más peso del módulo. Aprendes a pensar como un atacante **para defender mejor**: terminología, fases de una prueba de intrusión, y técnicas de Equipo Rojo y Azul, todo en un **laboratorio aislado**. El reto es un **escáner de puertos con sockets**, la base de herramientas como Nmap, que ejecutas **solo contra tu propia máquina**.
+Esta es la unidad de **síntesis**: reúne integridad (UT1), detección (UT2), filtrado (UT3) y riesgo (UT4) desde el otro lado — el de quien pone a prueba las defensas, **con permiso**, para encontrar el fallo antes que un atacante real. La herramienta de Python es `socket`, la base sobre la que están construidos Nmap y cualquier escáner de red. Es también, con diferencia, la unidad donde el uso ético importa más.
 
-!!! danger "Esto es lo más importante de la unidad"
-    Escanear, acceder o atacar sistemas ajenos sin **autorización escrita y con alcance definido** es delito (arts. 197 bis y 264 del Código Penal), con penas de prisión. La autorización es lo único que separa una prueba de intrusión de un delito. Todo el trabajo de esta unidad es **exclusivamente** sobre el laboratorio o `localhost`. Lee [Uso ético y legal](../recursos/uso-etico.md).
-
----
+!!! danger "Esta unidad se trabaja EXCLUSIVAMENTE en el laboratorio"
+    Todo lo que vas a programar aquí — escaneo de puertos, reconocimiento — se ejecuta **solo** contra `127.0.0.1`, contenedores de tu propio `docker-compose`, o el laboratorio autorizado del centro. Hacerlo contra cualquier sistema que no sea tuyo, sin permiso explícito por escrito, es un delito (arts. 197 y 264 del Código Penal), aunque el escaneo en sí "no dañe nada". Ver [Uso ético y legal](../recursos/uso-etico.md).
 
 !!! reto "El reto de la unidad"
-    Descubre, **con permiso y en el laboratorio**, qué puertos abiertos esconde un objetivo. Los **ejercicios** y el **laboratorio** de más abajo son tu **entrenamiento**: cuando los domines, resuelve el reto (el reto) y demuéstralo en el examen.
-
-## Mapa de la unidad
+    **Descubre, en tu laboratorio, qué puertos abiertos esconde un objetivo.** Vas a construir un escáner con severidad e informe.
 
 ```mermaid
 flowchart TB
-    A[Terminología y ética] --> B[Alcance y permiso]
-    B --> C[Fases: recon → enum → análisis → informe]
-    C --> D[Equipo Rojo / Azul]
-    C --> P[Reto:<br/>escáner de puertos socket]
-    style P fill:#1d7a6c,color:#fff
+    A["Terminología y ética<br/>del hacking"] --> B["Fases del pentest"]
+    B --> C["socket: sondear<br/>un puerto"]
+    C --> D["Escaneo concurrente<br/>de rangos"]
+    D --> E["Clasificar por<br/>severidad"]
+    B --> F["Equipos Rojo/Azul<br/>y MITRE ATT&CK"]
+    D --> P["RETO<br/>Escáner de puertos"]
+    E --> P
+    style P fill:#0f766e,color:#fff,stroke:#0a5c52,stroke-width:2px
+    style A fill:#16294a,color:#fff
 ```
 
-### Qué vas a saber hacer al terminar
+**Qué sabrás hacer al terminar:** distinguir hacking ético de delito informático, y las fases de un pentest · usar `socket` para sondear si un puerto está abierto · escanear rangos de puertos de forma concurrente con `concurrent.futures` · clasificar hallazgos por severidad y redactar un informe · situar el marco MITRE ATT&CK y los equipos Rojo/Azul/Púrpura · construir un escáner de puertos con CLI, tipado y probado.
 
-- [ ] Usar la **terminología** del hacking ético y definir el **alcance** de una prueba.
-- [ ] Enumerar las **fases** de una prueba de intrusión.
-- [ ] Reconocer tipos de vulnerabilidades y de ataques y sus vectores.
-- [ ] Diferenciar **Equipo Rojo, Azul y Púrpura**.
-- [ ] Programar un **escáner de puertos con sockets** en Python.
-- [ ] Redactar un **informe de vulnerabilidades** con hallazgos priorizados.
+**Cómo se trabaja (aula invertida):** lees la sección y ejecutas los ejemplos antes de clase, **siempre contra `127.0.0.1`** → en clase practicas en el laboratorio, en parejas, con el profesorado supervisando.
 
 ---
 
-## 1. Terminología y ética
+## 1. Hacking ético: terminología y marco legal
 
-| Término | Significado |
+| Término | Qué significa |
 |---|---|
-| **Hacking ético** | Uso **autorizado** de técnicas ofensivas para mejorar la seguridad |
-| **Pentest** | Prueba de intrusión acotada |
-| **Red Team / Blue Team** | Ataque sigiloso realista / defensa (detección y respuesta) |
-| **Purple Team** | Colaboración de ambos para mejorar |
-| **Vulnerabilidad / exploit / carga** | Debilidad / técnica que la aprovecha / acción posterior |
-| **CVE / CVSS** | Identificador de vulnerabilidad / puntuación de severidad (0–10) |
-
-!!! analogia "Analogía"
-    Un pentester es como un cerrajero que la empresa contrata para intentar entrar y decirle por dónde falla. Sin contrato, ese mismo cerrajero forzando la puerta es un ladrón.
-
-!!! reto "Reto rápido 1"
-    ¿Qué diferencia a un sombrero gris de uno blanco, y por qué el gris sigue siendo ilegal?
-
----
-
-## 2. El alcance: lo que se firma antes de empezar
-
-Ninguna prueba legítima empieza sin un documento de **alcance** y **reglas de enfrentamiento**: sistemas incluidos y excluidos, tipo de prueba (caja negra/gris/blanca), ventana temporal, técnicas permitidas, tratamiento de datos, contactos de emergencia y **autorización firmada**.
-
-!!! warning "Atención"
-    Tocar un sistema fuera del alcance, aunque sea de la misma empresa, deja de estar autorizado. El alcance es tu cobertura legal.
-
----
-
-## 3. Fases de una prueba de intrusión
+| **Hacking ético / pentest** | Poner a prueba la seguridad de un sistema **con autorización explícita** |
+| **Alcance (scope)** | Qué sistemas están autorizados a probarse, y cuáles no |
+| **Reglas de enfrentamiento** | Cuándo, cómo y con qué límites se hace la prueba |
+| **Black hat** | Ataca sin autorización, con intención maliciosa |
+| **White hat** | Es lo que vas a practicar: autorizado, documentado, con permiso |
+| **Grey hat** | Sin autorización pero sin intención maliciosa — **sigue siendo ilegal** |
 
 ```mermaid
 flowchart LR
-    R[Reconocimiento] --> E[Enumeración]
-    E --> V[Análisis de vulnerabilidades]
-    V --> X[Explotación controlada]
-    X --> P[Post-explotación]
-    P --> I[Informe]
+    P["Permiso por escrito"] --> Al["Alcance definido"]
+    Al --> Pr["Pruebas dentro<br/>del alcance"]
+    Pr --> Inf["Informe de<br/>vulnerabilidades"]
+    Inf --> Rem["Remediación"]
 ```
 
-| Fase | En el laboratorio |
-|---|---|
-| Reconocimiento | Descubrir hosts activos |
-| Enumeración | Puertos, servicios y versiones |
-| Análisis | Cruzar con la base de vulnerabilidades (NVD) |
-| Explotación | Solo sobre máquinas deliberadamente vulnerables |
-| Informe | Hallazgos priorizados y remediación |
-
-!!! reto "Reto rápido 2"
-    ¿En qué fase encaja un escáner de puertos: reconocimiento, enumeración o explotación?
+!!! warning "Sin autorización por escrito, no hay pentest: hay delito"
+    La diferencia entre un profesional de la ciberseguridad y un delincuente **no es la técnica** — es exactamente la misma. La diferencia es el **permiso**. Ni "solo estaba mirando" ni "no hice daño" son defensa legal.
 
 ---
 
-## 4. Escaneo de puertos con Python y sockets
+## 2. Fases de un pentest
 
-Un puerto abierto significa que hay un servicio escuchando. Con la librería `socket` compruebas si un puerto acepta conexión:
+```mermaid
+flowchart LR
+    R["1 · Reconocimiento<br/>info pública, pasivo"] --> E["2 · Enumeración<br/>puertos, servicios"]
+    E --> V["3 · Explotación<br/>vulnerabilidades"]
+    V --> Pe["4 · Post-explotación<br/>alcance del acceso"]
+    Pe --> I["5 · Informe<br/>hallazgos + remediación"]
+```
 
-```python title="¿Hay un servicio escuchando en ese puerto?"
+Esta unidad se centra en la **fase 2: enumeración** — descubrir qué servicios están escuchando, que es el paso previo (y el más programable) antes de cualquier otra cosa.
+
+---
+
+## 3. `socket`: la herramienta de esta unidad
+
+Un **socket** es el punto de conexión entre dos programas en red. Sondear si un puerto está abierto es, en esencia, intentar conectar y ver qué pasa.
+
+```python title="socket_basico.py"
 import socket
 
 def puerto_abierto(host: str, puerto: int, timeout: float = 0.5) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:  # (1)!
-        s.settimeout(timeout)  # (2)!
-        return s.connect_ex((host, puerto)) == 0  # (3)!
+    """True si hay algo escuchando en host:puerto. SOLO contra tu laboratorio."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:   # (1)!
+        s.settimeout(timeout)                                       # (2)!
+        return s.connect_ex((host, puerto)) == 0                    # (3)!
 
-print(puerto_abierto("127.0.0.1", 22))  # (4)!
+print(puerto_abierto("127.0.0.1", 80))
+print(puerto_abierto("127.0.0.1", 65432))
 ```
 
 1.  El `with` garantiza que el socket **se cierra** aunque haya error. `AF_INET` = IPv4, `SOCK_STREAM` = TCP.
-2.  Sin `timeout`, un puerto filtrado dejaría el escaneo colgado. Medio segundo es suficiente en red local.
-3.  `connect_ex` devuelve `0` si conecta (abierto) y un código de error si no, **sin lanzar excepción**: por eso es cómodo para escanear.
-4.  **Solo** contra `127.0.0.1` o los contenedores de tu laboratorio. Escanear fuera de ahí es delito.
+2.  Sin `timeout`, un puerto filtrado dejaría el escaneo colgado indefinidamente. Medio segundo basta en red local.
+3.  `connect_ex` devuelve `0` si conecta (abierto) y un código de error si no, **sin lanzar excepción** — por eso es cómodo para escanear muchos puertos seguidos.
 
-`connect_ex` devuelve `0` si conecta (puerto abierto) y un código de error si no. El `timeout` evita que el escaneo se cuelgue.
-
-!!! warning "Atención"
-    El destino por defecto de tu reto es `127.0.0.1`. **No** cambies eso para apuntar a máquinas que no sean tuyas o del reto.
-
-!!! reto "Reto rápido 3"
-    ¿Por qué conviene un `timeout` corto al escanear muchos puertos?
-
-### 4.1 Interpretar el resultado
-
-Un puerto abierto no es malo en sí; depende del servicio. Puertos como Telnet (23) o SMB (445) expuestos son señales de riesgo. Clasificar los hallazgos por severidad es parte del trabajo.
-
----
-
-## 5. Vulnerabilidades y ataques (visión defensiva)
-
-Ya conoces muchos de unidades anteriores: inyección (UD6), fuerza bruta (UD2), MITM (UD2), servicios sin parche (UD4). Aquí los integras en la perspectiva del atacante para entender **qué rastro dejan** y cómo los ve el Blue Team.
-
-Aplicaciones web (OWASP Top 10, resumen): inyección, XSS, control de acceso roto, configuración insegura, componentes vulnerables. Se practican en entornos preparados como **DVWA** o **OWASP Juice Shop** dentro del laboratorio.
-
----
-
-## 6. Equipo Rojo, Azul y Púrpura
-
-| Rojo | Azul |
-|---|---|
-| Reconocimiento y OSINT | Reducción de superficie |
-| Acceso y evasión | Detección (IDS/EDR) |
-| Movimiento lateral | Segmentación y mínimo privilegio |
-| Exfiltración | Caza de amenazas |
-
-El **Púrpura** une a ambos: el Rojo demuestra que un ataque es posible; el Azul comprueba si lo detecta y qué puntos ciegos tiene. **MITRE ATT&CK** es el catálogo común de técnicas.
-
-!!! reto "Reto rápido 4"
-    ¿Qué aporta el Equipo Azul que un pentest del Rojo por sí solo no da?
-
----
-
-## 7. El informe de vulnerabilidades
-
-El producto real de un pentest. Cada hallazgo lleva: título, clasificación, **severidad (CVSS)** justificada, prueba de concepto reproducible, evidencia, **impacto en el negocio** y **remediación** priorizada.
-
-| Severidad | Actuación |
-|---|---|
-| Crítica (9–10) | Inmediata |
-| Alta (7–8,9) | Días |
-| Media (4–6,9) | Semanas |
-| Baja (0,1–3,9) | Cuando sea razonable |
-
-!!! warning "Atención"
-    La severidad técnica no es el riesgo del negocio: un CVSS alto en un sistema sin datos puede importar menos que uno medio en el servidor de clientes.
-
----
-
-## 8. Practica **con** solución a la vista
-
-#### Actividad 1 — Servicio de un puerto
-`servicio(puerto)` → `"SSH"` para 22, `"HTTPS"` para 443, `"desconocido"` en otro caso.
-<details class="sol"><summary>Solución</summary>
-
-```python
-def servicio(puerto: int) -> str:
-    return {22: "SSH", 80: "HTTP", 443: "HTTPS"}.get(puerto, "desconocido")
+```text title="Salida"
+False
+False
 ```
-</details>
 
-#### Actividad 2 — ¿Puerto inseguro?
-`inseguro(puerto)` → True para 23, 21, 445.
-<details class="sol"><summary>Solución</summary>
+> En tu equipo, casi ningún puerto está abierto por defecto — por eso ambas salen `False`. Vamos a comprobarlo con un puerto que **sí** está abierto de verdad.
 
-```python
-def inseguro(puerto: int) -> bool:
-    return puerto in {21, 23, 25, 110, 143, 445, 3389}
+### 3.1 Comprobación con un servidor real
+
+```python title="socket_con_servidor.py"
+import socket, threading, time
+
+def servidor_de_prueba() -> None:
+    """Levanta un servidor TCP mínimo en el puerto 8765, solo para esta demo."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(("127.0.0.1", 8765))
+    s.listen(1)
+    s.settimeout(3)
+    try:
+        conn, _ = s.accept()
+        conn.close()
+    except socket.timeout:
+        pass
+
+def puerto_abierto(host: str, puerto: int, timeout: float = 0.5) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        return s.connect_ex((host, puerto)) == 0
+
+hilo = threading.Thread(target=servidor_de_prueba, daemon=True)
+hilo.start()
+time.sleep(0.3)   # da tiempo a que el servidor arranque
+
+print("puerto 8765 (con servidor):", puerto_abierto("127.0.0.1", 8765))
+print("puerto 8766 (sin nada):    ", puerto_abierto("127.0.0.1", 8766))
 ```
-</details>
 
-#### Actividad 3 — Clasificar severidad
-`severidad(cvss)` → "CRÍTICA/ALTA/MEDIA/BAJA".
-<details class="sol"><summary>Solución</summary>
-
-```python
-def severidad(cvss: float) -> str:
-    if cvss >= 9: return "CRÍTICA"
-    if cvss >= 7: return "ALTA"
-    if cvss >= 4: return "MEDIA"
-    return "BAJA"
+```text title="Salida"
+puerto 8765 (con servidor): True
+puerto 8766 (sin nada):     False
 ```
-</details>
 
-#### Actividad 4 — Formatear hallazgo
-`linea(puerto, estado)` → `"22/tcp SSH OK"`.
-<details class="sol"><summary>Solución</summary>
+!!! analogia "Analogía"
+    Sondear un puerto es como llamar a una puerta: si alguien responde, hay "algo" detrás (abierto); si nadie contesta en un tiempo razonable, asumes que no hay nadie (cerrado). No sabes **qué** hay detrás todavía — solo que la puerta responde.
 
-```python
-def linea(puerto: int, estado: str) -> str:
-    return f"{puerto}/tcp {servicio(puerto)} {estado}"
-```
-</details>
+!!! reto "Reto rápido 1"
+    ¿Por qué el ejemplo usa `SO_REUSEADDR`? Pista: intenta ejecutar dos veces seguidas un servidor en el mismo puerto sin cerrar bien el anterior y verás el error que evita.
 
 ---
 
-## Resuelve el reto
+## 4. Escanear un rango: hazlo rápido con concurrencia
 
-Aquí está el **reto de la unidad** en formato de código: un módulo con la estructura y los **tests** ya escritos (los tests son la especificación). Complétalo hasta dejarlos en verde.
+Sondear puertos **uno a uno**, en secuencia, es lento: 1000 puertos × 0.5 s de timeout = más de 8 minutos. La solución: sondearlos **en paralelo**.
 
-**[Abre el reto: escáner de puertos (código y tests) →](../proyectos/ud5/README.md)**
+```python title="escaneo_concurrente.py"
+from concurrent.futures import ThreadPoolExecutor
+import socket, time
 
-> Trabaja con `pytest` (te dice qué falta) y `mypy` (revisa los tipos). Así es exactamente como se te evaluará: con un **test práctico** sobre un reto equivalente.
+def puerto_abierto(host: str, puerto: int, timeout: float = 0.3) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        return s.connect_ex((host, puerto)) == 0
 
-## Retos de ampliación
+def escanea(host: str, puertos: list[int]) -> list[int]:
+    with ThreadPoolExecutor(max_workers=50) as ex:
+        resultados = ex.map(lambda p: (p, puerto_abierto(host, p)), puertos)
+    return sorted(p for p, abierto in resultados if abierto)
 
-- **R1.** Escanea un **rango** de puertos y muestra una barra de progreso.
-- **R2.** Acelera el escaneo con hilos (`concurrent.futures`).
-- **R3.** Intenta leer el *banner* del servicio de un puerto abierto (solo en el lab).
+t0 = time.time()
+abiertos = escanea("127.0.0.1", list(range(20, 100)))
+print("Puertos abiertos:", abiertos)
+print(f"Tiempo: {time.time() - t0:.2f}s para {100-20} puertos")
+```
+
+```text title="Salida"
+Puertos abiertos: []
+Tiempo: 0.05s para 80 puertos
+```
+
+> Como es I/O (esperar respuestas de red, no cálculo), los hilos (`ThreadPoolExecutor`) sirven perfectamente aunque Python tenga el GIL — mientras un hilo espera respuesta, otro puede seguir. Con 50 hilos en paralelo, 80 puertos tardan **milisegundos**, no 24 segundos.
 
 ---
 
-## Más práctica
+## 5. Clasificar por severidad
 
-#### Actividad 5 — Rango de puertos
-Escribe `rango(inicio, fin) -> list[int]` (ambos incluidos) validando que `inicio <= fin`.
-<details class="sol"><summary>Solución</summary>
+No todos los puertos abiertos son igual de preocupantes. Un puerto 443 (HTTPS) abierto es normal; un 23 (Telnet, sin cifrar) es una alarma.
 
-```python
-def rango(inicio: int, fin: int) -> list[int]:
-    if inicio > fin:
-        raise ValueError("inicio > fin")
-    return list(range(inicio, fin + 1))
+```python title="severidad.py"
+INSEGUROS = {21, 23, 25, 135, 445, 3389}   # FTP, Telnet, SMTP abierto, RPC, SMB, RDP
+REVISAR = {80, 8080, 110, 143}              # HTTP sin TLS, IMAP/POP3 sin cifrar
+
+def severidad(puerto: int) -> str:
+    if puerto in INSEGUROS:
+        return "INSEGURO"
+    if puerto in REVISAR:
+        return "REVISAR"
+    return "OK"
+
+for p in (23, 80, 443, 3389):
+    print(f"{p:5} -> {severidad(p)}")
 ```
-</details>
 
-#### Actividad 6 — Informe ordenado
-Dado `dict[int,str]` puerto→estado, devuelve las líneas ordenadas poniendo primero los `INSEGURO`.
-<details class="sol"><summary>Solución</summary>
+```text title="Salida"
+   23 -> INSEGURO
+   80 -> REVISAR
+  443 -> OK
+ 3389 -> INSEGURO
+```
 
-```python
-def informe(estados: dict[int, str]) -> list[str]:
+### 5.1 Del listado al informe
+
+```python title="informe_severidad.py"
+def clasificar(abiertos: list[int]) -> dict[int, str]:
+    return {p: severidad(p) for p in abiertos}
+
+def informe(clasificado: dict[int, str]) -> list[str]:
     orden = {"INSEGURO": 0, "REVISAR": 1, "OK": 2}
-    return [f"{p}: {e}" for p, e in sorted(estados.items(),
-            key=lambda kv: (orden.get(kv[1], 9), kv[0]))]
+    return [f"{p}: {sev}" for p, sev in
+            sorted(clasificado.items(), key=lambda kv: (orden[kv[1]], kv[0]))]
+
+for linea in informe(clasificar([443, 23, 80, 3389])):
+    print(linea)
 ```
-</details>
+
+```text title="Salida"
+23: INSEGURO
+3389: INSEGURO
+80: REVISAR
+443: OK
+```
+
+!!! reto "Reto rápido 2"
+    Un cliente tiene el puerto 3389 (RDP, escritorio remoto) abierto **a Internet**. ¿Por qué es especialmente peligroso? Pista: piensa en fuerza bruta (UT2) combinada con este hallazgo.
 
 ---
 
-## Ejercicios en progresión
+## 6. Equipos Rojo, Azul, Púrpura y MITRE ATT&CK
 
-> De fácil a retante. **Siempre contra tu laboratorio Docker.** Herramientas: `socket`, `concurrent.futures` (velocidad) y `ssl`.
+| Equipo | Rol |
+|---|---|
+| **Rojo (Red Team)** | Ataca (simulado) para encontrar fallos — lo que has practicado aquí |
+| **Azul (Blue Team)** | Defiende y detecta — lo que practicaste en la UT2 |
+| **Púrpura (Purple Team)** | Ambos colaboran para mejorar juntos |
 
-**1 · 🟢 Severidad de un puerto** — `severidad(p: int) -> str` (`INSEGURO`/`REVISAR`/`OK`).
+**MITRE ATT&CK** es un catálogo público de técnicas de ataque reales, organizado por fases (reconocimiento, acceso inicial, persistencia…). Un escaneo de puertos se clasifica dentro de la técnica de **Reconocimiento activo** (T1595). Sirve como vocabulario común entre atacantes (simulados) y defensores.
+
+---
+
+## 7. Errores frecuentes (ten esto a mano)
+
+| Error | Causa | Solución |
+|---|---|---|
+| El escaneo se queda colgado | Sin `timeout` en el socket | `s.settimeout(...)` siempre |
+| `OSError: Address already in use` | Reiniciar un servidor de prueba sin `SO_REUSEADDR` | `s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)` |
+| El escaneo tarda una eternidad | Sondear uno a uno, en secuencia | `ThreadPoolExecutor` para paralelizar |
+| Falsos "cerrados" | `timeout` demasiado corto en red lenta | Ajusta el timeout al contexto (más alto en redes reales, más bajo en local) |
+| Escanear algo que no es tuyo | — | **Nunca.** Solo `127.0.0.1` o tu laboratorio |
+
+---
+
+## 8. Actividades: de lo más sencillo a preguntas tipo examen
+
+> Todo contra `127.0.0.1` o tu laboratorio Docker. Librerías reales: `socket`, `concurrent.futures`, `ssl`.
+
+**1 · 🟢 Severidad de un puerto** — `severidad(p: int) -> str`.
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -267,7 +264,7 @@ def severidad(p: int) -> str:
 ```
 </details>
 
-**2 · 🟢 Rango de puertos** — `rango(ini: int, fin: int) -> list[int]` validado (`ValueError` si `ini>fin`).
+**2 · 🟢 Rango de puertos válido** — `rango(ini: int, fin: int) -> list[int]`, lanza `ValueError` si `ini > fin`.
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -278,149 +275,408 @@ def rango(ini: int, fin: int) -> list[int]:
 ```
 </details>
 
-**3 · 🟡 ¿Puerto abierto?** — `abierto(host: str, puerto: int, t: float = 0.5) -> bool` con `socket`.
+**3 · 🟢 Nombre de servicio conocido** — `servicio_de(puerto: int) -> str` para 22/80/443/3389, `"desconocido"` si no.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def servicio_de(puerto: int) -> str:
+    return {22: "SSH", 80: "HTTP", 443: "HTTPS", 3389: "RDP"}.get(puerto, "desconocido")
+```
+</details>
+
+**4 · 🟢 ¿Puerto abierto?** — `puerto_abierto(host, puerto, timeout=0.5) -> bool` con `socket`.
 <details class="sol"><summary>Solución</summary>
 
 ```python
 import socket
-def abierto(host: str, puerto: int, t: float = 0.5) -> bool:
-    with socket.socket() as s:
-        s.settimeout(t)
+def puerto_abierto(host: str, puerto: int, timeout: float = 0.5) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
         return s.connect_ex((host, puerto)) == 0
 ```
 </details>
 
-**4 · 🟡 Escaneo concurrente** — `escanea(host: str, puertos: list[int]) -> list[int]` en paralelo con hilos.
+**5 · 🟡 Escaneo secuencial** — `escanea_secuencial(host, puertos) -> list[int]`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def escanea_secuencial(host: str, puertos: list[int]) -> list[int]:
+    return sorted(p for p in puertos if puerto_abierto(host, p, 0.2))
+```
+</details>
+
+**6 · 🟡 Escaneo concurrente** — `escanea(host, puertos) -> list[int]` con `ThreadPoolExecutor`.
 <details class="sol"><summary>Solución</summary>
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
 def escanea(host: str, puertos: list[int]) -> list[int]:
     with ThreadPoolExecutor(max_workers=50) as ex:
-        res = ex.map(lambda p: (p, abierto(host, p)), puertos)
+        res = ex.map(lambda p: (p, puerto_abierto(host, p, 0.2)), puertos)
     return sorted(p for p, ok in res if ok)
 ```
 </details>
 
-**5 · 🟠 ¿Caduca el certificado?** — `dias_cert(host: str, puerto: int = 443) -> int` con `ssl` (contra tu contenedor HTTPS).
+**7 · 🟡 Clasificar abiertos** — `clasificar(abiertos: list[int]) -> dict[int,str]`.
 <details class="sol"><summary>Solución</summary>
 
 ```python
-import ssl, socket
-from datetime import datetime, timezone
-def dias_cert(host: str, puerto: int = 443) -> int:
-    ctx = ssl.create_default_context()
-    with socket.create_connection((host, puerto), timeout=5) as s:
-        with ctx.wrap_socket(s, server_hostname=host) as ss:
-            cert = ss.getpeercert()
-    vence = datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
-    return (vence - datetime.now(timezone.utc)).days
+def clasificar(abiertos: list[int]) -> dict[int, str]:
+    return {p: severidad(p) for p in abiertos}
 ```
 </details>
 
-**6 · 🔴 Informe por severidad** — `informe(host: str, puertos: list[int]) -> list[str]` ordenado de más grave a menos.
+**8 · 🟡 Contar por severidad** — `resumen(clasificado: dict[int,str]) -> dict[str,int]`.
 <details class="sol"><summary>Solución</summary>
 
 ```python
-def informe(host: str, puertos: list[int]) -> list[str]:
+from collections import Counter
+def resumen(clasificado: dict[int, str]) -> dict[str, int]:
+    return dict(Counter(clasificado.values()))
+```
+</details>
+
+**9 · 🟠 Informe ordenado por gravedad** — `informe(clasificado) -> list[str]`, INSEGURO primero.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def informe(clasificado: dict[int, str]) -> list[str]:
     orden = {"INSEGURO": 0, "REVISAR": 1, "OK": 2}
-    abiertos = escanea(host, puertos)
-    return [f"{p}: {severidad(p)}" for p in sorted(abiertos, key=lambda p: (orden[severidad(p)], p))]
+    return [f"{p}: {s}" for p, s in sorted(clasificado.items(), key=lambda kv: (orden[kv[1]], kv[0]))]
 ```
 </details>
+
+**10 · 🟠 Solo los graves** — `solo_inseguros(clasificado: dict[int,str]) -> list[int]`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def solo_inseguros(clasificado: dict[int, str]) -> list[int]:
+    return sorted(p for p, s in clasificado.items() if s == "INSEGURO")
+```
+</details>
+
+**11 · 🟠 Comparar dos escaneos** — `nuevos_puertos(anterior: list[int], actual: list[int]) -> list[int]`: puertos que se han abierto desde el último escaneo (detección de cambios, como el HIDS de la UT1).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def nuevos_puertos(anterior: list[int], actual: list[int]) -> list[int]:
+    return sorted(set(actual) - set(anterior))
+```
+</details>
+
+**12 · 🔴 Tiempo estimado de un escaneo** — `tiempo_estimado(n_puertos: int, hilos: int, timeout: float) -> float`: cuánto tardaría en el peor caso (todo cerrado).
+<details class="sol"><summary>Solución</summary>
+
+```python
+import math
+def tiempo_estimado(n_puertos: int, hilos: int, timeout: float) -> float:
+    tandas = math.ceil(n_puertos / hilos)
+    return round(tandas * timeout, 2)
+```
+</details>
+
+**13 · 🔴 Banner grabbing simplificado** — `intenta_leer_banner(host, puerto, timeout=1.0) -> str`: conecta y lee hasta 100 bytes que el servicio pueda enviar al conectar (sin enviar nada), o `""` si no hay nada.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import socket
+def intenta_leer_banner(host: str, puerto: int, timeout: float = 1.0) -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)
+            s.connect((host, puerto))
+            datos = s.recv(100)
+            return datos.decode(errors="replace")
+    except (socket.timeout, OSError):
+        return ""
+```
+</details>
+
+**14 · 🔴 Validar un objetivo de laboratorio** — `es_objetivo_valido(host: str) -> bool`: solo permite `127.0.0.1`, `localhost` o direcciones que empiecen por `10.0.20.` (tu red de laboratorio).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def es_objetivo_valido(host: str) -> bool:
+    return host in ("127.0.0.1", "localhost") or host.startswith("10.0.20.")
+```
+</details>
+
+**15 · 🔴 Escaneo con guardarraíl ético** — `escaneo_seguro(host, puertos) -> list[int]`: usa `es_objetivo_valido`; si el host no es válido, lanza `ValueError` en vez de escanear.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def escaneo_seguro(host: str, puertos: list[int]) -> list[int]:
+    if not es_objetivo_valido(host):
+        raise ValueError(f"objetivo no autorizado: {host}")
+    return escanea(host, puertos)
+```
+</details>
+
+### Preguntas tipo test práctico
+
+**P1.** ¿Qué devuelve `connect_ex` si el puerto está cerrado, y por qué es más cómodo que usar `connect` a secas para escanear?
+<details class="sol"><summary>Respuesta</summary>Devuelve un código de error distinto de <code>0</code> (no lanza excepción), así que puedes comprobar <code>== 0</code> directamente sin envolver cada intento en un <code>try/except</code>.</details>
+
+**P2.** ¿Por qué el escaneo secuencial de 1000 puertos es mucho más lento que el concurrente?
+<details class="sol"><summary>Respuesta</summary>Porque cada sondeo espera su propio <code>timeout</code> antes de pasar al siguiente; en paralelo, muchos sondeos esperan <b>a la vez</b>, así que el tiempo total es el de una sola espera, no la suma de todas.</details>
+
+**P3.** ¿Qué pasa si olvidas `s.settimeout(...)` antes de `connect_ex` a un puerto filtrado (que no responde ni sí ni no)?
+<details class="sol"><summary>Respuesta</summary>El programa puede quedarse colgado indefinidamente esperando una respuesta que nunca llega.</details>
+
+**P4.** ¿Por qué un puerto 3389 (RDP) abierto a Internet es más grave si además hay contraseñas débiles en el sistema?
+<details class="sol"><summary>Respuesta</summary>Porque combina dos hallazgos: un servicio de acceso remoto expuesto (UT5) y credenciales vulnerables a fuerza bruta (UT2/UT4) — el escaneo encuentra la puerta, la contraseña débil es la llave fácil.</details>
+
+**P5.** ¿Qué diferencia hay entre un `grey hat` y un `white hat`?
+<details class="sol"><summary>Respuesta</summary>Ambos actúan sin intención maliciosa, pero el <code>grey hat</code> lo hace <b>sin autorización</b> — lo que sigue siendo ilegal — mientras que el <code>white hat</code> siempre tiene permiso explícito.</details>
+
+**P6.** En el ejercicio 11 (`nuevos_puertos`), ¿qué operación de conjuntos detecta lo que ha aparecido nuevo?
+<details class="sol"><summary>Respuesta</summary>La diferencia de conjuntos <code>set(actual) - set(anterior)</code>: lo que está en el escaneo nuevo pero no estaba en el anterior.</details>
+
+**P7.** ¿Por qué `escaneo_seguro` valida el host **antes** de escanear, en vez de simplemente documentar "úsalo solo en el laboratorio"?
+<details class="sol"><summary>Respuesta</summary>Porque un guardarraíl en el código previene errores humanos (escanear por accidente la IP equivocada); una nota en la documentación es fácil de pasar por alto bajo presión.</details>
 
 ---
 
-## Retos de la unidad
+## 9. Reto resuelto, paso a paso — Escáner de puertos con informe
 
-!!! danger "Solo dentro del laboratorio Docker"
-    El escaneo se hace **exclusivamente** contra contenedores de tu propio `docker-compose`, en una red con `internal: true` (sin salida a Internet). Escanear fuera de ahí es delito. Ver [Uso ético y legal](../recursos/uso-etico.md).
+Te piden auditar (en tu propio laboratorio) qué servicios expone un servidor de pruebas, y entregar un informe priorizado por gravedad.
 
-### Reto resuelto (de principio a fin) — Escanear un objetivo del laboratorio
+```mermaid
+flowchart LR
+    H["host + rango"] --> V["valida objetivo"]
+    V --> S["escanea<br/>(concurrente)"]
+    S --> C["clasifica<br/>por severidad"]
+    C --> Inf["informe"]
+```
 
-Levantamos un "objetivo" con un par de puertos abiertos y lo escaneamos con sockets desde otro contenedor, todo en una red Docker aislada.
+**Paso 1 — Sondeo de un puerto, con validación del objetivo.**
 
-**`docker-compose.yml`**
+```python title="escaner.py"
+import socket
 
-```yaml
+def es_objetivo_valido(host: str) -> bool:
+    """Solo laboratorio: localhost o la red 10.0.20.0/24."""
+    return host in ("127.0.0.1", "localhost") or host.startswith("10.0.20.")
+
+def puerto_abierto(host: str, puerto: int, timeout: float = 0.5) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        return s.connect_ex((host, puerto)) == 0
+```
+
+**Paso 2 — Escaneo concurrente, con el guardarraíl ético incorporado.**
+
+```python title="escaner.py (continúa)"
+from concurrent.futures import ThreadPoolExecutor
+
+def escanear(host: str, puertos: list[int], timeout: float = 0.3) -> list[int]:
+    if not es_objetivo_valido(host):
+        raise ValueError(f"objetivo no autorizado: {host} (solo laboratorio)")
+    with ThreadPoolExecutor(max_workers=50) as ex:
+        resultados = ex.map(lambda p: (p, puerto_abierto(host, p, timeout)), puertos)
+    return sorted(p for p, abierto in resultados if abierto)
+```
+
+**Paso 3 — Clasificar por severidad.**
+
+```python title="escaner.py (continúa)"
+INSEGUROS = {21, 23, 25, 135, 445, 3389}
+REVISAR = {80, 8080, 110, 143}
+
+def severidad(puerto: int) -> str:
+    if puerto in INSEGUROS: return "INSEGURO"
+    if puerto in REVISAR: return "REVISAR"
+    return "OK"
+
+def clasificar(abiertos: list[int]) -> dict[int, str]:
+    return {p: severidad(p) for p in abiertos}
+```
+
+**Paso 4 — Generar el informe.**
+
+```python title="escaner.py (continúa)"
+def generar_informe(host: str, clasificado: dict[int, str]) -> list[str]:
+    orden = {"INSEGURO": 0, "REVISAR": 1, "OK": 2}
+    lineas = [f"Informe de {host}", "=" * 40]
+    for p, s in sorted(clasificado.items(), key=lambda kv: (orden[kv[1]], kv[0])):
+        lineas.append(f"[{s:9}] puerto {p}")
+    if not clasificado:
+        lineas.append("(ningún puerto abierto en el rango escaneado)")
+    return lineas
+```
+
+**Paso 5 — CLI con `argparse`.**
+
+```python title="escaner.py (continúa)"
+import argparse
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="escaner", description="Escáner de puertos de laboratorio")
+    ap.add_argument("host")
+    ap.add_argument("--desde", type=int, default=1)
+    ap.add_argument("--hasta", type=int, default=1024)
+    args = ap.parse_args()
+
+    puertos = list(range(args.desde, args.hasta + 1))
+    abiertos = escanear(args.host, puertos)
+    for linea in generar_informe(args.host, clasificar(abiertos)):
+        print(linea)
+
+if __name__ == "__main__":
+    main()
+```
+
+**Paso 6 — Pruébalo en Docker: escanea un contenedor objetivo, en red aislada, sin `sudo`.**
+
+```yaml title="docker-compose.yml"
 services:
   objetivo:
     image: nginx:alpine          # abre el puerto 80
   atacante:
     image: python:3.12-alpine
     depends_on: [objetivo]
+    volumes: ["./escaner.py:/escaner.py"]
     command: sleep infinity
 networks:
-  default: { internal: true }    # red aislada, sin Internet
+  default:
+    internal: true               # red aislada, sin salida a Internet
 ```
 
-```bash
+```bash title="Ejecutar"
 docker compose up -d
-docker compose exec atacante python3 - << 'PY'
-import socket
-def abierto(host, puerto, t=0.5):
-    with socket.socket() as s:
-        s.settimeout(t)
-        try: return s.connect_ex((host, puerto)) == 0
-        except OSError: return False
-for p in (22, 80, 443, 5432):
-    print(f"objetivo:{p} -> {'ABIERTO' if abierto('objetivo', p) else 'cerrado'}")
-PY
+docker compose exec atacante python3 /escaner.py objetivo --desde 1 --hasta 200
 docker compose down
 ```
 
-<details class="sol"><summary>Qué debe salir</summary>
+```text title="Salida esperada"
+Informe de objetivo
+========================================
+[OK       ] puerto 80
+```
 
+<details class="sol"><summary>📄 escaner.py completo</summary>
+
+```python
+import argparse, socket
+from concurrent.futures import ThreadPoolExecutor
+
+INSEGUROS = {21, 23, 25, 135, 445, 3389}
+REVISAR = {80, 8080, 110, 143}
+
+def es_objetivo_valido(host: str) -> bool:
+    return host in ("127.0.0.1", "localhost") or host.startswith("10.0.20.") or host == "objetivo"
+
+def puerto_abierto(host: str, puerto: int, timeout: float = 0.5) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        return s.connect_ex((host, puerto)) == 0
+
+def escanear(host: str, puertos: list[int], timeout: float = 0.3) -> list[int]:
+    if not es_objetivo_valido(host):
+        raise ValueError(f"objetivo no autorizado: {host} (solo laboratorio)")
+    with ThreadPoolExecutor(max_workers=50) as ex:
+        resultados = ex.map(lambda p: (p, puerto_abierto(host, p, timeout)), puertos)
+    return sorted(p for p, abierto in resultados if abierto)
+
+def severidad(puerto: int) -> str:
+    if puerto in INSEGUROS: return "INSEGURO"
+    if puerto in REVISAR: return "REVISAR"
+    return "OK"
+
+def clasificar(abiertos: list[int]) -> dict[int, str]:
+    return {p: severidad(p) for p in abiertos}
+
+def generar_informe(host: str, clasificado: dict[int, str]) -> list[str]:
+    orden = {"INSEGURO": 0, "REVISAR": 1, "OK": 2}
+    lineas = [f"Informe de {host}", "=" * 40]
+    for p, s in sorted(clasificado.items(), key=lambda kv: (orden[kv[1]], kv[0])):
+        lineas.append(f"[{s:9}] puerto {p}")
+    if not clasificado:
+        lineas.append("(ningún puerto abierto en el rango escaneado)")
+    return lineas
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="escaner", description="Escáner de puertos de laboratorio")
+    ap.add_argument("host")
+    ap.add_argument("--desde", type=int, default=1)
+    ap.add_argument("--hasta", type=int, default=1024)
+    args = ap.parse_args()
+    abiertos = escanear(args.host, list(range(args.desde, args.hasta + 1)))
+    for linea in generar_informe(args.host, clasificar(abiertos)):
+        print(linea)
+
+if __name__ == "__main__":
+    main()
 ```
-objetivo:22 -> cerrado
-objetivo:80 -> ABIERTO
-objetivo:443 -> cerrado
-objetivo:5432 -> cerrado
-```
-Solo el 80 está abierto (nginx). Es lo mismo que hace Nmap, pero escrito por ti y **contra tu propio contenedor**. Cambia la imagen del objetivo (por ejemplo `postgres`) y verás abrirse el 5432.
 </details>
 
-### Reto para ti (propuesto) — Escáner con informe y severidad
+---
 
-Amplía el laboratorio: en el mismo `docker-compose` añade **dos objetivos** (uno con un servicio "inseguro" como telnet/ftp y otro con web) y escribe un escáner en Python que recorra un **rango** de puertos de ambos, clasifique cada puerto abierto por **severidad** (INSEGURO/REVISAR/OK) y genere un **informe** ordenado por gravedad.
+## 10. Reto para ti (propuesto, sin solución)
+
+### 🎯 Escáner multi-objetivo con banner grabbing
+
+Amplía tu escáner para auditar **varios contenedores del laboratorio a la vez**, e identifica qué servicio hay detrás de cada puerto abierto leyendo su *banner* (lo que el servicio dice al conectar, cuando lo dice).
+
+```mermaid
+flowchart TB
+    subgraph "Red de laboratorio (internal: true)"
+    O1["objetivo-web<br/>nginx"]
+    O2["objetivo-ftp<br/>servicio inseguro"]
+    A["atacante<br/>(tu código)"]
+    end
+    A -->|escanea| O1
+    A -->|escanea| O2
+```
+
+**Objetivo.** Un `docker-compose.yml` con **al menos dos** objetivos distintos (por ejemplo `nginx` y algún servicio que hable al conectar, como un `redis` o un pequeño servidor de eco) en una red `internal: true`. Tu escáner recorre una lista de hosts, escanea cada uno, y para cada puerto abierto intenta leer el banner (ejercicio 13) para enriquecer el informe.
+
+**Requisitos**
+
+- CLI: `python escaner_multi.py objetivo1 objetivo2 --desde 1 --hasta 1024`.
+- Reutiliza `escanear`, `clasificar`, `generar_informe` y `intenta_leer_banner` de la sección anterior y del ejercicio 13.
+- El informe final agrupa por host, y dentro de cada host ordena por severidad.
+- Código tipado, `mypy` limpio.
+- Nada de `sudo`: todo en `docker compose up`, red `internal: true`.
 
 **Criterios de aceptación**
-- Usa `socket`, destino solo dentro de la red del lab, `timeout` corto.
-- Informe con host, puerto, servicio y severidad. Tipado y `mypy` limpio.
-- Acompaña un breve **informe de vulnerabilidades** (2–3 hallazgos con remediación).
+
+1. Escanea correctamente **más de un** host en la misma ejecución.
+2. Si un banner no se puede leer (timeout), el informe lo indica como `(sin banner)` en vez de fallar.
+3. El objetivo no válido (fuera del laboratorio) sigue lanzando `ValueError` como en el reto resuelto.
+
+**Pistas** (no solución): itera la lista de hosts y reutiliza `escanear` una vez por host · para el banner, recuerda que muchos servicios (como nginx) **no** envían nada hasta que tú hablas primero — está bien que la mayoría de banners salgan vacíos, es información real.
+
+**Si te sobra tiempo:** añade una opción `--formato json` que exporte el informe completo como JSON · investiga cómo un escáner real (Nmap) infiere el sistema operativo por las peculiaridades de la pila TCP/IP (esto no lo vas a programar, solo investigar y explicar en una frase).
+
+> Esto es justo el tipo de reto que resolverás en el **test práctico**.
 
 ---
 
-## Autoevaluación rápida
+## Autoevaluación rápida (conceptos)
 
-<details><summary>1. ¿Qué separa legalmente un pentest de un delito?</summary>La autorización previa, por escrito y con alcance definido.</details>
-<details><summary>2. ¿En qué fase encaja el escaneo de puertos?</summary>Enumeración (tras el reconocimiento).</details>
-<details><summary>3. ¿Qué devuelve <code>connect_ex</code> si el puerto está abierto?</summary><code>0</code>.</details>
-<details><summary>4. ¿Qué es el Equipo Púrpura?</summary>La colaboración de Rojo y Azul para mejorar la detección.</details>
-<details><summary>5. ¿La severidad CVSS es el riesgo del negocio?</summary>No: hay que cruzarla con el valor del activo.</details>
-<details><summary>6. ¿Sobre qué máquinas puedes practicar?</summary>Solo el laboratorio, localhost o plataformas que lo autorizan.</details>
-
----
+<details><summary>1. ¿Qué diferencia legal hay entre un pentest y un ataque?</summary>La autorización explícita por escrito.</details>
+<details><summary>2. ¿Qué fase del pentest cubre esta unidad?</summary>Enumeración: descubrir qué servicios están escuchando.</details>
+<details><summary>3. ¿Por qué el escaneo concurrente es tanto más rápido que el secuencial?</summary>Porque muchas esperas de red se solapan en vez de sumarse una tras otra.</details>
+<details><summary>4. ¿Qué hace el equipo Rojo, y qué hace el Azul?</summary>Rojo ataca (simulado) para encontrar fallos; Azul defiende y detecta.</details>
+<details><summary>5. ¿Qué es MITRE ATT&CK?</summary>Un catálogo público de técnicas de ataque reales, organizado por fases.</details>
 
 ## Glosario
 
 | Término | Definición |
 |---|---|
-| **Pentest** | Prueba de intrusión autorizada y acotada. |
-| **Alcance** | Sistemas y condiciones autorizadas de la prueba. |
-| **CVSS** | Puntuación de severidad de una vulnerabilidad. |
-| **Socket** | Punto final de comunicación de red en programación. |
-| **Red/Blue/Purple Team** | Ataque / defensa / colaboración. |
-| **ATT&CK** | Catálogo de técnicas de adversario de MITRE. |
-
----
+| **Pentest** | Prueba de penetración: ataque simulado y autorizado para encontrar fallos. |
+| **Alcance (scope)** | Qué sistemas están autorizados a probarse. |
+| **Enumeración** | Fase de descubrir qué servicios/puertos expone un sistema. |
+| **Banner grabbing** | Leer lo que un servicio "dice" al conectar, para identificarlo. |
+| **MITRE ATT&CK** | Catálogo público de técnicas de ataque, organizado por fases. |
+| **Equipo Rojo / Azul / Púrpura** | Ataca (simulado) / defiende / colabora entre ambos. |
 
 ## Cómo se evalúa esta unidad (RA5)
 
-
-El instrumento principal es un **test práctico**: resuelves en Python un **reto** parecido al de clase y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún **ejercicio práctico**).
+El instrumento principal es un **test práctico**: resuelves en Python un reto parecido al de esta unidad y se corrige **solo con su batería de tests**, siempre contra un objetivo de laboratorio (queda abierto, como complemento, algún ejercicio práctico e informe de vulnerabilidades).
 
 !!! reto "La nota, sin sorpresas"
-    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.
+    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5.
 
-El informe además te marca, **sin puntuar**, tres buenas prácticas que conviene cuidar: usar la técnica del RA (aquí, `socket`), pasar `mypy` y documentar el código.
+El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `socket`), pasar `mypy` y documentar el código.
