@@ -19,8 +19,8 @@ flowchart TB
     C3 --> D
     C1 --> P["RETO<br/>Verificador de integridad"]
     D --> P
-    style P fill:#0f766e,color:#fff,stroke:#0a5c52,stroke-width:2px
-    style A fill:#0f766e,color:#fff
+    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
 ```
 
 **Qué sabrás hacer al terminar:** explicar C·I·D y ampliarlo con autenticidad/trazabilidad · calcular y comparar hashes con criterio · cifrar y descifrar de verdad (simétrico y asimétrico) con `cryptography` · firmar un documento y generar un certificado X.509 · aplicar las fases del análisis forense y la cadena de custodia · escribir Python tipado con CLI profesional, comprobado con `mypy` y `pytest`.
@@ -38,11 +38,11 @@ Es el conjunto de medidas para proteger datos y servicios frente a accesos, alte
 
 ### 1.1 Los tres pilares: C·I·D
 
-| Pilar                      | Qué garantiza                                 | Se rompe cuando…            | La cripto que ayuda     |
-| -------------------------- | ---------------------------------------------- | ---------------------------- | ----------------------- |
-| **Confidencialidad** | Solo accede quien está autorizado             | Se filtra una base de datos  | Cifrado (§5)           |
-| **Integridad**       | La información no se altera sin permiso       | Alguien modifica una factura | Hash / firma (§4, §6) |
-| **Disponibilidad**   | El servicio está accesible cuando se necesita | Un ataque tumba la web       | Copias, redundancia     |
+| Pilar | Qué garantiza | Se rompe cuando… | La cripto que ayuda |
+|---|---|---|---|
+| **Confidencialidad** | Solo accede quien está autorizado | Se filtra una base de datos | Cifrado (§5) |
+| **Integridad** | La información no se altera sin permiso | Alguien modifica una factura | Hash / firma (§4, §6) |
+| **Disponibilidad** | El servicio está accesible cuando se necesita | Un ataque tumba la web | Copias, redundancia |
 
 Se amplían con **autenticidad** (el origen es quien dice ser) y **trazabilidad** (queda registro de quién hizo qué):
 
@@ -63,7 +63,7 @@ flowchart LR
 
 Lo modelamos ya con código — nada de listas en abstracto:
 
-```python
+```python title="clasificar_incidentes.py"
 from dataclasses import dataclass
 from enum import Enum
 
@@ -88,7 +88,7 @@ for i in INCIDENTES:
     print(f"[{i.pilar.name:16}] {i.descripcion}")
 ```
 
-```text
+```text title="Salida"
 [DISPONIBILIDAD ] Ransomware cifra los ficheros del servidor
 [CONFIDENCIALIDAD] Un empleado copia la lista de clientes a un USB
 [INTEGRIDAD      ] Cambian el número de cuenta en un albarán
@@ -113,7 +113,7 @@ flowchart LR
     Ri -->|si se materializa| Inc["Incidente"]
 ```
 
-```python
+```python title="riesgo_simple.py"
 def riesgo(probabilidad: float, impacto: float) -> float:
     """probabilidad en [0,1]; impacto en una escala (p. ej. euros o 1-10)."""
     return round(probabilidad * impacto, 2)
@@ -123,7 +123,7 @@ print(riesgo(probabilidad=0.7, impacto=10))   # alto: la amenaza es muy probable
 print(riesgo(probabilidad=0.05, impacto=10))  # bajo: la amenaza es rara
 ```
 
-```text
+```text title="Salida"
 7.0
 0.5
 ```
@@ -134,13 +134,13 @@ print(riesgo(probabilidad=0.05, impacto=10))  # bajo: la amenaza es rara
 
 No toda la seguridad es software: quien entra físicamente a la sala de servidores no necesita romper ningún cifrado.
 
-| Tipo                | Protege frente a             | Ejemplos                                                |
-| ------------------- | ---------------------------- | ------------------------------------------------------- |
-| **Física**   | Acceso físico no autorizado | Control de acceso al CPD, cerraduras, cámaras          |
-| **Ambiental** | El entorno                   | SAI (batería), climatización, detección de incendios |
-| **Lógica**   | Usos indebidos del sistema   | Contraseñas, permisos, cifrado, cortafuegos, copias    |
+| Tipo | Protege frente a | Ejemplos |
+|---|---|---|
+| **Física** | Acceso físico no autorizado | Control de acceso al CPD, cerraduras, cámaras |
+| **Ambiental** | El entorno | SAI (batería), climatización, detección de incendios |
+| **Lógica** | Usos indebidos del sistema | Contraseñas, permisos, cifrado, cortafuegos, copias |
 
-```python
+```python title="clasificar_medida.py"
 FISICA = {"camara", "cerradura", "armario", "torniquete", "biometria_entrada"}
 AMBIENTAL = {"sai", "climatizacion", "incendios", "humedad", "generador"}
 
@@ -155,7 +155,7 @@ for m in ["camara", "sai", "cortafuegos", "cifrado", "mfa"]:
     print(f"{m:12} -> {clasifica(m)}")
 ```
 
-```text
+```text title="Salida"
 camara       -> física
 sai          -> ambiental
 cortafuegos  -> lógica
@@ -167,7 +167,7 @@ mfa          -> lógica
 
 La regla **3-2-1**: al menos **3** copias, en **2** soportes distintos, con **1** fuera del sitio. Y **la copia que nunca se ha restaurado no cuenta como copia**: hay que probar la restauración.
 
-```python
+```python title="regla_321.py"
 from dataclasses import dataclass
 
 @dataclass
@@ -190,7 +190,7 @@ copias = [Copia("disco_local", "sitio"), Copia("nas", "sitio")]
 print(cumple_321(copias))
 ```
 
-```text
+```text title="Salida"
 (False, ['solo hay 2 copias, hacen falta 3', 'ninguna copia está fuera del sitio'])
 ```
 
@@ -203,7 +203,7 @@ print(cumple_321(copias))
 
 Python es tu herramienta durante todo el módulo. Monta el entorno una vez:
 
-```bash
+```bash title="Preparar el entorno"
 python -m venv .venv
 source .venv/bin/activate         # Windows: .venv\Scripts\Activate.ps1
 pip install pytest mypy cryptography
@@ -211,7 +211,7 @@ pip install pytest mypy cryptography
 
 Escribimos **Python tipado**: las anotaciones documentan y permiten que `mypy` cace errores sin ejecutar nada.
 
-```python
+```python title="Tu primera huella digital"
 import hashlib
 
 def hash_de_texto(texto: str) -> str:      # (1)!
@@ -222,12 +222,12 @@ print(hash_de_texto("hola"))                # (3)!
 print(hash_de_texto("hola"))                # (4)!
 ```
 
-1. Las **anotaciones de tipo** (`str -> str`) documentan y permiten que `mypy` detecte errores sin ejecutar.
-2. `.encode("utf-8")` convierte el texto en **bytes**, que es lo que acepta `hashlib`. Olvidarlo es el error clásico.
-3. Imprime `b221d9db…`: 64 caracteres hexadecimales (256 bits).
-4. El mismo texto da **siempre** el mismo hash — lo comprobamos llamando dos veces.
+1.  Las **anotaciones de tipo** (`str -> str`) documentan y permiten que `mypy` detecte errores sin ejecutar.
+2.  `.encode("utf-8")` convierte el texto en **bytes**, que es lo que acepta `hashlib`. Olvidarlo es el error clásico.
+3.  Imprime `b221d9db…`: 64 caracteres hexadecimales (256 bits).
+4.  El mismo texto da **siempre** el mismo hash — lo comprobamos llamando dos veces.
 
-```text
+```text title="Salida"
 b221d9dbb083a7f33428d7c2a3c3198ae925614d70210e28716ccaa7cd4ddb79
 b221d9dbb083a7f33428d7c2a3c3198ae925614d70210e28716ccaa7cd4ddb79
 ```
@@ -241,11 +241,11 @@ b221d9dbb083a7f33428d7c2a3c3198ae925614d70210e28716ccaa7cd4ddb79
 
 Una **función hash** transforma cualquier dato en una huella de longitud fija.
 
-| Propiedad                         | Qué significa                                    |
-| --------------------------------- | ------------------------------------------------- |
-| **Determinista**            | El mismo dato da siempre el mismo hash            |
-| **Efecto avalancha**        | Cambiar un bit cambia por completo la salida      |
-| **Unidireccional**          | No se puede volver del hash al dato               |
+| Propiedad | Qué significa |
+|---|---|
+| **Determinista** | El mismo dato da siempre el mismo hash |
+| **Efecto avalancha** | Cambiar un bit cambia por completo la salida |
+| **Unidireccional** | No se puede volver del hash al dato |
 | **Resistente a colisiones** | Es inviable encontrar dos datos con el mismo hash |
 
 ```mermaid
@@ -259,7 +259,7 @@ flowchart LR
 
 ### 4.1 Efecto avalancha, medido con código
 
-```python
+```python title="avalancha.py"
 import hashlib
 
 def h(t: str) -> str:
@@ -275,7 +275,7 @@ print(h(b))
 print(f"Cambian {avalancha(a, b)} de 64 caracteres del hash")
 ```
 
-```text
+```text title="Salida"
 1ea9f394f510e2beb43cb0b317258b09bce9f4fccef69407360483690ac9b746
 b64167f58e1cf0c322747fbe1a7361084a004ffb5c145fd64e5413ef11215965
 Cambian 57 de 64 caracteres del hash
@@ -285,7 +285,7 @@ Cambian 57 de 64 caracteres del hash
 
 ### 4.2 Elegir el algoritmo (no todos valen)
 
-```python
+```python title="comparar_algoritmos.py"
 import hashlib
 
 dato = b"documento importante"
@@ -294,7 +294,7 @@ for alg in ("md5", "sha1", "sha256", "sha3_256", "blake2b"):
     print(f"{alg:9} {len(d)*4:4} bits   {d[:24]}...")
 ```
 
-```text
+```text title="Salida"
 md5        128 bits   73943af0696212b0ebfb60cf...
 sha1       160 bits   3d8dd0ba48b54b431502c4f6...
 sha256     256 bits   dd1cd769ac316412f9a0669e...
@@ -302,15 +302,15 @@ sha3_256   256 bits   ce5c2e89bddab0174ba19299...
 blake2b    512 bits   e29f58fbe35b5357d889089c...
 ```
 
-| Algoritmo                | Estado                      | Uso recomendado                                       |
-| ------------------------ | --------------------------- | ----------------------------------------------------- |
-| MD5 / SHA-1              | **Rotos**             | Nunca para integridad seria                           |
-| **SHA-256**        | Vigente, estándar de facto | Integridad, firma, certificados TLS                   |
-| **SHA-3 / BLAKE2** | Vigente, más modernos      | Alternativas cuando se busca velocidad o margen extra |
+| Algoritmo | Estado | Uso recomendado |
+|---|---|---|
+| MD5 / SHA-1 | **Rotos** | Nunca para integridad seria |
+| **SHA-256** | Vigente, estándar de facto | Integridad, firma, certificados TLS |
+| **SHA-3 / BLAKE2** | Vigente, más modernos | Alternativas cuando se busca velocidad o margen extra |
 
 ### 4.3 Hash de un fichero grande (por bloques) y comparación segura
 
-```python
+```python title="hash_fichero.py"
 import hashlib, hmac
 from pathlib import Path
 
@@ -342,16 +342,16 @@ def integro(esperado: str, actual: str) -> bool:
 
 Cifrar es transformar un mensaje para que solo lo lea quien tenga la clave.
 
-|                     | **Simétrico**                      | **Asimétrico**           |
-| ------------------- | ----------------------------------------- | ------------------------------- |
-| Claves              | Una sola, compartida                      | Par: pública + privada         |
-| Algoritmos típicos | AES, ChaCha20 (Fernet los usa por debajo) | RSA, curvas elípticas (ECC)    |
-| Ventaja             | Muy rápido                               | No hay que compartir un secreto |
-| Problema            | ¿Cómo comparto la clave con seguridad?  | Lento para grandes volúmenes   |
+| | **Simétrico** | **Asimétrico** |
+|---|---|---|
+| Claves | Una sola, compartida | Par: pública + privada |
+| Algoritmos típicos | AES, ChaCha20 (Fernet los usa por debajo) | RSA, curvas elípticas (ECC) |
+| Ventaja | Muy rápido | No hay que compartir un secreto |
+| Problema | ¿Cómo comparto la clave con seguridad? | Lento para grandes volúmenes |
 
 ### 5.1 Simétrico de verdad: Fernet (AES) con `cryptography`
 
-```python
+```python title="simetrico_fernet.py"
 from cryptography.fernet import Fernet, InvalidToken
 
 clave = Fernet.generate_key()          # ⚠️ guárdala en secreto: cifra y descifra por igual
@@ -369,7 +369,7 @@ except InvalidToken:
     print("Detectado: el token manipulado NO se puede descifrar")
 ```
 
-```text
+```text title="Salida"
 Cifrado : b'gAAAAABo3k9f...' ...
 Descifrado: b'numero de cuenta: ES12 3456 7890'
 Detectado: el token manipulado NO se puede descifrar
@@ -379,7 +379,7 @@ Detectado: el token manipulado NO se puede descifrar
 
 ### 5.2 Asimétrico: RSA (candado público, llave privada)
 
-```python
+```python title="asimetrico_rsa.py"
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes
 
@@ -397,7 +397,7 @@ print("Cifrado (bytes):", cifrado[:20], "...")
 print("Descifrado:", privada_ana.decrypt(cifrado, oaep))
 ```
 
-```text
+```text title="Salida"
 Cifrado (bytes): b'\x8f\x3a\x1c...' ...
 Descifrado: b'clave de sesion: 7f3a9c'
 ```
@@ -435,7 +435,7 @@ sequenceDiagram
     Note over V: ¿coinciden? → auténtico e íntegro
 ```
 
-```python
+```python title="firma_rsa.py"
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
@@ -458,7 +458,7 @@ print("Documento original :", verifica(documento, firma))
 print("Documento alterado :", verifica(b"Transferir 999 EUR a la ES12-555", firma))
 ```
 
-```text
+```text title="Salida"
 Documento original : True
 Documento alterado : False
 ```
@@ -469,7 +469,7 @@ Documento alterado : False
 
 Un **certificado X.509** vincula una clave pública con una identidad. En producción lo firma una **CA** (Autoridad de Certificación); para practicar, generamos uno **autofirmado**:
 
-```python
+```python title="certificado_x509.py"
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
@@ -500,7 +500,7 @@ pem = certificado.public_bytes(serialization.Encoding.PEM)
 print(pem.decode().splitlines()[0])
 ```
 
-```text
+```text title="Salida"
 Sujeto      : CN=cmo314.local
 Emisor      : CN=cmo314.local
 Válido hasta: 2027-09-14
@@ -508,11 +508,11 @@ Autofirmado : True
 -----BEGIN CERTIFICATE-----
 ```
 
-| Concepto                                   | Qué es                                                                                        |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| **CA (Autoridad de Certificación)** | Entidad de confianza que firma certificados ajenos                                             |
-| **Certificado autofirmado**          | El emisor y el sujeto son el mismo — vale para pruebas,**no** para producción pública |
-| **PKI**                              | Toda la infraestructura: CAs, certificados, revocación, cadenas de confianza                  |
+| Concepto | Qué es |
+|---|---|
+| **CA (Autoridad de Certificación)** | Entidad de confianza que firma certificados ajenos |
+| **Certificado autofirmado** | El emisor y el sujeto son el mismo — vale para pruebas, **no** para producción pública |
+| **PKI** | Toda la infraestructura: CAs, certificados, revocación, cadenas de confianza |
 
 !!! reto "Reto rápido 5"
     Si tu navegador visita una web con un certificado **autofirmado**, avisa de "conexión no segura". ¿Por qué, si el cifrado funciona igual de bien?
@@ -535,7 +535,7 @@ flowchart LR
 
 Cada evidencia debe demostrar que **no se ha alterado** desde su recogida: se trabaja sobre una **copia**, se calcula el **hash** del original y de la copia (deben coincidir), y se registra quién la tuvo y cuándo.
 
-```python
+```python title="cadena_custodia.py"
 import hmac
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -570,14 +570,14 @@ print(verifica_integridad("abc123", "abc999"))   # ⚠️ ALTERADA
 
 ## 8. Errores frecuentes (ten esto a mano)
 
-| Error                                      | Causa                                        | Solución                                           |
-| ------------------------------------------ | -------------------------------------------- | --------------------------------------------------- |
-| `Strings must be encoded before hashing` | Pasar`str` a `hashlib`                   | `.encode("utf-8")` primero                        |
-| Hashes que "no coinciden"                  | Espacios, mayúsculas o saltos de línea     | Normaliza antes de comparar                         |
-| Comparar hashes/secretos con`==`         | Filtra información por tiempos              | `hmac.compare_digest(a, b)`                       |
-| Fichero grande lentísimo                  | Leerlo entero en memoria                     | Leer por bloques con`update()`                    |
-| Usar MD5 para integridad                   | Algoritmo roto (colisiones conocidas)        | SHA-256 o BLAKE2                                    |
-| `InvalidSignature` inesperado            | Verificar con datos distintos a los firmados | Comprueba que pasas el**mismo** `documento` |
+| Error | Causa | Solución |
+|---|---|---|
+| `Strings must be encoded before hashing` | Pasar `str` a `hashlib` | `.encode("utf-8")` primero |
+| Hashes que "no coinciden" | Espacios, mayúsculas o saltos de línea | Normaliza antes de comparar |
+| Comparar hashes/secretos con `==` | Filtra información por tiempos | `hmac.compare_digest(a, b)` |
+| Fichero grande lentísimo | Leerlo entero en memoria | Leer por bloques con `update()` |
+| Usar MD5 para integridad | Algoritmo roto (colisiones conocidas) | SHA-256 o BLAKE2 |
+| `InvalidSignature` inesperado | Verificar con datos distintos a los firmados | Comprueba que pasas el **mismo** `documento` |
 
 ---
 
@@ -585,44 +585,38 @@ print(verifica_integridad("abc123", "abc999"))   # ⚠️ ALTERADA
 
 > Una única escalera, sin saltos: empieza por el 🟢 1 y no mires la solución hasta intentarlo. Al final tienes preguntas del mismo estilo que el examen. Librerías reales: `hashlib`, `hmac`, `secrets`, `pathlib`, `re`, `cryptography`.
 
-**1 · 🟢 Huella de un texto** — `sha256_hex(texto: str) -> str`.
-
-<details class="sol"><summary>Solución</summary>
-
-```python
-import hashlib
-def sha256_hex(texto: str) -> str:
-    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
-```
-
-</details>
-
-**2 · 🟢 ¿Mismo contenido?** — `mismo_contenido(a: str, b: str) -> bool`: ¿tienen el mismo hash?
-
+**1 · 🟢 Verificar una descarga** — acabas de descargar un fichero y la web publica su SHA-256. `descarga_integra(contenido: str, hash_publicado: str) -> bool`: ¿coincide de verdad?
 <details class="sol"><summary>Solución</summary>
 
 ```python
 import hashlib, hmac
-def _h(t: str) -> str: return hashlib.sha256(t.encode()).hexdigest()
-def mismo_contenido(a: str, b: str) -> bool:
-    return hmac.compare_digest(_h(a), _h(b))
+def descarga_integra(contenido: str, hash_publicado: str) -> bool:
+    hash_real = hashlib.sha256(contenido.encode("utf-8")).hexdigest()
+    return hmac.compare_digest(hash_real, hash_publicado.strip().lower())
 ```
+</details>
 
+**2 · 🟢 ¿Ha cambiado el fichero?** — guardaste el hash de un `config.ini` la semana pasada. `ha_cambiado(hash_guardado: str, contenido_actual: str) -> bool`: ¿es distinto ahora? (este es, en miniatura, exactamente lo que hace `auditar()` en el reto de esta unidad).
+<details class="sol"><summary>Solución</summary>
+
+```python
+import hashlib, hmac
+def ha_cambiado(hash_guardado: str, contenido_actual: str) -> bool:
+    hash_actual = hashlib.sha256(contenido_actual.encode("utf-8")).hexdigest()
+    return not hmac.compare_digest(hash_actual, hash_guardado.strip().lower())
+```
 </details>
 
 **3 · 🟢 Clasificar incidente** — `pilar(x)` para `"filtracion"/"alteracion"/"caida"` → `"C"`/`"I"`/`"D"`.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
 def pilar(x: str) -> str:
     return {"filtracion": "C", "alteracion": "I", "caida": "D"}.get(x, "?")
 ```
-
 </details>
 
 **4 · 🟢 ¿Formato de hash válido?** — `es_sha256(cadena: str) -> bool` con una expresión regular (64 hex).
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -630,11 +624,9 @@ import re
 def es_sha256(cadena: str) -> bool:
     return bool(re.fullmatch(r"[0-9a-f]{64}", cadena.strip().lower()))
 ```
-
 </details>
 
 **5 · 🟡 Hash de bytes por bloques** — `hash_bloques(datos: bytes, n: int = 1024) -> str`.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -645,11 +637,9 @@ def hash_bloques(datos: bytes, n: int = 1024) -> str:
         h.update(datos[i:i + n])
     return h.hexdigest()
 ```
-
 </details>
 
 **6 · 🟡 Contar cambios (avalancha)** — `avalancha(a: str, b: str) -> int`: caracteres hex distintos entre sus SHA-256.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -659,11 +649,9 @@ def avalancha(a: str, b: str) -> int:
     hb = hashlib.sha256(b.encode()).hexdigest()
     return sum(1 for x, y in zip(ha, hb) if x != y)
 ```
-
 </details>
 
 **7 · 🟡 Sal aleatoria** — `con_sal(pwd: str) -> tuple[str, str]` con `secrets` (no `random`).
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -672,33 +660,27 @@ def con_sal(pwd: str) -> tuple[str, str]:
     sal = secrets.token_hex(16)
     return sal, hashlib.sha256((sal + pwd).encode()).hexdigest()
 ```
-
 </details>
 
 **8 · 🟡 Detectar el algoritmo por longitud** — `adivina(hash_hex: str) -> str`: `"md5"` (32), `"sha1"` (40), `"sha256"` (64) o `"desconocido"`.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
 def adivina(hash_hex: str) -> str:
     return {32: "md5", 40: "sha1", 64: "sha256"}.get(len(hash_hex.strip()), "desconocido")
 ```
-
 </details>
 
 **9 · 🟠 Manifiesto: ficheros alterados** — `alterados(esperados, actuales) -> list[str]`.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
 def alterados(esperados: dict[str, str], actuales: dict[str, str]) -> list[str]:
     return [f for f, h in esperados.items() if actuales.get(f) != h]
 ```
-
 </details>
 
 **10 · 🟠 Auditoría completa** — `audita(man, ahora) -> dict[str,str]` con estados `OK`/`MODIFICADO`/`NUEVO`/`AUSENTE`.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -711,11 +693,9 @@ def audita(man: dict[str, str], ahora: dict[str, str]) -> dict[str, str]:
             r[f] = "NUEVO"
     return r
 ```
-
 </details>
 
 **11 · 🟠 Detectar ficheros duplicados** — `duplicados(archivos: dict[str,str]) -> dict[str, list[str]]`: agrupa nombres que comparten el mismo hash.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -726,11 +706,9 @@ def duplicados(archivos: dict[str, str]) -> dict[str, list[str]]:
         por_hash[h].append(nombre)
     return {h: n for h, n in por_hash.items() if len(n) > 1}
 ```
-
 </details>
 
 **12 · 🔴 Autenticar un mensaje (HMAC)** — `firma(clave, msg) -> str` y `valida(clave, msg, f) -> bool`. Así se firman webhooks y APIs reales.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -740,11 +718,9 @@ def firma(clave: str, msg: str) -> str:
 def valida(clave: str, msg: str, f: str) -> bool:
     return hmac.compare_digest(firma(clave, msg), f)
 ```
-
 </details>
 
 **13 · 🔴 Cadena de hashes (mini-blockchain)** — `cadena(bloques: list[str]) -> list[str]`: cada hash depende del anterior; `cadena_valida(bloques, hashes) -> bool` detecta si algo se alteró.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -760,11 +736,9 @@ def cadena(bloques: list[str]) -> list[str]:
 def cadena_valida(bloques: list[str], hashes: list[str]) -> bool:
     return cadena(bloques) == hashes
 ```
-
 </details>
 
 **14 · 🔴 Firma RSA con `cryptography`** — dados `privada`/`publica`, `firma_rsa(privada, doc: bytes) -> bytes` y `verifica_rsa(publica, doc, firma) -> bool`.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -782,11 +756,9 @@ def verifica_rsa(publica, doc: bytes, firma: bytes) -> bool:
     except InvalidSignature:
         return False
 ```
-
 </details>
 
 **15 · 🔴 ¿Cuánto le queda al certificado?** — `dias_restantes(fecha_expiracion: datetime) -> int`, usando `datetime.now(timezone.utc)`.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -795,11 +767,9 @@ from datetime import datetime, timezone
 def dias_restantes(fecha_expiracion: datetime) -> int:
     return (fecha_expiracion - datetime.now(timezone.utc)).days
 ```
-
 </details>
 
 **16 · 🔴 Manifiesto en dos formatos** — `a_texto(man: dict[str,str]) -> str` en formato `sha256sum` (`hash  nombre` por línea) y `de_texto(s: str) -> dict[str,str]` que lo lee de vuelta.
-
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -814,7 +784,6 @@ def de_texto(s: str) -> dict[str, str]:
             m[n.strip()] = h.strip().lower()
     return m
 ```
-
 </details>
 
 ### Preguntas tipo test práctico
@@ -822,50 +791,39 @@ def de_texto(s: str) -> dict[str, str]:
 > Mismo estilo que el examen: sobre **código y retos**, no sobre definiciones sueltas. Respóndelas sin mirar atrás.
 
 **P1.** Si llamas `hash_fichero()` dos veces seguidas sobre el **mismo** fichero sin tocarlo, ¿qué devuelve?
-
 <details class="sol"><summary>Respuesta</summary>El mismo hash las dos veces — es <b>determinista</b>. Si diera algo distinto, no serviría para detectar cambios.</details>
 
 **P2.** ¿Qué imprime este fragmento?
-
 ```python
 import hashlib
 a = hashlib.sha256(b"CMO314").hexdigest()
 b = hashlib.sha256(b"CMO314").hexdigest()
 print(a == b)
 ```
-
 <details class="sol"><summary>Respuesta</summary><code>True</code>. Mismo dato de entrada, misma salida.</details>
 
 **P3.** En el ejercicio 12 (HMAC), ¿por qué `valida()` no compara las firmas con `==`?
-
 <details class="sol"><summary>Respuesta</summary>Porque <code>==</code> se detiene en el primer carácter distinto y filtra información por el tiempo de respuesta (ataque de temporización). <code>hmac.compare_digest</code> siempre tarda lo mismo.</details>
 
 **P4.** En `audita()` (ejercicio 10), un fichero que estaba en el manifiesto y ya no existe, ¿qué estado recibe?
-
 <details class="sol"><summary>Respuesta</summary><code>"AUSENTE"</code>: está en <code>man</code> pero no en <code>ahora</code>.</details>
 
 **P5.** En el ejercicio 13 (cadena de hashes), si alteras el bloque `"tx1"`, ¿qué hashes de la cadena cambian: solo el de ese bloque, o también los siguientes?
-
 <details class="sol"><summary>Respuesta</summary>Ese y <b>todos los posteriores</b>, porque cada hash incorpora el anterior. Es la base de cómo una blockchain detecta manipulaciones retroactivas.</details>
 
 **P6.** ¿Por qué `simetrico_fernet.py` lanza `InvalidToken` con un mensaje manipulado en vez de devolver datos corruptos?
-
 <details class="sol"><summary>Respuesta</summary>Porque Fernet es cifrado <b>autenticado</b>: verifica integridad además de cifrar. Si el texto cifrado cambió, rechaza explícitamente en vez de "descifrar basura".</details>
 
 **P7.** ¿Con qué clave firmas un documento para demostrar que lo firmaste tú, y con cuál lo verifica cualquiera?
-
 <details class="sol"><summary>Respuesta</summary>Firmas con tu clave <b>privada</b>; cualquiera verifica con tu clave <b>pública</b>.</details>
 
 **P8.** Un certificado X.509 tiene `subject == issuer`. ¿Qué tipo de certificado es?
-
 <details class="sol"><summary>Respuesta</summary><b>Autofirmado</b>: nadie de confianza (una CA reconocida) lo ha avalado.</details>
 
 **P9.** ¿Qué pasa si ejecutas dos veces seguidas un `generar` de manifiesto sobre la misma carpeta sin cambiar nada?
-
 <details class="sol"><summary>Respuesta</summary>Se sobrescribe con los mismos hashes (nada cambió), así que una auditoría posterior daría todo <code>OK</code>. Es idempotente.</details>
 
 **P10.** ¿Por qué en forense se calcula el hash de la evidencia **antes** de analizarla?
-
 <details class="sol"><summary>Respuesta</summary>Para poder demostrar después que el análisis no la alteró — es el precinto digital de la cadena de custodia.</details>
 
 ---
@@ -884,7 +842,7 @@ flowchart LR
 
 **Paso 1 — Hash de un fichero.** La pieza más pequeña: hashear leyendo por bloques, para que funcione igual con 1 KB que con 10 GB.
 
-```python
+```python title="verificador.py"
 import hashlib
 from pathlib import Path
 
@@ -898,7 +856,7 @@ def hash_fichero(ruta: Path, algoritmo: str = "sha256") -> str:
 
 **Paso 2 — Manifiesto de una carpeta entera.** Recorremos con `pathlib.rglob` y hasheamos cada fichero, saltando el propio manifiesto para no auto-referenciarnos:
 
-```python
+```python title="verificador.py (continúa)"
 def generar_manifiesto(carpeta: Path, algoritmo: str = "sha256") -> dict[str, str]:
     manifiesto: dict[str, str] = {}
     for ruta in sorted(carpeta.rglob("*")):
@@ -909,7 +867,7 @@ def generar_manifiesto(carpeta: Path, algoritmo: str = "sha256") -> dict[str, st
 
 **Paso 3 — Persistir en JSON.** Un manifiesto real se guarda estructurado, no como texto suelto: así es fácil de extender (algoritmo, fecha…).
 
-```python
+```python title="verificador.py (continúa)"
 import json
 from datetime import datetime, timezone
 
@@ -924,7 +882,7 @@ def cargar(origen: Path) -> dict[str, str]:
 
 **Paso 4 — Auditar.** El corazón de la herramienta: comparar lo guardado con lo actual, en tiempo constante.
 
-```python
+```python title="verificador.py (continúa)"
 import hmac
 
 def auditar(previo: dict[str, str], actual: dict[str, str]) -> dict[str, str]:
@@ -944,7 +902,7 @@ def auditar(previo: dict[str, str], actual: dict[str, str]) -> dict[str, str]:
 
 **Paso 5 — CLI profesional con `argparse`.** Nada de leer `sys.argv` a mano: `argparse` da ayuda automática (`-h`), validación de opciones y aspecto de herramienta real.
 
-```python
+```python title="verificador.py (continúa)"
 import argparse
 
 def main() -> None:
@@ -973,7 +931,7 @@ if __name__ == "__main__":
 
 **Paso 6 — Pruébalo como cadena de custodia (Docker, sin `sudo`).**
 
-```yaml
+```yaml title="docker-compose.yml"
 services:
   demo:
     image: python:3.12-alpine
@@ -989,11 +947,11 @@ services:
              python /verificador.py auditar ."
 ```
 
-```bash
+```bash title="Ejecutar"
 mkdir -p datos && docker compose run --rm demo
 ```
 
-```text
+```text title="Salida esperada"
 Manifiesto creado en datos/MANIFEST.json
 --- alguien altera config.conf ---
 [MODIFICADO] app.conf
@@ -1058,7 +1016,6 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
-
 </details>
 
 ---
@@ -1120,18 +1077,18 @@ flowchart TB
 
 ## Glosario
 
-| Término                                   | Definición                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------------ |
-| **C·I·D**                          | Confidencialidad, integridad y disponibilidad.                           |
-| **Hash**                             | Huella de longitud fija de un dato; unidireccional y determinista.       |
-| **Efecto avalancha**                 | Un cambio mínimo altera casi todo el hash.                              |
-| **HMAC**                             | Hash con clave secreta: autentica un mensaje, no solo lo hashea.         |
-| **Cifrado simétrico / asimétrico** | Una clave compartida / par pública-privada.                             |
-| **Cifrado autenticado (AEAD)**       | Cifrado que además detecta si el texto cifrado fue manipulado.          |
-| **Firma electrónica**               | Hash cifrado con la clave privada; prueba autoría e integridad.         |
-| **Certificado / CA / PKI**           | Vínculo clave-identidad / quien lo firma / la infraestructura completa. |
-| **Cadena de custodia**               | Garantía de que una evidencia no se ha alterado.                        |
-| **HIDS**                             | Sistema que detecta cambios no autorizados en los ficheros de un host.   |
+| Término | Definición |
+|---|---|
+| **C·I·D** | Confidencialidad, integridad y disponibilidad. |
+| **Hash** | Huella de longitud fija de un dato; unidireccional y determinista. |
+| **Efecto avalancha** | Un cambio mínimo altera casi todo el hash. |
+| **HMAC** | Hash con clave secreta: autentica un mensaje, no solo lo hashea. |
+| **Cifrado simétrico / asimétrico** | Una clave compartida / par pública-privada. |
+| **Cifrado autenticado (AEAD)** | Cifrado que además detecta si el texto cifrado fue manipulado. |
+| **Firma electrónica** | Hash cifrado con la clave privada; prueba autoría e integridad. |
+| **Certificado / CA / PKI** | Vínculo clave-identidad / quien lo firma / la infraestructura completa. |
+| **Cadena de custodia** | Garantía de que una evidencia no se ha alterado. |
+| **HIDS** | Sistema que detecta cambios no autorizados en los ficheros de un host. |
 
 ## Cómo se evalúa esta unidad (RA1)
 

@@ -14,8 +14,8 @@ flowchart TB
     C --> D["Anonimización<br/>con re"]
     B --> P["RETO<br/>Verificador de cumplimiento"]
     D --> P
-    style P fill:#0f766e,color:#fff,stroke:#0a5c52,stroke-width:2px
-    style A fill:#16294a,color:#fff
+    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
 ```
 
 **Qué sabrás hacer al terminar:** explicar los principios del RGPD y sus bases de licitud · diferenciar seudonimización de anonimización · seudonimizar un identificador con `hashlib` de forma estable e irreversible · anonimizar texto libre con `re` (DNI, emails) · situar la LSSI-CE, el ENS y NIS2 · construir un verificador de cumplimiento y anonimizador, tipado y probado.

@@ -15,8 +15,8 @@ flowchart TB
     D --> E["Autenticación<br/>multifactor (MFA)"]
     B --> P["RETO<br/>Riesgo y contraseñas"]
     D --> P
-    style P fill:#0f766e,color:#fff,stroke:#0a5c52,stroke-width:2px
-    style A fill:#16294a,color:#fff
+    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
 ```
 
 **Qué sabrás hacer al terminar:** distinguir activo, amenaza, vulnerabilidad e impacto · calcular riesgo cualitativo y cuantitativo (ALE) · **validar entradas** con `raise`/`try`/`except`, incluidas excepciones propias · diseñar una política de contraseñas y medir su fuerza · explicar los tres factores de autenticación y por qué el MFA los combina · construir una herramienta de auditoría de riesgo y contraseñas, tipada y probada.

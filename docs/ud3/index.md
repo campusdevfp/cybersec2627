@@ -14,8 +14,8 @@ flowchart TB
     C --> D["Reglas como objetos"]
     D --> E["VPN y acceso remoto"]
     D --> P["RETO<br/>Motor de cortafuegos"]
-    style P fill:#0f766e,color:#fff,stroke:#0a5c52,stroke-width:2px
-    style A fill:#16294a,color:#fff
+    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
 ```
 
 **Qué sabrás hacer al terminar:** explicar qué es una ACL y la política "deny by default" · diseñar una DMZ · escribir clases en Python con `@dataclass`, métodos y herencia · modelar reglas de cortafuegos como objetos que se evalúan a sí mismos · explicar VPN y AAA (autenticación, autorización, auditoría) · construir un cortafuegos evaluable por CLI, tipado y probado.

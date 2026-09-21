@@ -19,8 +19,8 @@ flowchart TB
     B --> F["Equipos Rojo/Azul<br/>y MITRE ATT&CK"]
     D --> P["RETO<br/>Escáner de puertos"]
     E --> P
-    style P fill:#0f766e,color:#fff,stroke:#0a5c52,stroke-width:2px
-    style A fill:#16294a,color:#fff
+    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
 ```
 
 **Qué sabrás hacer al terminar:** distinguir hacking ético de delito informático, y las fases de un pentest · usar `socket` para sondear si un puerto está abierto · escanear rangos de puertos de forma concurrente con `concurrent.futures` · clasificar hallazgos por severidad y redactar un informe · situar el marco MITRE ATT&CK y los equipos Rojo/Azul/Púrpura · construir un escáner de puertos con CLI, tipado y probado.
