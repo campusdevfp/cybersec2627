@@ -477,37 +477,6 @@ def informe(eventos: list[dict[str, str]], umbral: int = 5) -> list[str]:
 ```
 </details>
 
-### Preguntas tipo test práctico
-
-**P1.** ¿Qué devuelve `re.search(patron, linea)` si la línea no encaja con el patrón?
-<details class="sol"><summary>Respuesta</summary><code>None</code>. Por eso siempre hay que comprobar <code>if m:</code> antes de usar <code>m["campo"]</code>.</details>
-
-**P2.** En `parsear_log`, ¿qué pasa con una línea corrupta que no encaja con el patrón?
-<details class="sol"><summary>Respuesta</summary>Se descarta silenciosamente (<code>parsear_evento</code> devuelve <code>None</code> y no se añade a la lista) — el parser no se rompe.</details>
-
-**P3.** ¿Cuál es la diferencia entre `re.match` y `re.search`?
-<details class="sol"><summary>Respuesta</summary><code>match</code> solo comprueba si el patrón encaja al <b>principio</b> de la cadena; <code>search</code> lo busca en cualquier parte.</details>
-
-**P4.** Si `Counter` cuenta también los eventos `OK`, ¿qué falta en el bucle?
-<details class="sol"><summary>Respuesta</summary>El filtro <code>if e["estado"] == "FALLO":</code> antes de incrementar el contador.</details>
-
-**P5.** En el ejercicio 12 (password spraying), ¿por qué se cuentan **usuarios distintos** en vez de fallos totales?
-<details class="sol"><summary>Respuesta</summary>Porque el spraying prueba <b>pocas</b> contraseñas contra <b>muchos</b> usuarios — contar fallos totales no lo distinguiría de una fuerza bruta normal contra un solo usuario.</details>
-
-**P6.** ¿Qué imprime esto?
-```python
-import re
-m = re.search(r"ip=(?P<ip>\S+)", "estado=OK ip=10.0.0.1")
-print(m["ip"] if m else "sin match")
-```
-<details class="sol"><summary>Respuesta</summary><code>10.0.0.1</code> — el grupo con nombre <code>ip</code> captura hasta el siguiente espacio (<code>\S+</code>).</details>
-
-**P7.** ¿Por qué una IP con muchos fallos pero **sin ningún** `OK` es menos crítica que una con pocos fallos seguidos de un `OK`?
-<details class="sol"><summary>Respuesta</summary>Porque sin <code>OK</code> el atacante no ha entrado; con un <code>OK</code> posterior, probablemente acertó la contraseña — es la diferencia entre ruido y una brecha real.</details>
-
-**P8.** ¿Qué hace `ipaddress.ip_address("10.0.20.5").is_private`?
-<details class="sol"><summary>Respuesta</summary>Devuelve <code>True</code>: <code>10.0.20.5</code> pertenece a un rango privado (RFC 1918), típico de una red local o de laboratorio.</details>
-
 ---
 
 ## 9. Reto resuelto, paso a paso — Detector de fuerza bruta profesional
@@ -741,3 +710,144 @@ El instrumento principal es un **test práctico**: resuelves en Python un reto p
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5.
 
 El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `re`), pasar `mypy` y documentar el código.
+
+---
+
+## Simulacro de examen tipo test
+
+> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+
+**1.** Según `clasificar_malware.py`, ¿qué devuelve `clasifica("cifra_y_pide_rescate")`?
+
+A) `"virus"`
+B) `"ransomware"`
+C) `"gusano"`
+D) `"desconocido"`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Es la entrada directa del diccionario <code>COMPORTAMIENTO_A_TIPO</code>.</details>
+
+**2.** ¿Qué diferencia a un virus de un gusano, según la tabla de la unidad?
+
+A) El virus es más peligroso
+B) El gusano necesita un fichero hospedador; el virus no
+C) El virus necesita un fichero hospedador para propagarse; el gusano se replica solo por la red
+D) No hay diferencia real, son sinónimos
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b></details>
+
+**3.** Un atacante consulta muchas IPs de destino distintas en poco tiempo desde una sola IP origen. ¿Qué tipo de ataque es, según la tabla de §2?
+
+A) Fuerza bruta
+B) Phishing
+C) Escaneo de puertos
+D) Man-in-the-middle
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Es la pista típica del escaneo de puertos: reconocimiento previo a un ataque.</details>
+
+**4.** Con `texto = "Conexión desde 10.0.20.5 al puerto 22"`, ¿qué devuelve `re.findall(r"puerto (\d+)", texto)`?
+
+A) `["puerto 22"]`
+B) `["22"]`
+C) `[]`
+D) `"22"`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>findall</code> devuelve una <b>lista</b> con el contenido del grupo capturado, no de todo el match.</details>
+
+**5.** Con `m = patron.search(linea)` y un grupo con nombre `ip`, ¿cómo accedes al valor capturado?
+
+A) `m.ip`
+B) `m["ip"]` o `m.group("ip")`
+C) `m[1]` siempre
+D) `m.groupdict("ip")`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Ambas formas son equivalentes para un grupo con nombre.</details>
+
+**6.** La línea es `"usuario=root ip=1.2.3.4 estado=FALLO"`. ¿Qué devuelve `re.match(r"usuario=", linea)` frente a `re.search(r"usuario=", linea)`?
+
+A) Ambos encuentran el patrón, dan igual
+B) Ambos fallan porque falta `^`
+C) Los dos coinciden porque el patrón está al principio de la cadena
+D) `match` falla y `search` sí lo encuentra
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Como <code>"usuario="</code> está justo al principio de la línea, en este caso concreto <code>match</code> también lo encuentra — pero solo porque coincide con el inicio; si la línea empezara con la fecha, como en los ejemplos reales de log, <code>match</code> fallaría y <code>search</code> seguiría funcionando.</details>
+
+**7.** `parsear_log` recibe un texto con 3 líneas: dos válidas y una corrupta que no encaja con el patrón. ¿Cuántos eventos devuelve?
+
+A) 3
+B) 2
+C) 1
+D) Lanza una excepción
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Las líneas que no encajan se descartan silenciosamente; el parser sobrevive a la basura.</details>
+
+**8.** Con eventos donde la IP `1.1.1.1` tiene 3 `FALLO` y 1 `OK`, y la IP `2.2.2.2` tiene 1 `FALLO`, ¿qué devuelve `contar_fallos_por_ip(eventos)`?
+
+A) `{'1.1.1.1': 4, '2.2.2.2': 1}`
+B) `{'1.1.1.1': 3, '2.2.2.2': 1}`
+C) `{'1.1.1.1': 3}`
+D) `{'1.1.1.1': 1, '2.2.2.2': 1}`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Solo se cuentan los eventos con <code>estado == "FALLO"</code>; el <code>OK</code> de <code>1.1.1.1</code> no suma, pero la IP sigue apareciendo con sus 3 fallos.</details>
+
+**9.** Sobre los mismos eventos de la pregunta anterior, ¿qué devuelve `hubo_acceso_correcto(eventos, "2.2.2.2")`?
+
+A) `True`
+B) `False`
+C) `None`
+D) Lanza `KeyError`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>2.2.2.2</code> solo tiene un evento <code>FALLO</code>, ningún <code>OK</code>.</details>
+
+**10.** ¿Qué hace un SIEM, según la unidad?
+
+A) Cifra el tráfico de red automáticamente
+B) Centraliza logs de muchas fuentes, los correla en tiempo real y dispara alertas
+C) Sustituye al cortafuegos
+D) Genera contraseñas seguras para los usuarios
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**11.** ¿Qué devuelve `ipaddress.ip_address("8.8.4.4").is_private`?
+
+A) `True`, porque es una IP conocida
+B) `False`, porque 8.8.4.4 es una IP pública
+C) Lanza una excepción, no es una IP válida
+D) `True` siempre que la IP tenga 4 octetos
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El rango 8.0.0.0/8 es público (de hecho, es un DNS de Google); no pertenece a ningún rango privado RFC 1918.</details>
+
+**12.** En el ejercicio de *password spraying*, ¿por qué la función cuenta **usuarios distintos** por IP en vez de fallos totales?
+
+A) Porque así se ejecuta más rápido
+B) Porque el spraying prueba pocas contraseñas contra muchos usuarios; contar solo fallos totales no lo distinguiría de una fuerza bruta normal
+C) Porque `Counter` no puede contar fallos
+D) No hay ninguna razón especial, es solo estilo
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**13.** `en_ventana([0, 5, 10, 12, 50], segundos=10)` calcula el máximo de marcas que caben en cualquier ventana deslizante de 10 segundos. ¿Qué devuelve?
+
+A) `2`
+B) `3`
+C) `4`
+D) `5`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Las marcas 0, 5 y 10 caben en una ventana de 10 segundos (10−0=10); al llegar a 12, la marca 0 queda fuera. El máximo es 3.</details>
+
+**14.** `codigos()` cuenta el código HTTP de cada línea con una regex sobre líneas de log tipo Apache. Si le pasas 1 línea con código `200` y 2 líneas con código `404`, ¿qué devuelve?
+
+A) `{'200': 1, '404': 1}`
+B) `{'200': 1, '404': 2}`
+C) `{'404': 2}`
+D) `Counter()` vacío
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>Counter</code> acumula una entrada por cada código encontrado; los dos 404 se suman en la misma clave.</details>
+
+**15.** En el reto resuelto, `generar_informe` etiqueta una IP como `"CRÍTICO (acceso logrado)"` en vez de `"alerta"`. ¿Qué condición dispara esa etiqueta?
+
+A) Que la IP tenga más de 100 fallos
+B) Que `hubo_acceso_correcto(eventos, ip)` devuelva `True`
+C) Que la IP sea privada
+D) Que el usuario objetivo sea `"root"`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Una IP sospechosa que además logró un <code>OK</code> tras sus fallos es la señal de que probablemente entró — de ahí la etiqueta crítica.</details>

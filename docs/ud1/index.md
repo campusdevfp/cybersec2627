@@ -465,7 +465,36 @@ Documento alterado : False
 
 > Cambiar **un solo carácter** del documento rompe la verificación: integridad y autenticidad a la vez, en una sola operación.
 
-### 6.1 Certificados digitales: generar uno de verdad
+### 6.1 Firmar un fichero real, no solo una cadena en memoria
+
+En la práctica no firmas literales de Python: firmas **ficheros** (un informe, un instalador, un contrato en PDF). La firma se guarda aparte, como un fichero `.sig`, y se distribuye junto al original.
+
+```python title="firma_de_fichero.py"
+from pathlib import Path
+
+# Un informe real en disco (reutiliza privada/pss/verifica del ejemplo anterior)
+Path("informe.txt").write_text("Informe trimestral: cifras confidenciales del cliente.")
+
+# Se firma el CONTENIDO en bytes del fichero, no una cadena en memoria
+contenido = Path("informe.txt").read_bytes()
+firma_fichero = privada.sign(contenido, pss, hashes.SHA256())
+Path("informe.txt.sig").write_bytes(firma_fichero)
+print(f"Firma guardada en informe.txt.sig ({len(firma_fichero)} bytes)")
+
+# La verificación se hace RELEYENDO ambos ficheros del disco — así ocurre en la vida real
+contenido_releido = Path("informe.txt").read_bytes()
+firma_releida = Path("informe.txt.sig").read_bytes()
+print("Verificación tras releer del disco:", verifica(contenido_releido, firma_releida))
+```
+
+```text title="Salida"
+Firma guardada en informe.txt.sig (256 bytes)
+Verificación tras releer del disco: True
+```
+
+> 256 bytes es justo el tamaño de una firma RSA de 2048 bits (2048 ÷ 8), **siempre**, sin importar si el fichero firmado pesa 10 bytes o 10 GB — la firma es del hash del documento, no del documento entero.
+
+### 6.2 Certificados digitales: generar uno de verdad
 
 Un **certificado X.509** vincula una clave pública con una identidad. En producción lo firma una **CA** (Autoridad de Certificación); para practicar, generamos uno **autofirmado**:
 
@@ -506,6 +535,27 @@ Emisor      : CN=cmo314.local
 Válido hasta: 2027-09-14
 Autofirmado : True
 -----BEGIN CERTIFICATE-----
+```
+
+Un certificado no vive en una variable: se **guarda como fichero `.pem`** y así es como lo lee un servidor web o un navegador.
+
+```python title="certificado_a_fichero.py"
+from pathlib import Path
+
+# Los certificados se distribuyen como ficheros .pem, no en memoria
+Path("cert.pem").write_bytes(pem)
+print("Certificado guardado en cert.pem")
+
+# Comprobación real: lo recargamos desde el disco, como haría un servidor web
+recargado = x509.load_pem_x509_certificate(Path("cert.pem").read_bytes())
+print("Mismo sujeto tras recargar del disco:", recargado.subject == certificado.subject)
+print("Tamaño del fichero:", Path("cert.pem").stat().st_size, "bytes")
+```
+
+```text title="Salida"
+Certificado guardado en cert.pem
+Mismo sujeto tras recargar del disco: True
+Tamaño del fichero: 1005 bytes
 ```
 
 | Concepto | Qué es |
@@ -786,46 +836,6 @@ def de_texto(s: str) -> dict[str, str]:
 ```
 </details>
 
-### Preguntas tipo test práctico
-
-> Mismo estilo que el examen: sobre **código y retos**, no sobre definiciones sueltas. Respóndelas sin mirar atrás.
-
-**P1.** Si llamas `hash_fichero()` dos veces seguidas sobre el **mismo** fichero sin tocarlo, ¿qué devuelve?
-<details class="sol"><summary>Respuesta</summary>El mismo hash las dos veces — es <b>determinista</b>. Si diera algo distinto, no serviría para detectar cambios.</details>
-
-**P2.** ¿Qué imprime este fragmento?
-```python
-import hashlib
-a = hashlib.sha256(b"CMO314").hexdigest()
-b = hashlib.sha256(b"CMO314").hexdigest()
-print(a == b)
-```
-<details class="sol"><summary>Respuesta</summary><code>True</code>. Mismo dato de entrada, misma salida.</details>
-
-**P3.** En el ejercicio 12 (HMAC), ¿por qué `valida()` no compara las firmas con `==`?
-<details class="sol"><summary>Respuesta</summary>Porque <code>==</code> se detiene en el primer carácter distinto y filtra información por el tiempo de respuesta (ataque de temporización). <code>hmac.compare_digest</code> siempre tarda lo mismo.</details>
-
-**P4.** En `audita()` (ejercicio 10), un fichero que estaba en el manifiesto y ya no existe, ¿qué estado recibe?
-<details class="sol"><summary>Respuesta</summary><code>"AUSENTE"</code>: está en <code>man</code> pero no en <code>ahora</code>.</details>
-
-**P5.** En el ejercicio 13 (cadena de hashes), si alteras el bloque `"tx1"`, ¿qué hashes de la cadena cambian: solo el de ese bloque, o también los siguientes?
-<details class="sol"><summary>Respuesta</summary>Ese y <b>todos los posteriores</b>, porque cada hash incorpora el anterior. Es la base de cómo una blockchain detecta manipulaciones retroactivas.</details>
-
-**P6.** ¿Por qué `simetrico_fernet.py` lanza `InvalidToken` con un mensaje manipulado en vez de devolver datos corruptos?
-<details class="sol"><summary>Respuesta</summary>Porque Fernet es cifrado <b>autenticado</b>: verifica integridad además de cifrar. Si el texto cifrado cambió, rechaza explícitamente en vez de "descifrar basura".</details>
-
-**P7.** ¿Con qué clave firmas un documento para demostrar que lo firmaste tú, y con cuál lo verifica cualquiera?
-<details class="sol"><summary>Respuesta</summary>Firmas con tu clave <b>privada</b>; cualquiera verifica con tu clave <b>pública</b>.</details>
-
-**P8.** Un certificado X.509 tiene `subject == issuer`. ¿Qué tipo de certificado es?
-<details class="sol"><summary>Respuesta</summary><b>Autofirmado</b>: nadie de confianza (una CA reconocida) lo ha avalado.</details>
-
-**P9.** ¿Qué pasa si ejecutas dos veces seguidas un `generar` de manifiesto sobre la misma carpeta sin cambiar nada?
-<details class="sol"><summary>Respuesta</summary>Se sobrescribe con los mismos hashes (nada cambió), así que una auditoría posterior daría todo <code>OK</code>. Es idempotente.</details>
-
-**P10.** ¿Por qué en forense se calcula el hash de la evidencia **antes** de analizarla?
-<details class="sol"><summary>Respuesta</summary>Para poder demostrar después que el análisis no la alteró — es el precinto digital de la cadena de custodia.</details>
-
 ---
 
 ## 10. Reto resuelto, paso a paso — Verificador de integridad profesional
@@ -1098,3 +1108,162 @@ El instrumento principal es un **test práctico**: resuelves en Python un reto p
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.
 
 El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `hashlib`), pasar `mypy` y documentar el código.
+
+---
+
+## Simulacro de examen tipo test
+
+> 17 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto. Elige tu respuesta antes de abrir la solución.
+
+**1.** Un ransomware moderno cifra los ficheros **y además** exfiltra los datos antes (doble extorsión). Según `clasificar_incidentes.py`, ¿qué pilar(es) rompe?
+
+A) Solo Disponibilidad
+B) Solo Confidencialidad
+C) Disponibilidad y Confidencialidad
+D) Integridad
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Cifrar rompe la disponibilidad (no se puede acceder a los datos); exfiltrarlos antes rompe además la confidencialidad (alguien no autorizado los tiene).</details>
+
+**2.** ¿Qué devuelve `riesgo(probabilidad=0.2, impacto=8)` con la función de `riesgo_simple.py`?
+
+A) `1.6`
+B) `10.0`
+C) `0.2`
+D) `8.0`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>round(0.2 * 8, 2) = 1.6</code>.</details>
+
+**3.** Según `clasifica()` de `clasificar_medida.py`, ¿qué devuelve `clasifica("generador")`?
+
+A) `"física"`
+B) `"ambiental"`
+C) `"lógica"`
+D) `"desconocido"`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>"generador"</code> está en el conjunto <code>AMBIENTAL</code>.</details>
+
+**4.** Tres copias, **todas** en `soporte="disco_local"`, dos en `"sitio"` y una en `"externo"`. ¿Qué devuelve `cumple_321`?
+
+A) `(True, [])`
+B) `(False, ['solo hay 3 copias, hacen falta 3'])`
+C) `(False, ['todas las copias usan el mismo soporte'])`
+D) `(False, ['ninguna copia está fuera del sitio'])`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Hay 3 copias (cumple) y sí hay una externa (cumple), pero las tres usan el <b>mismo</b> soporte — falla la regla de los "2 soportes distintos".</details>
+
+**5.** ¿Qué relación hay entre las dos líneas que imprime `print(hash_de_texto("hola"))` ejecutado dos veces seguidas?
+
+A) Son idénticas siempre
+B) Son distintas cada vez que se ejecuta el programa
+C) Solo coinciden si el ordenador no ha cambiado de hora
+D) La segunda tiene el doble de caracteres
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El hash es <b>determinista</b>: el mismo texto siempre produce el mismo resultado.</details>
+
+**6.** `avalancha("1234", "1235")` compara los SHA-256 de dos cadenas que difieren en un solo dígito. ¿Qué observas en el resultado?
+
+A) Cambia solo 1 carácter del hash (el dígito que cambió)
+B) Cambia 0 caracteres, son números parecidos
+C) Cambia la mayoría de los 64 caracteres — efecto avalancha
+D) El hash da error porque los textos son casi iguales
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Es el efecto avalancha: un cambio mínimo en la entrada altera casi toda la salida (en la práctica, más de 50 de los 64 caracteres).</details>
+
+**7.** Según `comparar_algoritmos.py`, ¿cuántos bits produce `hashlib.new("sha256", ...).hexdigest()`?
+
+A) 128
+B) 160
+C) 256
+D) 512
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> SHA-256 produce 256 bits (64 caracteres hexadecimales).</details>
+
+**8.** ¿Por qué `hash_fichero()` lee el fichero en bloques de 8192 bytes en vez de cargarlo entero con `f.read()`?
+
+A) Es un límite fijo de `hashlib` que no se puede evitar
+B) Para que funcione igual de bien con ficheros enormes sin agotar la memoria
+C) Para que el hash resultante sea más seguro
+D) Es un requisito legal del RGPD
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Leer por bloques mantiene el consumo de memoria constante, sin importar si el fichero pesa 1 KB o 10 GB.</details>
+
+**9.** En `simetrico_fernet.py`, si manipulas los últimos bytes del token cifrado y luego llamas a `f.decrypt(...)`, ¿qué ocurre?
+
+A) Devuelve el texto descifrado igualmente, aunque corrupto
+B) Lanza `InvalidToken`
+C) El programa se queda colgado sin excepción
+D) Devuelve `None` silenciosamente
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Fernet es cifrado autenticado: detecta la manipulación y rechaza explícitamente el token en vez de devolver datos corruptos.</details>
+
+**10.** Quieres enviar un mensaje que **solo** Ana pueda leer, usando RSA asimétrico. ¿Con qué clave lo cifras?
+
+A) Tu clave privada
+B) Tu clave pública
+C) La clave pública de Ana
+D) La clave privada de Ana
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Se cifra con la clave <b>pública</b> del destinatario; solo su clave privada (que nadie más tiene) puede descifrarlo.</details>
+
+**11.** Firmas un documento con `firma_rsa.py`. ¿Con qué clave firmas, y con cuál se verifica la firma?
+
+A) Firmas con tu pública; se verifica con tu privada
+B) Firmas con tu privada; se verifica con tu pública
+C) Ambas operaciones usan tu clave privada
+D) Ambas operaciones usan tu clave pública
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Se firma con la clave privada del autor; cualquiera puede verificar con su clave pública, que es de dominio público.</details>
+
+**12.** En `firma_de_fichero.py`, ¿cuántos bytes ocupa la firma guardada en `informe.txt.sig`?
+
+A) Depende del tamaño de `informe.txt`
+B) Siempre 256 bytes, porque la clave RSA es de 2048 bits (2048 ÷ 8)
+C) 64 bytes, como un hash SHA-256
+D) 1 byte por cada carácter del documento firmado
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La firma RSA tiene un tamaño fijo determinado por el tamaño de la clave, no por el tamaño del documento — por eso pesa 256 bytes firmes un informe de 10 bytes o de 10 GB.</details>
+
+**13.** ¿Por qué `certificado_a_fichero.py` guarda el certificado como `cert.pem` en vez de dejarlo solo en la variable `pem`?
+
+A) Porque las variables de Python se borran cada pocos segundos
+B) Porque un certificado se distribuye y se lee como fichero — así lo usa un servidor web real
+C) Porque el formato `.pem` comprime los datos
+D) No hay ninguna razón técnica, es solo estética
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Un certificado tiene que poder leerse desde disco por un servidor, un navegador u otra herramienta — por eso se distribuye como fichero <code>.pem</code>, no como una variable en memoria.</details>
+
+**14.** Un certificado X.509 tiene `certificado.subject == certificado.issuer`. ¿Qué tipo de certificado es?
+
+A) Emitido por una CA reconocida
+B) Autofirmado
+C) Caducado
+D) Revocado
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Que el emisor y el sujeto coincidan significa que el propio certificado se firmó a sí mismo — nadie de confianza externo lo avaló.</details>
+
+**15.** Ordena las fases del análisis forense digital tal como se ven en la unidad:
+
+A) Análisis → Identificación → Adquisición → Documentación → Presentación
+B) Identificación → Adquisición → Análisis → Documentación → Presentación
+C) Adquisición → Identificación → Presentación → Análisis → Documentación
+D) Presentación → Documentación → Análisis → Adquisición → Identificación
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Primero se identifica el incidente, luego se adquiere una copia de la evidencia, se analiza esa copia, se documenta todo, y por último se presenta el informe.</details>
+
+**16.** Con el manifiesto guardado `{"app.bin": "aaa", "app.conf": "bbb"}` y el estado actual `{"app.conf": "ccc", "extra.txt": "ddd"}`, ¿qué estado recibe `"app.bin"` al llamar a `auditar(previo, actual)`?
+
+A) `"OK"`
+B) `"MODIFICADO"`
+C) `"AUSENTE"`
+D) `"NUEVO"`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> <code>"app.bin"</code> está en el manifiesto guardado (<code>previo</code>) pero ya no existe en el estado actual (<code>actual</code>) — por eso se marca <code>AUSENTE</code>.</details>
+
+**17.** ¿Por qué el código de esta unidad usa `hmac.compare_digest(a, b)` en vez de `a == b` para comparar hashes o firmas?
+
+A) Es más rápido de ejecutar
+B) `compare_digest` tarda siempre el mismo tiempo, evitando filtrar información por temporización
+C) `==` no funciona con cadenas de más de 32 caracteres
+D) No hay diferencia real, es solo una cuestión de estilo
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>==</code> se detiene en el primer carácter distinto, y ese tiempo de respuesta variable puede filtrar información a un atacante (ataque de temporización). <code>compare_digest</code> siempre tarda lo mismo.</details>

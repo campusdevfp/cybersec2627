@@ -412,29 +412,6 @@ def escaneo_seguro(host: str, puertos: list[int]) -> list[int]:
 ```
 </details>
 
-### Preguntas tipo test práctico
-
-**P1.** ¿Qué devuelve `connect_ex` si el puerto está cerrado, y por qué es más cómodo que usar `connect` a secas para escanear?
-<details class="sol"><summary>Respuesta</summary>Devuelve un código de error distinto de <code>0</code> (no lanza excepción), así que puedes comprobar <code>== 0</code> directamente sin envolver cada intento en un <code>try/except</code>.</details>
-
-**P2.** ¿Por qué el escaneo secuencial de 1000 puertos es mucho más lento que el concurrente?
-<details class="sol"><summary>Respuesta</summary>Porque cada sondeo espera su propio <code>timeout</code> antes de pasar al siguiente; en paralelo, muchos sondeos esperan <b>a la vez</b>, así que el tiempo total es el de una sola espera, no la suma de todas.</details>
-
-**P3.** ¿Qué pasa si olvidas `s.settimeout(...)` antes de `connect_ex` a un puerto filtrado (que no responde ni sí ni no)?
-<details class="sol"><summary>Respuesta</summary>El programa puede quedarse colgado indefinidamente esperando una respuesta que nunca llega.</details>
-
-**P4.** ¿Por qué un puerto 3389 (RDP) abierto a Internet es más grave si además hay contraseñas débiles en el sistema?
-<details class="sol"><summary>Respuesta</summary>Porque combina dos hallazgos: un servicio de acceso remoto expuesto (UT5) y credenciales vulnerables a fuerza bruta (UT2/UT4) — el escaneo encuentra la puerta, la contraseña débil es la llave fácil.</details>
-
-**P5.** ¿Qué diferencia hay entre un `grey hat` y un `white hat`?
-<details class="sol"><summary>Respuesta</summary>Ambos actúan sin intención maliciosa, pero el <code>grey hat</code> lo hace <b>sin autorización</b> — lo que sigue siendo ilegal — mientras que el <code>white hat</code> siempre tiene permiso explícito.</details>
-
-**P6.** En el ejercicio 11 (`nuevos_puertos`), ¿qué operación de conjuntos detecta lo que ha aparecido nuevo?
-<details class="sol"><summary>Respuesta</summary>La diferencia de conjuntos <code>set(actual) - set(anterior)</code>: lo que está en el escaneo nuevo pero no estaba en el anterior.</details>
-
-**P7.** ¿Por qué `escaneo_seguro` valida el host **antes** de escanear, en vez de simplemente documentar "úsalo solo en el laboratorio"?
-<details class="sol"><summary>Respuesta</summary>Porque un guardarraíl en el código previene errores humanos (escanear por accidente la IP equivocada); una nota en la documentación es fácil de pasar por alto bajo presión.</details>
-
 ---
 
 ## 9. Reto resuelto, paso a paso — Escáner de puertos con informe
@@ -680,3 +657,144 @@ El instrumento principal es un **test práctico**: resuelves en Python un reto p
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5.
 
 El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `socket`), pasar `mypy` y documentar el código.
+
+---
+
+## Simulacro de examen tipo test
+
+> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+
+**1.** ¿Qué diferencia hay entre un `grey hat` y un `white hat`?
+
+A) El `grey hat` es más peligroso técnicamente
+B) Ambos actúan sin intención maliciosa, pero el `grey hat` lo hace sin autorización — lo que sigue siendo ilegal
+C) El `white hat` nunca escanea puertos
+D) No hay diferencia real, son el mismo concepto
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La autorización explícita es lo único que separa el hacking ético del delito, no la técnica usada.</details>
+
+**2.** ¿Qué fase del pentest cubre principalmente esta unidad?
+
+A) Explotación
+B) Enumeración
+C) Post-explotación
+D) Informe
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Descubrir qué servicios están escuchando (escaneo de puertos) es la fase de enumeración.</details>
+
+**3.** ¿Qué devuelve `connect_ex((host, puerto))` cuando el puerto está cerrado?
+
+A) Lanza una excepción `ConnectionRefusedError`
+B) Un código distinto de `0`, sin lanzar ninguna excepción
+C) `None`
+D) Siempre `0`, igual que si estuviera abierto
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Por eso es cómodo para escanear muchos puertos: basta con comprobar <code>== 0</code>, sin <code>try/except</code> en cada intento.</details>
+
+**4.** ¿Por qué el ejemplo del servidor de prueba usa `SO_REUSEADDR`?
+
+A) Para que el servidor acepte más de una conexión a la vez
+B) Para evitar el error `Address already in use` al reiniciar un servidor en el mismo puerto
+C) Para cifrar el tráfico del socket
+D) Es obligatorio en cualquier socket TCP
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**5.** ¿Por qué el escaneo concurrente con `ThreadPoolExecutor` es mucho más rápido que el secuencial?
+
+A) Python ejecuta cálculos matemáticos más rápido en paralelo
+B) Muchas esperas de red se solapan en vez de sumarse una tras otra
+C) El GIL desaparece al usar hilos
+D) No hay diferencia real de velocidad
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Como sondear un puerto es esperar una respuesta de red (I/O), varios hilos pueden esperar a la vez sin que el GIL lo impida.</details>
+
+**6.** Según `severidad()`, ¿qué devuelve `severidad(3389)` (puerto de RDP)?
+
+A) `"OK"`
+B) `"REVISAR"`
+C) `"INSEGURO"`
+D) Lanza una excepción
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> 3389 está en el conjunto <code>INSEGUROS</code>.</details>
+
+**7.** ¿Qué catálogo público organiza las técnicas de ataque reales por fases, y sirve de vocabulario común entre atacantes simulados y defensores?
+
+A) RGPD
+B) ISO 27000
+C) MITRE ATT&CK
+D) CVE
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b></details>
+
+**8.** ¿Qué ocurre al llamar a `rango(10, 5)` (inicio mayor que fin)?
+
+A) Devuelve una lista vacía
+B) Devuelve `[10, 9, 8, 7, 6, 5]` en orden descendente
+C) Lanza `ValueError`
+D) Devuelve `None`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La función comprueba explícitamente <code>if ini > fin:</code> y rechaza el rango sin sentido.</details>
+
+**9.** ¿Qué devuelve `servicio_de(443)`?
+
+A) `"SSH"`
+B) `"HTTP"`
+C) `"HTTPS"`
+D) `"desconocido"`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Es la entrada directa del diccionario de puertos conocidos.</details>
+
+**10.** Con `clasificado = {23: "INSEGURO", 80: "REVISAR", 443: "OK", 3389: "INSEGURO"}`, ¿qué devuelve `resumen(clasificado)`?
+
+A) `{'INSEGURO': 1, 'REVISAR': 1, 'OK': 1}`
+B) `{'INSEGURO': 2, 'REVISAR': 1, 'OK': 1}`
+C) `{23: 1, 80: 1, 443: 1, 3389: 1}`
+D) `4`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>Counter</code> cuenta cuántas veces aparece cada valor de severidad; hay dos puertos <code>INSEGURO</code>.</details>
+
+**11.** Con `anterior = [80]` y `actual = [80, 443, 8080]`, ¿qué devuelve `nuevos_puertos(anterior, actual)`?
+
+A) `[80]`
+B) `[443, 8080]`
+C) `[80, 443, 8080]`
+D) `[]`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Es la diferencia de conjuntos <code>set(actual) - set(anterior)</code>: lo que aparece ahora y no estaba antes.</details>
+
+**12.** ¿Qué ocurre al llamar a `escaneo_seguro("192.168.1.1", [80])` si esa IP no está en el laboratorio autorizado?
+
+A) Escanea igualmente, solo avisa por consola
+B) Lanza `ValueError` antes de escanear nada
+C) Devuelve una lista vacía silenciosamente
+D) Se conecta pero no imprime resultados
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El guardarraíl ético comprueba <code>es_objetivo_valido</code> <b>antes</b> de escanear, y rechaza explícitamente cualquier objetivo no autorizado.</details>
+
+**13.** ¿Por qué ese guardarraíl se implementa **en el código** en vez de solo advertirlo en la documentación?
+
+A) Por exigencia legal explícita del RGPD
+B) Porque previene errores humanos (escanear la IP equivocada por accidente); una nota en la documentación es fácil de pasar por alto
+C) Porque el código es más rápido de leer que la documentación
+D) No hay ninguna ventaja real, es solo redundancia
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**14.** En el reto resuelto, si `escanear()` no encuentra ningún puerto abierto en el rango, ¿qué añade `generar_informe` al final?
+
+A) Nada, el informe queda con solo la cabecera
+B) `"(ningún puerto abierto en el rango escaneado)"`
+C) Lanza una excepción, porque un informe vacío no es válido
+D) Repite la cabecera dos veces
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El código comprueba <code>if not clasificado:</code> y añade una línea explicativa en vez de dejar un informe vacío sin contexto.</details>
+
+**15.** Un puerto 3389 (RDP) abierto a Internet es más grave si, además, el sistema tiene contraseñas débiles. ¿Qué relaciona esto con las unidades anteriores?
+
+A) No tiene relación, son temas independientes
+B) Combina un servicio de acceso remoto expuesto (UT5) con credenciales vulnerables a fuerza bruta (UT2/UT4): el escaneo encuentra la puerta, la contraseña débil es la llave fácil
+C) Solo importa la UT1, porque ahí se habló de contraseñas
+D) RDP nunca se ve afectado por fuerza bruta
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Esta unidad conecta directamente con la detección de fuerza bruta (UT2) y la política de contraseñas (UT4): un puerto expuesto es la mitad del problema.</details>

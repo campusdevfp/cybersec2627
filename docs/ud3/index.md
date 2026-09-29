@@ -474,35 +474,6 @@ def resumen(fw: Cortafuegos, trafico: list[tuple]) -> dict[str, int]:
 ```
 </details>
 
-### Preguntas tipo test práctico
-
-**P1.** ¿Por qué `reglas: list = []` directamente en un `@dataclass` es un error?
-<details class="sol"><summary>Respuesta</summary>Python evaluaría esa lista <b>una sola vez</b> y todas las instancias de la clase compartirían la misma lista mutable. Hay que usar <code>field(default_factory=list)</code>.</details>
-
-**P2.** En `Cortafuegos.evaluar`, si dos reglas coinciden con el mismo tráfico, ¿cuál gana?
-<details class="sol"><summary>Respuesta</summary>La <b>primera</b> en la lista — el bucle hace <code>return</code> en cuanto encuentra una coincidencia.</details>
-
-**P3.** ¿Qué evalúa esto?
-```python
-fw = Cortafuegos()
-fw.anadir(Regla("DENEGAR"))
-fw.anadir(Regla("PERMITIR", puerto=80))
-print(fw.evaluar("x", "y", 80))
-```
-<details class="sol"><summary>Respuesta</summary><code>"DENEGAR"</code>: la primera regla (<code>DENEGAR</code>, comodín total) coincide con todo, así que la de <code>PERMITIR</code> nunca se alcanza. Es una regla "tapada".</details>
-
-**P4.** ¿Qué te da `@dataclass` automáticamente que tendrías que escribir a mano en una clase normal?
-<details class="sol"><summary>Respuesta</summary><code>__init__</code>, <code>__repr__</code> (para que <code>print()</code> sea legible) y <code>__eq__</code> (para comparar con <code>==</code>).</details>
-
-**P5.** ¿Qué significa que `ReglaHoraria` **hereda** de `Regla`?
-<details class="sol"><summary>Respuesta</summary>Que tiene todos los atributos y métodos de <code>Regla</code> (como <code>coincide</code>) y además puede añadir los suyos propios (<code>activa_a_las</code>), sin reescribir nada.</details>
-
-**P6.** Si un cortafuegos **no** tiene ninguna regla `DENEGAR` al final, ¿qué evalúa `.evaluar()` cuando nada coincide?
-<details class="sol"><summary>Respuesta</summary><code>"DENEGAR"</code> igualmente: es el valor que devuelve la función <b>después</b> del bucle si ninguna regla coincidió — la política por defecto está en el código, no depende de que exista una regla explícita.</details>
-
-**P7.** ¿Por qué una DMZ evita que Internet llegue directamente a la LAN?
-<details class="sol"><summary>Respuesta</summary>Porque las reglas del cortafuegos solo permiten que el tráfico de Internet llegue a la DMZ; el tráfico DMZ→LAN se restringe a lo estrictamente necesario (p. ej., solo el servidor web a la base de datos), nunca Internet→LAN directo.</details>
-
 ---
 
 ## 9. Reto resuelto, paso a paso — Motor de cortafuegos con zonas
@@ -751,3 +722,144 @@ El instrumento principal es un **test práctico**: resuelves en Python un reto p
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5.
 
 El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, definir y usar **clases**), pasar `mypy` y documentar el código.
+
+---
+
+## Simulacro de examen tipo test
+
+> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+
+**1.** Tienes dos reglas: 1) `PERMITIR` cualquier origen al puerto 443. 2) `DENEGAR` todo. Llega tráfico al puerto 22. ¿Qué se aplica?
+
+A) `PERMITIR`, porque hay una regla de permitir
+B) `DENEGAR`, porque no coincide con la regla del 443 y cae en la regla atrapa-todo
+C) Error: ninguna regla coincide
+D) Depende del orden en que llegue el tráfico
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El puerto 22 no coincide con la primera regla (puerto 443), así que se evalúa la segunda, que deniega todo.</details>
+
+**2.** Si dos reglas de un `Cortafuegos` coinciden con el mismo tráfico, ¿cuál se aplica?
+
+A) La última de la lista
+B) La primera de la lista
+C) Se combinan ambas acciones
+D) La más restrictiva de las dos
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El bucle de <code>evaluar()</code> hace <code>return</code> en cuanto encuentra la primera coincidencia.</details>
+
+**3.** Según el diagrama de la DMZ, ¿qué tráfico **nunca** debería llegar directamente a la LAN interna?
+
+A) El tráfico de la DMZ hacia la LAN
+B) El tráfico de Internet directo hacia la LAN
+C) El tráfico entre dos servidores de la LAN
+D) El tráfico de la LAN hacia la DMZ
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Internet solo debe poder llegar a la DMZ; la LAN queda aislada detrás.</details>
+
+**4.** Con `r = Regla("permitir", 443)` de `clase_basica.py`, ¿qué devuelve `r.permite(22)`?
+
+A) `True`
+B) `False`
+C) Lanza `AttributeError`
+D) `None`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>self.puerto</code> es 443, no coincide con el 22 que se le pregunta.</details>
+
+**5.** ¿Qué tres cosas genera `@dataclass` automáticamente que tendrías que escribir a mano en una clase normal?
+
+A) `__str__`, `__len__` y `__iter__`
+B) `__init__`, `__repr__` y `__eq__`
+C) `__enter__`, `__exit__` y `__del__`
+D) Solo el constructor `__init__`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**6.** ¿Por qué `reglas: list = []` directamente como valor por defecto en un `@dataclass` es un error?
+
+A) Python no permite listas vacías como valor por defecto
+B) Todas las instancias de la clase compartirían la **misma** lista mutable
+C) Da un error de sintaxis
+D) Solo funciona con tuplas, no con listas
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Por eso se usa <code>field(default_factory=list)</code>, que crea una lista nueva por cada instancia.</details>
+
+**7.** Con `r = Regla("PERMITIR", origen="lan", destino="web", puerto=80)` de `regla_comodin.py`, ¿qué devuelve `r.coincide("wan", "web", 80)`?
+
+A) `True`, porque el destino y el puerto coinciden
+B) `False`, porque el origen no coincide (`"wan"` ≠ `"lan"`)
+C) `True`, porque dos de los tres campos coinciden
+D) Lanza una excepción
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>coincide</code> exige que <b>todos</b> los campos encajen (o sean comodín); el origen no encaja.</details>
+
+**8.** Un `Cortafuegos` tiene, en este orden: 1) `DENEGAR` (atrapa-todo), 2) `PERMITIR` puerto 80. ¿Qué evalúa `fw.evaluar("x", "y", 80)`?
+
+A) `"PERMITIR"`
+B) `"DENEGAR"`
+C) Evalúa ambas y prioriza `PERMITIR`
+D) Lanza un error porque hay reglas contradictorias
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La primera regla (atrapa-todo) ya coincide con cualquier tráfico, así que la segunda nunca se alcanza — está "tapada".</details>
+
+**9.** ¿Qué significa exactamente que `ReglaHoraria` **hereda** de `Regla`?
+
+A) Que copia y pega el código de `Regla` dentro de su propia definición
+B) Que tiene todos los atributos y métodos de `Regla` (como `coincide`) y puede añadir los suyos propios
+C) Que solo puede usarse si `Regla` no existe todavía
+D) Que sustituye por completo a `Regla` en el resto del programa
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Es el principio de sustitución: <code>ReglaHoraria</code> <b>es</b> una <code>Regla</code> y además sabe algo nuevo.</details>
+
+**10.** Un empleado introduce su contraseña correctamente, pero intenta acceder a un recurso que no le corresponde. Según AAA, ¿qué lo detiene?
+
+A) Autenticación
+B) Autorización
+C) Auditoría
+D) Ninguna de las tres, es un fallo del sistema
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La autenticación ya se superó (sabía la contraseña); lo que falla es la autorización: qué tiene permitido hacer.</details>
+
+**11.** ¿Qué devuelve `en_red("10.0.2.50", "10.0.1.0/24")`?
+
+A) `True`
+B) `False`
+C) Lanza una excepción, la IP no es válida
+D) Depende del sistema operativo
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>10.0.2.50</code> no pertenece a la subred <code>10.0.1.0/24</code> (esa subred va de <code>10.0.1.0</code> a <code>10.0.1.255</code>).</details>
+
+**12.** Un cortafuegos tiene la regla `PERMITIR puerto=80` primero y `DENEGAR` (atrapa-todo) después. Le pasas tráfico: dos paquetes al puerto 80 y uno al puerto 22. ¿Qué devuelve `impactos(fw, trafico)`?
+
+A) `{0: 3}`
+B) `{0: 2, 1: 1}`
+C) `{0: 1, 1: 2}`
+D) `{}`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La regla en el índice 0 (<code>PERMITIR</code> puerto 80) se aplica a los 2 paquetes del puerto 80; la regla en el índice 1 (<code>DENEGAR</code>) se aplica al del puerto 22.</details>
+
+**13.** Con las subredes `dmz=10.0.1.0/24` y `lan=10.0.2.0/24`, ¿qué devuelve `zona("8.8.8.8")`?
+
+A) `"dmz"`
+B) `"lan"`
+C) `"externa"`
+D) Lanza una excepción
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> No pertenece a ninguna de las dos subredes internas, así que cae en el valor por defecto <code>"externa"</code>.</details>
+
+**14.** Un `Cortafuegos` termina con la regla `Regla("DENEGAR", origen="wan")` (no es un atrapa-todo total, porque especifica origen). ¿Qué devuelve `tiene_regla_final_deny(fw)`?
+
+A) `True`, porque la última regla es `DENEGAR`
+B) `False`, porque la última regla no es un atrapa-todo (`origen != "*"`)
+C) Lanza una excepción
+D) Depende de cuántas reglas tenga antes
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La función exige que la última regla sea <code>DENEGAR</code> <b>y</b> comodín total (<code>origen == "*"</code> y <code>puerto == 0</code>); aquí el origen está restringido a <code>"wan"</code>, así que no cuenta como el atrapa-todo final.</details>
+
+**15.** En el reto resuelto, la política tiene `PERMITIR internet dmz 443`, `PERMITIR dmz lan 5432` y `DENEGAR * * 0`. ¿Qué evalúa `fw.evaluar("internet", "lan", 5432)`?
+
+A) `PERMITIR`, porque el puerto 5432 está permitido en la política
+B) `DENEGAR`, porque ninguna regla permite a `internet` llegar directamente a `lan`
+C) Error: la política es ambigua
+D) `PERMITIR`, porque `internet` y `dmz` ya están autorizados
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La regla del puerto 5432 solo permite <code>dmz → lan</code>, no <code>internet → lan</code>; ese tráfico no coincide con ninguna regla de permiso y cae en la política por defecto.</details>

@@ -380,30 +380,6 @@ def informe_cumplimiento(tratamientos: list[dict]) -> list[str]:
 ```
 </details>
 
-### Preguntas tipo test práctico
-
-**P1.** ¿Por qué `seudonimo("12345678Z")` debe dar siempre el mismo resultado?
-<details class="sol"><summary>Respuesta</summary>Porque hay que poder agrupar registros de la misma persona en análisis posteriores sin conocer su identidad — si cambiara cada vez, perdería esa utilidad. Es la propiedad determinista del hash, igual que en la UT1.</details>
-
-**P2.** ¿Sigue siendo un dato personal, a efectos del RGPD, un DNI seudonimizado?
-<details class="sol"><summary>Respuesta</summary>Sí: la seudonimización no saca el dato del ámbito del RGPD, porque en teoría —con la sal— se podría revertir. Solo la anonimización real lo hace.</details>
-
-**P3.** ¿Qué imprime esto?
-```python
-import re
-print(re.sub(r"\b\d{8}[A-Za-z]\b", "[DNI]", "contacta con 12345678Z o con ana@x.es"))
-```
-<details class="sol"><summary>Respuesta</summary><code>contacta con [DNI] o con ana@x.es</code> — el patrón solo sustituye el DNI; el email no encaja con ese patrón y queda igual.</details>
-
-**P4.** En el ejercicio 9, si un tratamiento tiene base válida y finalidad declarada, pero un plazo de `-3` meses, ¿qué lanza `plazo_ok(-3)` si lo llamas directamente?
-<details class="sol"><summary>Respuesta</summary>Lanza <code>ValueError</code>. Por eso <code>evaluar_tratamiento</code> compara directamente el número (<code>plazo &lt; 0</code>) en vez de llamar a <code>plazo_ok</code>, para poder añadirlo a la lista de fallos sin que el programa se detenga.</details>
-
-**P5.** ¿Por qué reutilizar la misma sal en dos sistemas distintos es un riesgo, aunque cada uno seudonimice por separado?
-<details class="sol"><summary>Respuesta</summary>Porque si el mismo DNI produce el mismo seudónimo en ambos sistemas, alguien que tenga acceso a los dos conjuntos de datos puede cruzarlos por coincidencia de seudónimo y re-identificar a la persona.</details>
-
-**P6.** ¿Qué normativa española regula el envío de comunicaciones comerciales por email no solicitadas?
-<details class="sol"><summary>Respuesta</summary>La LSSI-CE (Ley de Servicios de la Sociedad de la Información y Comercio Electrónico), además del RGPD en cuanto al tratamiento del dato del email en sí.</details>
-
 ---
 
 ## 8. Reto resuelto, paso a paso — Verificador de cumplimiento y anonimizador
@@ -677,3 +653,144 @@ El instrumento principal es un **test práctico**: resuelves en Python un reto p
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Esta unidad además incluye la nota de **FFE** (Formación y Fomento del Emprendimiento), que aporta un 10 % adicional al módulo completo — ver [Cómo se evalúa el módulo](../el-curso.md).
 
 El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `hashlib`/`re`), pasar `mypy` y documentar el código.
+
+---
+
+## Simulacro de examen tipo test
+
+> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+
+**1.** ¿Qué devuelve `base_valida("  CONTRATO ")` (con espacios y en mayúsculas)?
+
+A) `False`, porque no coincide exactamente con `"contrato"`
+B) `True`, porque la función normaliza con `.strip().lower()` antes de comparar
+C) Lanza una excepción por los espacios
+D) `True` solo si se escribe todo en minúsculas
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>base_valida</code> hace <code>.strip().lower()</code> antes de comprobar si está en el conjunto de bases válidas.</details>
+
+**2.** Una tienda usa el email del cliente para enviar la factura (necesario para el contrato) y también para publicidad no solicitada. Según el RGPD, ¿necesita la misma base de licitud para ambos usos?
+
+A) Sí, basta con una base de licitud por cliente
+B) No: cada finalidad distinta necesita su propia base — la factura tiene base "contrato", pero la publicidad no solicitada carece de una base válida (necesitaría consentimiento)
+C) No hace falta base de licitud si el cliente ya está registrado
+D) Solo hace falta declarar la base una vez al año
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**3.** ¿Por qué `seudonimo("12345678Z")` debe devolver siempre el mismo valor cada vez que se llama?
+
+A) Es un error del código; debería cambiar cada vez
+B) Porque hay que poder agrupar registros de la misma persona sin conocer su identidad — es la propiedad determinista del hash, igual que en la UT1
+C) Porque `hashlib` obliga a cachear el resultado
+D) Solo es determinista la primera vez que se ejecuta
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**4.** ¿Sigue siendo un dato personal, a efectos del RGPD, un DNI ya seudonimizado?
+
+A) No, en cuanto se aplica un hash deja de ser dato personal
+B) Sí: la seudonimización no saca el dato del ámbito del RGPD, porque en teoría (con la sal) se podría revertir
+C) Depende del algoritmo de hash usado
+D) Solo si el hash tiene menos de 10 caracteres
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Solo la anonimización real (irreversible incluso en teoría) queda fuera del ámbito del RGPD.</details>
+
+**5.** ¿Qué devuelve `enmascarar_email("jj@dominio.com")` (usuario de 2 caracteres)?
+
+A) `"j*@dominio.com"`
+B) `"**@dominio.com"`
+C) `"jj@dominio.com"` sin cambios
+D) Lanza una excepción porque el usuario es demasiado corto
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Con <code>len(usuario) &lt;= 2</code>, la función usa la rama corta: <code>usuario[0] + "*@" + dominio</code>.</details>
+
+**6.** Un ticket de soporte contiene un DNI, un email **y** un teléfono. Le pasas ese texto a `anonimizar_texto` (tal como está definida en la unidad, sin el patrón de teléfono del Reto rápido 2). ¿Qué ocurre con el teléfono?
+
+A) Se sustituye por `[TEL]` automáticamente
+B) Se sustituye por `[DNI]` por error
+C) Se queda tal cual, sin anonimizar — solo hay patrones para DNI y email
+D) La función lanza una excepción al encontrar un patrón desconocido
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> <code>anonimizar_texto</code> solo aplica <code>PATRON_DNI</code> y <code>PATRON_EMAIL</code>; el teléfono queda expuesto a menos que añadas el tercer patrón, como pide el Reto rápido 2.</details>
+
+**7.** ¿Qué ocurre al llamar a `plazo_ok(-5)`?
+
+A) Devuelve `False`
+B) Devuelve `True`, porque -5 es un número válido
+C) Lanza `ValueError`, porque el plazo no puede ser negativo
+D) Devuelve `0`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La función comprueba explícitamente <code>if meses &lt; 0: raise ValueError(...)</code> antes de evaluar el rango.</details>
+
+**8.** ¿Qué regula específicamente la LSSI-CE, además de lo que ya cubre el RGPD?
+
+A) La seguridad de los sistemas del sector público español
+B) El comercio electrónico y las comunicaciones comerciales por vía electrónica en España
+C) La ciberseguridad de infraestructuras críticas en toda la UE
+D) Es un sinónimo español del RGPD, regula lo mismo
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**9.** Un tratamiento tiene `base="marketing_directo"` (no está en las bases válidas) y `finalidad=""` (vacía). ¿Qué devuelve `evaluar_tratamiento(t)`?
+
+A) `[]` (lista vacía, porque el plazo no se ha comprobado todavía)
+B) `["base de licitud no válida", "sin finalidad declarada"]`
+C) Lanza una excepción al encontrar dos errores a la vez
+D) Solo `["sin finalidad declarada"]`, porque la base se comprueba después
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> A diferencia de <code>valida_activo</code> en la UT4, aquí <b>no</b> se usa <code>raise</code>: se acumulan <b>todos</b> los fallos encontrados en una lista.</details>
+
+**10.** Con un tratamiento que tiene base válida, finalidad declarada y plazo de 24 meses, ¿qué devuelve `cumple(t)`?
+
+A) `True`
+B) `False`
+C) `None`
+D) La lista de fallos vacía, no un booleano
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>cumple(t)</code> es <code>not evaluar_tratamiento(t)</code>; si no hay fallos, la lista vacía es "falsy" y <code>not []</code> es <code>True</code>.</details>
+
+**11.** Seudonimizas el mismo DNI en dos sistemas distintos usando la **misma** sal. ¿Qué detecta `sal_reutilizada(mapa1, mapa2)`?
+
+A) Nada, porque compara diccionarios distintos
+B) Que hay al menos un seudónimo coincidente entre ambos mapas — indicio de sal compartida
+C) Solo detecta DNIs coincidentes, no seudónimos
+D) Siempre devuelve una lista vacía si los DNIs son distintos
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Usa la intersección de conjuntos <code>set(mapa1.values()) & set(mapa2.values())</code>: si aparece el mismo seudónimo en los dos sistemas, es señal de que comparten sal.</details>
+
+**12.** `anonimizar_csv(texto_csv, columnas=["dni"])` recibe un CSV con columnas `nombre,dni,email`. ¿Qué le ocurre a la columna `nombre` en el resultado?
+
+A) También se seudonimiza, por seguridad
+B) Se conserva tal cual — solo se seudonimizan las columnas indicadas en `columnas`
+C) Se elimina por completo del CSV
+D) Se sustituye por `[NOMBRE]`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La función solo aplica <code>seudonimo()</code> a las columnas que le pases explícitamente en la lista <code>columnas</code>; el resto se copia sin tocar.</details>
+
+**13.** `informe_cumplimiento` ordena las líneas del informe. Si el tratamiento `"A"` cumple y el `"B"` no, ¿en qué orden aparecen?
+
+A) Alfabético: A antes que B
+B) `"B"` (incumple) antes que `"A"` (cumple)
+C) En el orden en que aparecen en la lista original, sin reordenar
+D) Los que cumplen siempre van al final del todo, sin excepción
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El <code>sorted(..., key=lambda l: ": OK" in l)</code> pone primero las líneas donde <code>": OK"</code> es <code>False</code> (los incumplimientos), y al final las que sí terminan en <code>": OK"</code>.</details>
+
+**14.** En el reto resuelto, el tratamiento `"Logs acceso"` tiene `base="porque_si"`, `finalidad=""` y `plazo_meses=-1`. ¿Cuántos fallos distintos reporta la auditoría para ese tratamiento?
+
+A) 1
+B) 2
+C) 3
+D) 0, porque los logs de acceso no necesitan base de licitud
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Los tres a la vez: base de licitud no válida, sin finalidad declarada, y plazo de conservación fuera de rango (negativo).</details>
+
+**15.** Ejecutas `cumplimiento.py anonimizar tickets.txt tickets_anon.txt` sobre un fichero con la línea `"Usuario 12345678Z (ana.perez@iesx.es) reporta un fallo"`. ¿Qué contiene `tickets_anon.txt`?
+
+A) La misma línea, sin cambios
+B) `"Usuario [DNI] ([EMAIL]) reporta un fallo"`
+C) El fichero queda vacío
+D) Lanza un error porque el fichero de entrada no es JSON
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>anonimizar_fichero</code> aplica <code>anonimizar_texto</code> línea a línea, sustituyendo el DNI y el email por sus marcadores.</details>

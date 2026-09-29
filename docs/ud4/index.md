@@ -476,37 +476,6 @@ def valida_activo(nombre: str, valor: float, prob: float) -> None:
 ```
 </details>
 
-### Preguntas tipo test práctico
-
-**P1.** ¿Qué diferencia hay entre `raise ValueError(...)` y `raise TypeError(...)`?
-<details class="sol"><summary>Respuesta</summary><code>ValueError</code> es para un valor que no tiene sentido (fuera de rango, formato incorrecto); <code>TypeError</code> es para cuando el <b>tipo</b> de dato no es el esperado.</details>
-
-**P2.** ¿Por qué `class PoliticaError(ValueError)` sigue siendo capturable con `except ValueError:`?
-<details class="sol"><summary>Respuesta</summary>Porque hereda de <code>ValueError</code> (como <code>ReglaHoraria</code> heredaba de <code>Regla</code> en la UT3): un <code>PoliticaError</code> <b>es</b> un <code>ValueError</code>.</details>
-
-**P3.** ¿Qué imprime esto?
-```python
-try:
-    if 1.5 > 1:
-        raise ValueError("fuera de rango")
-except ValueError as e:
-    print("capturado:", e)
-print("sigue")
-```
-<details class="sol"><summary>Respuesta</summary><code>capturado: fuera de rango</code> y luego <code>sigue</code> — el <code>except</code> maneja el error y el programa continúa con normalidad después del bloque.</details>
-
-**P4.** ¿Por qué `secrets.choice` y no `random.choice` para generar contraseñas?
-<details class="sol"><summary>Respuesta</summary><code>random</code> es predecible si se conoce su estado interno (no es criptográficamente seguro); <code>secrets</code> usa el generador aleatorio del sistema operativo, pensado para uso criptográfico.</details>
-
-**P5.** Dos factores: "contraseña" y "PIN". ¿Es MFA?
-<details class="sol"><summary>Respuesta</summary>No: ambos son "algo que sabes" — la misma categoría. MFA exige categorías <b>distintas</b>.</details>
-
-**P6.** En el ejercicio 15, si `nombre` está vacío **y** `valor` es negativo, ¿qué excepción se lanza?
-<details class="sol"><summary>Respuesta</summary>Solo la del nombre vacío: la función comprueba en orden y <code>raise</code> detiene la ejecución en el primer fallo, sin llegar a comprobar <code>valor</code>.</details>
-
-**P7.** ¿Por qué `merece_la_pena` compara `ahorro > coste_anual` y no `ale_actual > coste_anual`?
-<details class="sol"><summary>Respuesta</summary>Porque lo relevante es cuánto <b>reduce</b> la salvaguarda el riesgo (la diferencia entre el ALE actual y el residual), no el ALE total: una salvaguarda puede ser cara pero seguir mereciendo la pena si reduce mucho el riesgo.</details>
-
 ---
 
 ## 8. Reto resuelto, paso a paso — Auditor de riesgo y contraseñas
@@ -754,3 +723,153 @@ El instrumento principal es un **test práctico**: resuelves en Python un reto p
     **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5.
 
 El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, **validar** con `try`/`raise`), pasar `mypy` y documentar el código.
+
+---
+
+## Simulacro de examen tipo test
+
+> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+
+**1.** ¿Qué devuelve `nivel_riesgo(impacto=4, probabilidad=2)`?
+
+A) `"ALTO"`
+B) `"MEDIO"`
+C) `"BAJO"`
+D) Lanza una excepción
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>4 × 2 = 8</code>, y 8 está en el rango <code>[7, 15)</code> → <code>"MEDIO"</code>.</details>
+
+**2.** ¿Qué devuelve `calcular_ale(valor_activo=20000, factor_exposicion=0.25, aro=1)`?
+
+A) `20000.0`
+B) `5000.0`
+C) `0.25`
+D) `500.0`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>SLE = 20000 × 0.25 = 5000</code>; <code>ALE = 5000 × 1 = 5000.0</code>.</details>
+
+**3.** ¿Qué diferencia hay entre `raise ValueError(...)` y `raise TypeError(...)`?
+
+A) Son sinónimos, da igual cuál uses
+B) `ValueError` es para un valor sin sentido (fuera de rango); `TypeError` es para cuando el tipo de dato no es el esperado
+C) `TypeError` solo existe en Python 2
+D) `ValueError` detiene el programa; `TypeError` no
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**4.** `class PoliticaError(ValueError): pass`. ¿Se puede capturar un `PoliticaError` con `except ValueError:`?
+
+A) No, son tipos incompatibles
+B) Sí, porque `PoliticaError` hereda de `ValueError` — un `PoliticaError` **es** un `ValueError`
+C) Solo si se importa `PoliticaError` explícitamente en el `except`
+D) Solo en modo `strict` de `mypy`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**5.** ¿Qué imprime este fragmento?
+
+```python
+try:
+    if 1.5 > 1:
+        raise ValueError("fuera de rango")
+except ValueError as e:
+    print("capturado:", e)
+print("sigue")
+```
+
+A) Solo `capturado: fuera de rango`
+B) `capturado: fuera de rango` y después `sigue`
+C) Solo `sigue`, porque el error se ignora
+D) El programa se detiene con una traza de error
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El <code>except</code> maneja la excepción y el programa continúa con normalidad tras el bloque <code>try</code>.</details>
+
+**6.** ¿Por qué se usa `secrets.choice` en vez de `random.choice` para generar contraseñas?
+
+A) `secrets` es más rápido
+B) `random` es predecible si se conoce su estado interno; `secrets` usa el generador del sistema operativo, pensado para criptografía
+C) `random.choice` no existe en Python 3
+D) No hay diferencia real
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**7.** ¿Qué devuelve `entropia("abcdefgh")` frente a `entropia("12345678")` (misma longitud, 8 caracteres)?
+
+A) Los mismos bits, porque ambas tienen 8 caracteres
+B) Más bits para las letras (alfabeto de 26) que para los dígitos (alfabeto de 10)
+C) Más bits para los dígitos, porque son más difíciles de recordar
+D) Ambas dan 0.0, porque no tienen símbolos
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>entropia("abcdefgh") = 37.6</code> (alfabeto de 26 minúsculas) frente a <code>entropia("12345678") = 26.6</code> (alfabeto de solo 10 dígitos) — a igual longitud, más variedad de caracteres da más entropía.</details>
+
+**8.** `cumple_politica("SoloMayusculas")` (14 caracteres, con mayúsculas y minúsculas, sin dígitos ni símbolos). ¿Qué devuelve?
+
+A) `(True, [])`
+B) `(False, ['sin dígito', 'sin símbolo'])`
+C) `(False, ['corta'])`
+D) `(False, ['sin mayúscula'])`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Tiene longitud suficiente (14 ≥ 12) y sí tiene mayúscula, pero le faltan un dígito y un símbolo.</details>
+
+**9.** Dos factores de autenticación: `"contraseña"` y `"PIN"`. ¿Es MFA de verdad según `es_mfa`?
+
+A) Sí, son dos factores distintos
+B) No, ambos son "algo que sabes" — la misma categoría
+C) Sí, porque son dos cadenas de texto diferentes
+D) Depende de la longitud del PIN
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> MFA exige categorías <b>distintas</b> (saber/tener/ser); dos formas de "saber" no cuentan como MFA.</details>
+
+**10.** ¿Qué devuelve `merece_la_pena(ale_actual=10000, ale_residual=9000, coste_anual=2000)`?
+
+A) `True`, porque cualquier reducción de riesgo merece la pena
+B) `False`, porque el ahorro (1000) no supera el coste (2000)
+C) `True`, porque el ALE actual es mayor que el coste
+D) Lanza una excepción, porque `ale_residual` es positivo
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El ahorro es <code>10000 − 9000 = 1000</code>, que no supera el coste de <code>2000</code>.</details>
+
+**11.** ¿Por qué `merece_la_pena` compara `ahorro > coste_anual` en vez de `ale_actual > coste_anual`?
+
+A) Es equivalente, da igual cuál se use
+B) Porque lo relevante es cuánto **reduce** la salvaguarda el riesgo, no el riesgo total
+C) Porque `ale_actual` nunca es mayor que el coste
+D) Por convención de estilo, sin motivo técnico
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Una salvaguarda puede ser cara y seguir mereciendo la pena si reduce mucho el riesgo — lo que importa es el ahorro neto, no el ALE de partida.</details>
+
+**12.** ¿Qué ocurre al llamar a `riesgo_medio([])` (lista vacía)?
+
+A) Devuelve `0.0`
+B) Devuelve `None`
+C) Lanza `ValueError`
+D) Se queda en un bucle infinito
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La función comprueba explícitamente <code>if not valores:</code> y lanza <code>ValueError</code> en vez de dividir por cero silenciosamente.</details>
+
+**13.** En `valida_activo(nombre, valor, prob)` (ejercicio 15), si `nombre` está vacío **y además** `valor` es negativo, ¿qué excepción ves?
+
+A) Las dos a la vez, en una lista
+B) Solo la del nombre vacío: la primera comprobación que falla detiene la función
+C) Solo la del valor negativo, porque se comprueba primero
+D) Ninguna, los dos errores se cancelan entre sí
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>raise</code> interrumpe la función en el primer fallo encontrado; nunca llega a comprobar <code>valor</code>.</details>
+
+**14.** ¿Por qué el código de la unidad evita `except Exception:` a secas?
+
+A) Python no permite capturar `Exception` directamente
+B) Porque oculta errores de programación reales (como una variable mal escrita) junto con los esperados
+C) Porque es más lento que capturar tipos concretos
+D) No hay ninguna razón, es solo una preferencia de estilo
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+
+**15.** En el reto resuelto, `nivel_riesgo` recibe `impacto=8`. Según la validación de `auditor.py`, ¿qué ocurre?
+
+A) Se acepta igual, `nivel_riesgo` no valida nada
+B) Lanza `RiesgoInvalidoError`, porque 8 está fuera del rango `[1, 5]`
+C) Devuelve `"ALTO"` automáticamente para cualquier valor mayor que 5
+D) Se trunca a 5 silenciosamente
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>auditor.py</code> valida explícitamente <code>1 &lt;= impacto &lt;= 5</code> y lanza <code>RiesgoInvalidoError</code> si no se cumple, en vez de calcular con un dato sin sentido.</details>
