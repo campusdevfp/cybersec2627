@@ -727,139 +727,318 @@ El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la t�
 
 ## Simulacro de examen tipo test
 
-> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+> 15 preguntas de opción múltiple. Cada una trae su propio código.
 
-**1.** Tienes dos reglas: 1) `PERMITIR` cualquier origen al puerto 443. 2) `DENEGAR` todo. Llega tráfico al puerto 22. ¿Qué se aplica?
+**1.** ¿Qué imprime este código?
 
-A) `PERMITIR`, porque hay una regla de permitir
-B) `DENEGAR`, porque no coincide con la regla del 443 y cae en la regla atrapa-todo
-C) Error: ninguna regla coincide
-D) Depende del orden en que llegue el tráfico
+```python
+from dataclasses import dataclass
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El puerto 22 no coincide con la primera regla (puerto 443), así que se evalúa la segunda, que deniega todo.</details>
+@dataclass
+class Regla:
+    accion: str
+    puerto: int = 0
 
-**2.** Si dos reglas de un `Cortafuegos` coinciden con el mismo tráfico, ¿cuál se aplica?
+r1 = Regla("PERMITIR", 80)
+r2 = Regla("PERMITIR", 80)
+print(r1 == r2, r1 is r2)
+```
 
-A) La última de la lista
-B) La primera de la lista
-C) Se combinan ambas acciones
-D) La más restrictiva de las dos
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El bucle de <code>evaluar()</code> hace <code>return</code> en cuanto encuentra la primera coincidencia.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>@dataclass</code> genera un <code>__eq__</code> que compara por valor de los campos: son iguales (<code>==</code>) aunque sean dos objetos distintos en memoria (<code>is</code> compara identidad, no valor).</details>
 
-**3.** Según el diagrama de la DMZ, ¿qué tráfico **nunca** debería llegar directamente a la LAN interna?
+**2.** ¿Qué imprime este código?
 
-A) El tráfico de la DMZ hacia la LAN
-B) El tráfico de Internet directo hacia la LAN
-C) El tráfico entre dos servidores de la LAN
-D) El tráfico de la LAN hacia la DMZ
+```python
+class ColaMala:
+    def __init__(self, items=[]):     # valor por defecto mutable
+        self.items = items
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Internet solo debe poder llegar a la DMZ; la LAN queda aislada detrás.</details>
+c1 = ColaMala()
+c1.items.append("a")
+c2 = ColaMala()
+print(c2.items)
+```
 
-**4.** Con `r = Regla("permitir", 443)` de `clase_basica.py`, ¿qué devuelve `r.permite(22)`?
-
-A) `True`
-B) `False`
+A) `[]`
+B) `['a']`
 C) Lanza `AttributeError`
 D) `None`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>self.puerto</code> es 443, no coincide con el 22 que se le pregunta.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La lista <code>[]</code> por defecto se crea <b>una sola vez</b> al definir la función, y todas las instancias que no pasan su propio valor la comparten — el mismo error que <code>reglas: list = []</code> en un <code>@dataclass</code>.</details>
 
-**5.** ¿Qué tres cosas genera `@dataclass` automáticamente que tendrías que escribir a mano en una clase normal?
+**3.** ¿Qué imprime este código?
 
-A) `__str__`, `__len__` y `__iter__`
-B) `__init__`, `__repr__` y `__eq__`
-C) `__enter__`, `__exit__` y `__del__`
-D) Solo el constructor `__init__`
+```python
+from dataclasses import dataclass
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+@dataclass
+class Regla:
+    accion: str
+    origen: str = "*"
+    destino: str = "*"
+    puerto: int = 0
+    def coincide(self, o, d, p):
+        def encaja(v, patron): return patron == "*" or patron == v
+        return encaja(o, self.origen) and encaja(d, self.destino) and (self.puerto == 0 or self.puerto == p)
 
-**6.** ¿Por qué `reglas: list = []` directamente como valor por defecto en un `@dataclass` es un error?
+r = Regla("PERMITIR", destino="bd", puerto=5432)
+print(r.coincide("cualquiera", "bd", 5432))
+print(r.coincide("cualquiera", "web", 5432))
+```
 
-A) Python no permite listas vacías como valor por defecto
-B) Todas las instancias de la clase compartirían la **misma** lista mutable
-C) Da un error de sintaxis
-D) Solo funciona con tuplas, no con listas
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Por eso se usa <code>field(default_factory=list)</code>, que crea una lista nueva por cada instancia.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>origen="*"</code> es comodín, así que cualquier origen encaja. En la primera llamada el destino (<code>"bd"</code>) coincide; en la segunda, el destino pedido es <code>"web"</code>, que no coincide con la regla.</details>
 
-**7.** Con `r = Regla("PERMITIR", origen="lan", destino="web", puerto=80)` de `regla_comodin.py`, ¿qué devuelve `r.coincide("wan", "web", 80)`?
+**4.** Un cortafuegos recorre sus reglas en orden y aplica la primera que coincide. ¿Qué imprime esto?
 
-A) `True`, porque el destino y el puerto coinciden
-B) `False`, porque el origen no coincide (`"wan"` ≠ `"lan"`)
-C) `True`, porque dos de los tres campos coinciden
-D) Lanza una excepción
+```python
+fw = Cortafuegos()
+fw.anadir(Regla("DENEGAR"))                    # comodín total, va primero
+fw.anadir(Regla("PERMITIR", puerto=80))
+print(fw.evaluar("x", "y", 80))
+```
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>coincide</code> exige que <b>todos</b> los campos encajen (o sean comodín); el origen no encaja.</details>
+A) `PERMITIR`
+B) `DENEGAR`
+C) Se aplican las dos, sin sentido
+D) Lanza un error por reglas contradictorias
 
-**8.** Un `Cortafuegos` tiene, en este orden: 1) `DENEGAR` (atrapa-todo), 2) `PERMITIR` puerto 80. ¿Qué evalúa `fw.evaluar("x", "y", 80)`?
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La regla <code>DENEGAR</code> es un comodín total y coincide con <b>cualquier</b> tráfico; al ser la primera, se aplica y la <code>PERMITIR</code> de después nunca se alcanza — queda "tapada".</details>
 
-A) `"PERMITIR"`
-B) `"DENEGAR"`
-C) Evalúa ambas y prioriza `PERMITIR`
-D) Lanza un error porque hay reglas contradictorias
+**5.** Con el orden invertido respecto a la pregunta anterior, ¿qué imprime esto?
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La primera regla (atrapa-todo) ya coincide con cualquier tráfico, así que la segunda nunca se alcanza — está "tapada".</details>
+```python
+fw = Cortafuegos()
+fw.anadir(Regla("PERMITIR", puerto=80))
+fw.anadir(Regla("DENEGAR"))
+print(fw.evaluar("x", "y", 80))
+print(fw.evaluar("x", "y", 22))
+```
 
-**9.** ¿Qué significa exactamente que `ReglaHoraria` **hereda** de `Regla`?
+A) `PERMITIR` y `PERMITIR`
+B) `DENEGAR` y `DENEGAR`
+C) `PERMITIR` y `DENEGAR`
+D) `DENEGAR` y `PERMITIR`
 
-A) Que copia y pega el código de `Regla` dentro de su propia definición
-B) Que tiene todos los atributos y métodos de `Regla` (como `coincide`) y puede añadir los suyos propios
-C) Que solo puede usarse si `Regla` no existe todavía
-D) Que sustituye por completo a `Regla` en el resto del programa
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> El tráfico al puerto 80 coincide con la primera regla (<code>PERMITIR</code>); el del puerto 22 no coincide con ninguna regla específica y cae en la <code>DENEGAR</code> final.</details>
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Es el principio de sustitución: <code>ReglaHoraria</code> <b>es</b> una <code>Regla</code> y además sabe algo nuevo.</details>
+**6.** ¿Qué imprime este código?
 
-**10.** Un empleado introduce su contraseña correctamente, pero intenta acceder a un recurso que no le corresponde. Según AAA, ¿qué lo detiene?
+```python
+from dataclasses import dataclass
 
-A) Autenticación
-B) Autorización
-C) Auditoría
-D) Ninguna de las tres, es un fallo del sistema
+@dataclass
+class ReglaHoraria(Regla):          # hereda accion, origen, destino, puerto, coincide
+    hora_inicio: int = 0
+    hora_fin: int = 23
+    def activa_a_las(self, h): return self.hora_inicio <= h <= self.hora_fin
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La autenticación ya se superó (sabía la contraseña); lo que falla es la autorización: qué tiene permitido hacer.</details>
+r = ReglaHoraria("PERMITIR", puerto=22, hora_inicio=9, hora_fin=17)
+print(r.coincide("*", "*", 22))
+print(r.activa_a_las(12))
+print(r.activa_a_las(20))
+```
 
-**11.** ¿Qué devuelve `en_red("10.0.2.50", "10.0.1.0/24")`?
+A) `True True True`
+B) `True True False`
+C) `False True False`
+D) `True False False`
 
-A) `True`
-B) `False`
-C) Lanza una excepción, la IP no es válida
-D) Depende del sistema operativo
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>coincide</code> se hereda de <code>Regla</code> sin reescribirla y sigue funcionando; las 12:00 caen dentro del rango 9-17, las 20:00 no.</details>
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>10.0.2.50</code> no pertenece a la subred <code>10.0.1.0/24</code> (esa subred va de <code>10.0.1.0</code> a <code>10.0.1.255</code>).</details>
+**7.** ¿Qué te da `@dataclass` **gratis**, que tendrías que escribir a mano en una clase normal con `class Regla:`?
 
-**12.** Un cortafuegos tiene la regla `PERMITIR puerto=80` primero y `DENEGAR` (atrapa-todo) después. Le pasas tráfico: dos paquetes al puerto 80 y uno al puerto 22. ¿Qué devuelve `impactos(fw, trafico)`?
+```python
+class ReglaSinDataclass:
+    def __init__(self, accion, puerto):
+        self.accion = accion
+        self.puerto = puerto
+    # ¿qué falta aquí para poder hacer print(r) y r1 == r2?
+```
 
-A) `{0: 3}`
-B) `{0: 2, 1: 1}`
-C) `{0: 1, 1: 2}`
+A) Nada, Python ya lo da todo por defecto
+B) `__repr__` (para que `print()` muestre algo legible) y `__eq__` (para comparar con `==`)
+C) Solo `__init__`, que ya está escrito
+D) `__del__` y `__len__`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Sin ellos, <code>print(r)</code> mostraría algo como <code>&lt;__main__.ReglaSinDataclass object at 0x...&gt;</code> y <code>r1 == r2</code> compararía identidad, no valores. <code>@dataclass</code> genera ambos automáticamente, además del <code>__init__</code>.</details>
+
+**8.** ¿Qué imprime este código?
+
+```python
+import ipaddress
+
+def en_red(ip: str, cidr: str) -> bool:
+    return ipaddress.ip_address(ip) in ipaddress.ip_network(cidr)
+
+print(en_red("172.16.5.30", "172.16.5.0/24"))
+print(en_red("172.16.6.30", "172.16.5.0/24"))
+```
+
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>172.16.5.0/24</code> cubre de <code>172.16.5.0</code> a <code>172.16.5.255</code>; la primera IP cae dentro, la segunda (<code>172.16.6.30</code>) está en la subred siguiente.</details>
+
+**9.** ¿Qué imprime este código?
+
+```python
+from collections import Counter
+
+def contar_acciones(reglas) -> dict:
+    return dict(Counter(r.accion.upper() for r in reglas))
+
+reglas = [Regla("permitir"), Regla("PERMITIR"), Regla("denegar"), Regla("DENEGAR")]
+print(contar_acciones(reglas))
+```
+
+A) `{'permitir': 1, 'PERMITIR': 1, 'denegar': 1, 'DENEGAR': 1}`
+B) `{'PERMITIR': 2, 'DENEGAR': 2}`
+C) `{'PERMITIR': 4}`
 D) `{}`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La regla en el índice 0 (<code>PERMITIR</code> puerto 80) se aplica a los 2 paquetes del puerto 80; la regla en el índice 1 (<code>DENEGAR</code>) se aplica al del puerto 22.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>.upper()</code> normaliza <code>"permitir"</code> y <code>"PERMITIR"</code> a la misma clave antes de contar, así que se agrupan juntas.</details>
 
-**13.** Con las subredes `dmz=10.0.1.0/24` y `lan=10.0.2.0/24`, ¿qué devuelve `zona("8.8.8.8")`?
+**10.** ¿Qué imprime este código?
+
+```python
+def tapada(reglas_anteriores: list[tuple], nueva: tuple) -> bool:
+    _, puerto_nuevo = nueva
+    return any(puerto in (0, puerto_nuevo) for _, puerto in reglas_anteriores)
+
+print(tapada([("*", 0)], ("lan", 80)))
+print(tapada([("lan", 443)], ("lan", 80)))
+```
+
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Una regla anterior con puerto <code>0</code> (comodín) tapa cualquier regla nueva. Una regla anterior con puerto <code>443</code> no tapa una nueva de puerto <code>80</code>, porque no coinciden.</details>
+
+**11.** ¿Qué imprime este código?
+
+```python
+def duplicadas(reglas: list) -> list[tuple[int, int]]:
+    pares = []
+    for i in range(len(reglas)):
+        for j in range(i + 1, len(reglas)):
+            if reglas[i] == reglas[j]:
+                pares.append((i, j))
+    return pares
+
+reglas = [Regla("PERMITIR", puerto=80), Regla("DENEGAR"), Regla("PERMITIR", puerto=80)]
+print(duplicadas(reglas))
+```
+
+A) `[]`
+B) `[(0, 1)]`
+C) `[(0, 2)]`
+D) `[(0, 1), (1, 2)]`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Las reglas en los índices 0 y 2 son iguales (mismo <code>accion</code> y <code>puerto</code>, gracias al <code>__eq__</code> de <code>@dataclass</code>); la del índice 1 es distinta.</details>
+
+**12.** ¿Qué imprime este código?
+
+```python
+import ipaddress
+
+def zona(ip: str) -> str:
+    d = ipaddress.ip_address(ip)
+    if d in ipaddress.ip_network("10.0.1.0/24"):
+        return "dmz"
+    if d in ipaddress.ip_network("10.0.2.0/24"):
+        return "lan"
+    return "externa"
+
+print(zona("10.0.1.99"))
+```
 
 A) `"dmz"`
 B) `"lan"`
 C) `"externa"`
 D) Lanza una excepción
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> No pertenece a ninguna de las dos subredes internas, así que cae en el valor por defecto <code>"externa"</code>.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>10.0.1.99</code> pertenece a la subred <code>10.0.1.0/24</code>, que la función identifica como <code>"dmz"</code>.</details>
 
-**14.** Un `Cortafuegos` termina con la regla `Regla("DENEGAR", origen="wan")` (no es un atrapa-todo total, porque especifica origen). ¿Qué devuelve `tiene_regla_final_deny(fw)`?
+**13.** ¿Qué imprime este código?
 
-A) `True`, porque la última regla es `DENEGAR`
-B) `False`, porque la última regla no es un atrapa-todo (`origen != "*"`)
-C) Lanza una excepción
-D) Depende de cuántas reglas tenga antes
+```python
+def tiene_regla_final_deny(fw) -> bool:
+    if not fw.reglas:
+        return False
+    u = fw.reglas[-1]
+    return u.accion.upper() == "DENEGAR" and u.origen == "*" and u.puerto == 0
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La función exige que la última regla sea <code>DENEGAR</code> <b>y</b> comodín total (<code>origen == "*"</code> y <code>puerto == 0</code>); aquí el origen está restringido a <code>"wan"</code>, así que no cuenta como el atrapa-todo final.</details>
+fw = Cortafuegos()
+fw.anadir(Regla("PERMITIR", puerto=80))
+fw.anadir(Regla("DENEGAR"))
+print(tiene_regla_final_deny(fw))
+```
 
-**15.** En el reto resuelto, la política tiene `PERMITIR internet dmz 443`, `PERMITIR dmz lan 5432` y `DENEGAR * * 0`. ¿Qué evalúa `fw.evaluar("internet", "lan", 5432)`?
+A) `True`
+B) `False`
+C) Lanza `IndexError`
+D) `None`
 
-A) `PERMITIR`, porque el puerto 5432 está permitido en la política
-B) `DENEGAR`, porque ninguna regla permite a `internet` llegar directamente a `lan`
-C) Error: la política es ambigua
-D) `PERMITIR`, porque `internet` y `dmz` ya están autorizados
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> La última regla es <code>DENEGAR</code> con <code>origen="*"</code> (por defecto) y <code>puerto=0</code> (por defecto) — es un atrapa-todo final válido.</details>
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La regla del puerto 5432 solo permite <code>dmz → lan</code>, no <code>internet → lan</code>; ese tráfico no coincide con ninguna regla de permiso y cae en la política por defecto.</details>
+**14.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+def cargar_reglas(texto: str) -> Cortafuegos:
+    fw = Cortafuegos()
+    for linea in texto.strip().splitlines():
+        partes = linea.split()
+        accion, origen, destino = partes[0], partes[1], partes[2]
+        puerto = int(partes[3]) if len(partes) > 3 else 0
+        fw.anadir(Regla(accion, origen, destino, puerto))
+    return fw
+
+politica = "PERMITIR internet dmz 443\nDENEGAR * * 0"
+fw = cargar_reglas(politica)
+print(fw.evaluar("internet", "dmz", 443))
+print(fw.evaluar("internet", "lan", 5432))
+```
+
+A) `PERMITIR` y `PERMITIR`
+B) `PERMITIR` y `DENEGAR`
+C) `DENEGAR` y `DENEGAR`
+D) `DENEGAR` y `PERMITIR`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El primer tráfico coincide con la regla de permiso a la DMZ; el segundo (<code>internet → lan</code>) no coincide con ninguna regla de permiso y cae en la <code>DENEGAR</code> final.</details>
+
+**15.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+from collections import Counter
+
+def resumen(fw, trafico: list[tuple]) -> dict:
+    return dict(Counter(fw.evaluar(o, d, p) for o, d, p in trafico))
+
+fw = Cortafuegos()
+fw.anadir(Regla("PERMITIR", puerto=80))
+fw.anadir(Regla("DENEGAR"))
+
+trafico = [("a", "b", 80), ("a", "b", 80), ("a", "b", 22)]
+print(resumen(fw, trafico))
+```
+
+A) `{'PERMITIR': 2, 'DENEGAR': 1}`
+B) `{'PERMITIR': 3}`
+C) `{'PERMITIR': 1, 'DENEGAR': 2}`
+D) `{80: 2, 22: 1}`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Los dos paquetes al puerto 80 se evalúan como <code>PERMITIR</code>; el del puerto 22 no coincide con la primera regla y cae en <code>DENEGAR</code>. <code>Counter</code> agrupa los tres resultados.</details>

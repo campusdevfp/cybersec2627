@@ -1113,157 +1113,346 @@ El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la t�
 
 ## Simulacro de examen tipo test
 
-> 17 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto. Elige tu respuesta antes de abrir la solución.
+> 15 preguntas de opción múltiple. Cada una trae su propio código — no necesitas recordar de qué sección era, solo leerlo y razonar.
 
-**1.** Un ransomware moderno cifra los ficheros **y además** exfiltra los datos antes (doble extorsión). Según `clasificar_incidentes.py`, ¿qué pilar(es) rompe?
+**1.** ¿Qué imprime este código?
 
-A) Solo Disponibilidad
-B) Solo Confidencialidad
-C) Disponibilidad y Confidencialidad
-D) Integridad
+```python
+import hashlib
+def h(t): return hashlib.sha256(t.encode()).hexdigest()
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Cifrar rompe la disponibilidad (no se puede acceder a los datos); exfiltrarlos antes rompe además la confidencialidad (alguien no autorizado los tiene).</details>
+print(h("clave123") == h("clave123"))
+print(h("clave123") == h("Clave123"))
+```
 
-**2.** ¿Qué devuelve `riesgo(probabilidad=0.2, impacto=8)` con la función de `riesgo_simple.py`?
+A) `True` y `True`
+B) `True` y `False`
+C) `False` y `False`
+D) `False` y `True`
 
-A) `1.6`
-B) `10.0`
-C) `0.2`
-D) `8.0`
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El hash es determinista (mismo texto exacto → mismo resultado), pero es sensible a mayúsculas: <code>"clave123"</code> y <code>"Clave123"</code> son cadenas distintas, así que sus hashes también lo son.</details>
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>round(0.2 * 8, 2) = 1.6</code>.</details>
+**2.** ¿Qué imprime este código?
 
-**3.** Según `clasifica()` de `clasificar_medida.py`, ¿qué devuelve `clasifica("generador")`?
+```python
+import hashlib
+def h(t): return hashlib.sha256(t.encode()).hexdigest()
 
-A) `"física"`
-B) `"ambiental"`
-C) `"lógica"`
-D) `"desconocido"`
+a, b = h("1234"), h("1235")
+iguales = sum(1 for x, y in zip(a, b) if x == y)
+print(iguales < 20)
+```
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>"generador"</code> está en el conjunto <code>AMBIENTAL</code>.</details>
+A) `True`
+B) `False`
+C) Lanza una excepción, `zip` no funciona con cadenas
+D) Depende de la máquina donde se ejecute
 
-**4.** Tres copias, **todas** en `soporte="disco_local"`, dos en `"sitio"` y una en `"externo"`. ¿Qué devuelve `cumple_321`?
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Es el efecto avalancha: cambiar un solo carácter de la entrada altera la mayoría del hash, así que muy pocos de los 64 caracteres siguen coincidiendo entre los dos hashes.</details>
+
+**3.** Tienes estas dos funciones para comparar dos cadenas secretas:
+
+```python
+import hmac
+
+def comparar_lento(a: str, b: str) -> bool:
+    return a == b
+
+def comparar_seguro(a: str, b: str) -> bool:
+    return hmac.compare_digest(a, b)
+```
+
+¿Cuál de las dos es vulnerable a un ataque de temporización, y por qué?
+
+A) `comparar_seguro`, porque `hmac` es más lento
+B) `comparar_lento`, porque `==` se detiene en el primer carácter distinto y el tiempo de respuesta varía según cuántos caracteres coincidan
+C) Ninguna, ambas tardan exactamente lo mismo siempre
+D) `comparar_lento`, porque Python no permite comparar cadenas con `==`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>==</code> compara carácter a carácter y se detiene en el primer fallo; ese tiempo variable puede filtrar información a un atacante. <code>compare_digest</code> siempre tarda lo mismo, sin importar dónde esté la diferencia.</details>
+
+**4.** ¿Qué imprime este código?
+
+```python
+import hashlib
+
+def hash_bloques(datos: bytes, n: int = 4) -> str:
+    h = hashlib.sha256()
+    for i in range(0, len(datos), n):
+        h.update(datos[i:i + n])
+    return h.hexdigest()
+
+print(hash_bloques(b"holamundo", 4) == hashlib.sha256(b"holamundo").hexdigest())
+```
+
+A) `True`
+B) `False`
+C) Lanza `TypeError`
+D) Depende del valor de `n`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Hashear un dato entero de una vez o alimentarlo por trozos con <code>update()</code> produce exactamente el mismo resultado — es lo que permite hashear ficheros enormes sin cargarlos enteros en memoria.</details>
+
+**5.** ¿Qué imprime este código?
+
+```python
+from cryptography.fernet import Fernet, InvalidToken
+
+clave = Fernet.generate_key()
+f = Fernet(clave)
+token = f.encrypt(b"mensaje")
+alterado = token[:-1] + b"X"      # se cambia el último byte
+
+try:
+    f.decrypt(alterado)
+    resultado = "descifrado sin problema"
+except InvalidToken:
+    resultado = "rechazado"
+
+print(resultado)
+```
+
+A) `descifrado sin problema`, porque Fernet ignora bytes sueltos manipulados
+B) `rechazado`, porque Fernet detecta que el texto cifrado fue alterado
+C) El programa se cuelga esperando una respuesta
+D) Lanza `KeyError`, no `InvalidToken`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Fernet es cifrado autenticado: verifica la integridad del texto cifrado antes de descifrar, y si detecta manipulación lanza <code>InvalidToken</code> en vez de devolver datos corruptos.</details>
+
+**6.** Ana tiene un par de claves (`privada_ana`, `publica_ana`). Quieres enviarle un mensaje que **solo ella** pueda leer:
+
+```python
+oaep = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+mensaje_cifrado = ____.encrypt(b"secreto", oaep)
+```
+
+¿Qué clave va en el hueco?
+
+A) `privada_ana`
+B) `publica_ana`
+C) Tu propia clave privada
+D) Cualquiera de las dos, da igual
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Se cifra con la clave <b>pública</b> del destinatario; solo su clave privada (que nadie más tiene) puede descifrarlo después.</details>
+
+**7.** ¿Qué imprime este código?
+
+```python
+firma = privada.sign(documento, pss, hashes.SHA256())
+
+def verifica(doc: bytes) -> bool:
+    try:
+        publica.verify(firma, doc, pss, hashes.SHA256())
+        return True
+    except InvalidSignature:
+        return False
+
+print(verifica(documento))
+print(verifica(documento + b"!"))
+```
+
+A) `True` y `True`
+B) `True` y `False`
+C) `False` y `True`
+D) `False` y `False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La firma se calculó sobre <code>documento</code> exacto; verificar ese mismo documento da <code>True</code>, pero cambiar un solo carácter (<code>documento + b"!"</code>) hace que la verificación falle.</details>
+
+**8.** Generas un certificado así:
+
+```python
+certificado = (
+    x509.CertificateBuilder()
+    .subject_name(nombre)
+    .issuer_name(nombre)          # mismo valor que subject_name
+    .public_key(clave.public_key())
+    .sign(clave, hashes.SHA256())
+)
+print(certificado.subject == certificado.issuer)
+```
+
+¿Qué imprime, y qué tipo de certificado es?
+
+A) `False`; es un certificado firmado por una CA
+B) `True`; es un certificado autofirmado
+C) Lanza una excepción, `subject` e `issuer` no se pueden comparar
+D) `True`; es un certificado revocado
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Como <code>issuer_name</code> recibe el mismo <code>nombre</code> que <code>subject_name</code>, el certificado se firma a sí mismo — por definición, un certificado autofirmado.</details>
+
+**9.** ¿Qué imprime este código, sabiendo que `privada` es una clave RSA de 2048 bits?
+
+```python
+contenido = b"informe confidencial de la empresa"
+firma = privada.sign(contenido, pss, hashes.SHA256())
+print(len(firma))
+```
+
+A) `19`, la longitud del texto en bytes
+B) `32`, el tamaño de un hash SHA-256 en bytes
+C) `256`, el tamaño fijo que da una clave RSA de 2048 bits (2048 ÷ 8)
+D) Depende de la longitud de `contenido`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> El tamaño de una firma RSA lo determina el tamaño de la <b>clave</b>, no el del documento firmado — por eso firmar un byte o firmar un fichero de 10 GB da siempre 256 bytes con esta clave.</details>
+
+**10.** Tienes esta función de auditoría:
+
+```python
+def auditar(previo: dict, actual: dict) -> dict:
+    r = {}
+    for n, h in previo.items():
+        if n not in actual:
+            r[n] = "AUSENTE"
+        elif h == actual[n]:
+            r[n] = "OK"
+        else:
+            r[n] = "MODIFICADO"
+    for n in actual:
+        if n not in previo:
+            r[n] = "NUEVO"
+    return r
+
+print(auditar({"a": "x", "b": "y"}, {"a": "x", "c": "z"}))
+```
+
+¿Qué imprime?
+
+A) `{'a': 'OK', 'b': 'AUSENTE', 'c': 'NUEVO'}`
+B) `{'a': 'OK', 'b': 'MODIFICADO'}`
+C) `{'a': 'OK', 'b': 'OK', 'c': 'OK'}`
+D) `{'a': 'OK'}`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>"a"</code> tiene el mismo hash en ambos → <code>OK</code>. <code>"b"</code> estaba en <code>previo</code> pero ya no está en <code>actual</code> → <code>AUSENTE</code>. <code>"c"</code> no estaba en <code>previo</code> → <code>NUEVO</code>.</details>
+
+**11.** Tienes esta cadena de hashes (cada uno depende del anterior):
+
+```python
+def cadena(bloques: list[str]) -> list[str]:
+    hashes_, anterior = [], "0" * 64
+    for b in bloques:
+        h = hashlib.sha256((anterior + b).encode()).hexdigest()
+        hashes_.append(h)
+        anterior = h
+    return hashes_
+
+c1 = cadena(["a", "b", "c"])
+c2 = cadena(["a", "X", "c"])     # se altera el bloque del medio
+print(c1[0] == c2[0], c1[1] == c2[1], c1[2] == c2[2])
+```
+
+¿Qué imprime?
+
+A) `True True True`
+B) `False False False`
+C) `True False False`
+D) `True True False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> El primer bloque no depende del alterado, así que su hash no cambia. Pero a partir de ahí, cada hash incorpora el anterior — alterar el bloque 2 cambia su hash y, en cascada, también el del bloque 3.</details>
+
+**12.** ¿Qué imprime este código?
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Copia:
+    soporte: str
+    ubicacion: str
+
+def cumple_321(copias: list[Copia]) -> tuple[bool, list[str]]:
+    fallos = []
+    if len(copias) < 3:
+        fallos.append("num")
+    if len({c.soporte for c in copias}) < 2:
+        fallos.append("soporte")
+    if not any(c.ubicacion == "externo" for c in copias):
+        fallos.append("externo")
+    return (not fallos, fallos)
+
+copias = [Copia("disco_local", "sitio"), Copia("disco_local", "sitio"), Copia("nas", "externo")]
+print(cumple_321(copias))
+```
 
 A) `(True, [])`
-B) `(False, ['solo hay 3 copias, hacen falta 3'])`
-C) `(False, ['todas las copias usan el mismo soporte'])`
-D) `(False, ['ninguna copia está fuera del sitio'])`
+B) `(False, ['num'])`
+C) `(False, ['soporte'])`
+D) `(False, ['num', 'soporte'])`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Hay 3 copias (cumple) y sí hay una externa (cumple), pero las tres usan el <b>mismo</b> soporte — falla la regla de los "2 soportes distintos".</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Hay 3 copias (cumple), dos soportes distintos (<code>disco_local</code> y <code>nas</code>, cumple) y una está en <code>"externo"</code> (cumple) — las tres condiciones se satisfacen.</details>
 
-**5.** ¿Qué relación hay entre las dos líneas que imprime `print(hash_de_texto("hola"))` ejecutado dos veces seguidas?
+**13.** ¿Qué imprime este código?
 
-A) Son idénticas siempre
-B) Son distintas cada vez que se ejecuta el programa
-C) Solo coinciden si el ordenador no ha cambiado de hora
-D) La segunda tiene el doble de caracteres
+```python
+from enum import Enum
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El hash es <b>determinista</b>: el mismo texto siempre produce el mismo resultado.</details>
+class Pilar(Enum):
+    CONFIDENCIALIDAD = "C"
+    INTEGRIDAD = "I"
+    DISPONIBILIDAD = "D"
 
-**6.** `avalancha("1234", "1235")` compara los SHA-256 de dos cadenas que difieren en un solo dígito. ¿Qué observas en el resultado?
+def describe(p: Pilar) -> str:
+    return f"Rompe: {p.name}"
 
-A) Cambia solo 1 carácter del hash (el dígito que cambió)
-B) Cambia 0 caracteres, son números parecidos
-C) Cambia la mayoría de los 64 caracteres — efecto avalancha
-D) El hash da error porque los textos son casi iguales
+incidente = Pilar.DISPONIBILIDAD
+print(describe(incidente))
+```
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Es el efecto avalancha: un cambio mínimo en la entrada altera casi toda la salida (en la práctica, más de 50 de los 64 caracteres).</details>
+A) `Rompe: D`
+B) `Rompe: DISPONIBILIDAD`
+C) `Rompe: Pilar.DISPONIBILIDAD`
+D) Lanza `AttributeError`, `Enum` no tiene atributo `name`
 
-**7.** Según `comparar_algoritmos.py`, ¿cuántos bits produce `hashlib.new("sha256", ...).hexdigest()`?
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>.name</code> devuelve el nombre del miembro del <code>Enum</code> (<code>"DISPONIBILIDAD"</code>), no su valor (<code>.value</code> daría <code>"D"</code>).</details>
 
-A) 128
-B) 160
-C) 256
-D) 512
+**14.** ¿Qué imprime este código?
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> SHA-256 produce 256 bits (64 caracteres hexadecimales).</details>
+```python
+def riesgo(probabilidad: float, impacto: float) -> float:
+    return round(probabilidad * impacto, 2)
 
-**8.** ¿Por qué `hash_fichero()` lee el fichero en bloques de 8192 bytes en vez de cargarlo entero con `f.read()`?
+print(riesgo(probabilidad=0.9, impacto=6))
+```
 
-A) Es un límite fijo de `hashlib` que no se puede evitar
-B) Para que funcione igual de bien con ficheros enormes sin agotar la memoria
-C) Para que el hash resultante sea más seguro
-D) Es un requisito legal del RGPD
+A) `5.4`
+B) `6.9`
+C) `0.9`
+D) `54.0`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Leer por bloques mantiene el consumo de memoria constante, sin importar si el fichero pesa 1 KB o 10 GB.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>0.9 × 6 = 5.4</code>, redondeado a 2 decimales sigue siendo <code>5.4</code>.</details>
 
-**9.** En `simetrico_fernet.py`, si manipulas los últimos bytes del token cifrado y luego llamas a `f.decrypt(...)`, ¿qué ocurre?
+**15.** *(Sobre el reto de la unidad)* Un fichero de configuración cambia de valor, y aparece un fichero nuevo. Con las funciones del verificador de integridad:
 
-A) Devuelve el texto descifrado igualmente, aunque corrupto
-B) Lanza `InvalidToken`
-C) El programa se queda colgado sin excepción
-D) Devuelve `None` silenciosamente
+```python
+manifiesto = {"app.conf": "hash_de_puerto=8080", "app.bin": "hash_binario"}
+actual =     {"app.conf": "hash_de_puerto=9090", "app.bin": "hash_binario", "nuevo.txt": "hash_x"}
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Fernet es cifrado autenticado: detecta la manipulación y rechaza explícitamente el token en vez de devolver datos corruptos.</details>
+print(auditar(manifiesto, actual))
+```
 
-**10.** Quieres enviar un mensaje que **solo** Ana pueda leer, usando RSA asimétrico. ¿Con qué clave lo cifras?
+(`auditar` es la misma función de la pregunta 10.) ¿Qué imprime?
 
-A) Tu clave privada
-B) Tu clave pública
-C) La clave pública de Ana
-D) La clave privada de Ana
+A) `{'app.conf': 'OK', 'app.bin': 'OK', 'nuevo.txt': 'NUEVO'}`
+B) `{'app.conf': 'MODIFICADO', 'app.bin': 'OK', 'nuevo.txt': 'NUEVO'}`
+C) `{'app.conf': 'AUSENTE', 'app.bin': 'OK'}`
+D) `{'app.conf': 'MODIFICADO', 'app.bin': 'MODIFICADO', 'nuevo.txt': 'NUEVO'}`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Se cifra con la clave <b>pública</b> del destinatario; solo su clave privada (que nadie más tiene) puede descifrarlo.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>app.conf</code> cambió de valor (hash distinto) → <code>MODIFICADO</code>. <code>app.bin</code> sigue igual → <code>OK</code>. <code>nuevo.txt</code> no estaba en el manifiesto original → <code>NUEVO</code>. Es exactamente el mecanismo que usa tu <code>verificador.py</code> para detectar manipulaciones.</details>
 
-**11.** Firmas un documento con `firma_rsa.py`. ¿Con qué clave firmas, y con cuál se verifica la firma?
+**16.** *(Sobre el reto de la unidad)* ¿Qué ocurre al ejecutar este código?
 
-A) Firmas con tu pública; se verifica con tu privada
-B) Firmas con tu privada; se verifica con tu pública
-C) Ambas operaciones usan tu clave privada
-D) Ambas operaciones usan tu clave pública
+```python
+import argparse
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Se firma con la clave privada del autor; cualquiera puede verificar con su clave pública, que es de dominio público.</details>
+ap = argparse.ArgumentParser()
+ap.add_argument("accion", choices=["generar", "auditar"])
+ap.add_argument("--algoritmo", default="sha256", choices=["sha256", "sha3_256", "blake2b"])
 
-**12.** En `firma_de_fichero.py`, ¿cuántos bytes ocupa la firma guardada en `informe.txt.sig`?
+args = ap.parse_args(["generar", "--algoritmo", "md5"])
+print(args.algoritmo)
+```
 
-A) Depende del tamaño de `informe.txt`
-B) Siempre 256 bytes, porque la clave RSA es de 2048 bits (2048 ÷ 8)
-C) 64 bytes, como un hash SHA-256
-D) 1 byte por cada carácter del documento firmado
+A) Imprime `"md5"` sin problema
+B) `argparse` rechaza la ejecución, porque `"md5"` no está entre los `choices` permitidos
+C) Imprime `"sha256"`, ignorando el valor inválido
+D) Lanza `TypeError` en tiempo de ejecución
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La firma RSA tiene un tamaño fijo determinado por el tamaño de la clave, no por el tamaño del documento — por eso pesa 256 bytes firmes un informe de 10 bytes o de 10 GB.</details>
-
-**13.** ¿Por qué `certificado_a_fichero.py` guarda el certificado como `cert.pem` en vez de dejarlo solo en la variable `pem`?
-
-A) Porque las variables de Python se borran cada pocos segundos
-B) Porque un certificado se distribuye y se lee como fichero — así lo usa un servidor web real
-C) Porque el formato `.pem` comprime los datos
-D) No hay ninguna razón técnica, es solo estética
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Un certificado tiene que poder leerse desde disco por un servidor, un navegador u otra herramienta — por eso se distribuye como fichero <code>.pem</code>, no como una variable en memoria.</details>
-
-**14.** Un certificado X.509 tiene `certificado.subject == certificado.issuer`. ¿Qué tipo de certificado es?
-
-A) Emitido por una CA reconocida
-B) Autofirmado
-C) Caducado
-D) Revocado
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Que el emisor y el sujeto coincidan significa que el propio certificado se firmó a sí mismo — nadie de confianza externo lo avaló.</details>
-
-**15.** Ordena las fases del análisis forense digital tal como se ven en la unidad:
-
-A) Análisis → Identificación → Adquisición → Documentación → Presentación
-B) Identificación → Adquisición → Análisis → Documentación → Presentación
-C) Adquisición → Identificación → Presentación → Análisis → Documentación
-D) Presentación → Documentación → Análisis → Adquisición → Identificación
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Primero se identifica el incidente, luego se adquiere una copia de la evidencia, se analiza esa copia, se documenta todo, y por último se presenta el informe.</details>
-
-**16.** Con el manifiesto guardado `{"app.bin": "aaa", "app.conf": "bbb"}` y el estado actual `{"app.conf": "ccc", "extra.txt": "ddd"}`, ¿qué estado recibe `"app.bin"` al llamar a `auditar(previo, actual)`?
-
-A) `"OK"`
-B) `"MODIFICADO"`
-C) `"AUSENTE"`
-D) `"NUEVO"`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> <code>"app.bin"</code> está en el manifiesto guardado (<code>previo</code>) pero ya no existe en el estado actual (<code>actual</code>) — por eso se marca <code>AUSENTE</code>.</details>
-
-**17.** ¿Por qué el código de esta unidad usa `hmac.compare_digest(a, b)` en vez de `a == b` para comparar hashes o firmas?
-
-A) Es más rápido de ejecutar
-B) `compare_digest` tarda siempre el mismo tiempo, evitando filtrar información por temporización
-C) `==` no funciona con cadenas de más de 32 caracteres
-D) No hay diferencia real, es solo una cuestión de estilo
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>==</code> se detiene en el primer carácter distinto, y ese tiempo de respuesta variable puede filtrar información a un atacante (ataque de temporización). <code>compare_digest</code> siempre tarda lo mismo.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Al declarar <code>choices=[...]</code>, <code>argparse</code> valida el valor <b>antes</b> de que tu código lo use, y termina el programa con un mensaje de error si no está en la lista — así el <code>verificador.py</code> nunca llega a intentar hashear con un algoritmo roto como MD5.</details>

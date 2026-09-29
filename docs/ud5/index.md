@@ -662,139 +662,292 @@ El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la t�
 
 ## Simulacro de examen tipo test
 
-> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+> 15 preguntas de opción múltiple. Cada una trae su propio código.
 
-**1.** ¿Qué diferencia hay entre un `grey hat` y un `white hat`?
+**1.** ¿Qué imprime este código, sabiendo que en `127.0.0.1` no hay ningún servicio escuchando en el puerto 65431?
 
-A) El `grey hat` es más peligroso técnicamente
-B) Ambos actúan sin intención maliciosa, pero el `grey hat` lo hace sin autorización — lo que sigue siendo ilegal
-C) El `white hat` nunca escanea puertos
-D) No hay diferencia real, son el mismo concepto
+```python
+import socket
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La autorización explícita es lo único que separa el hacking ético del delito, no la técnica usada.</details>
+def puerto_abierto(host: str, puerto: int, timeout: float = 0.3) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        return s.connect_ex((host, puerto)) == 0
 
-**2.** ¿Qué fase del pentest cubre principalmente esta unidad?
+print(puerto_abierto("127.0.0.1", 65431))
+```
 
-A) Explotación
-B) Enumeración
-C) Post-explotación
-D) Informe
+A) `True`
+B) `False`
+C) Lanza una excepción porque el puerto no existe
+D) Se queda esperando indefinidamente
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Descubrir qué servicios están escuchando (escaneo de puertos) es la fase de enumeración.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>connect_ex</code> devuelve un código distinto de <code>0</code> cuando no hay nada escuchando; la función lo traduce a <code>False</code>. El <code>timeout</code> evita que se quede esperando indefinidamente.</details>
 
-**3.** ¿Qué devuelve `connect_ex((host, puerto))` cuando el puerto está cerrado?
+**2.** ¿Qué imprime este código?
 
-A) Lanza una excepción `ConnectionRefusedError`
-B) Un código distinto de `0`, sin lanzar ninguna excepción
-C) `None`
-D) Siempre `0`, igual que si estuviera abierto
+```python
+INSEGUROS = {21, 23, 25, 135, 445, 3389}
+REVISAR = {80, 8080, 110, 143}
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Por eso es cómodo para escanear muchos puertos: basta con comprobar <code>== 0</code>, sin <code>try/except</code> en cada intento.</details>
+def severidad(p: int) -> str:
+    if p in INSEGUROS: return "INSEGURO"
+    if p in REVISAR: return "REVISAR"
+    return "OK"
 
-**4.** ¿Por qué el ejemplo del servidor de prueba usa `SO_REUSEADDR`?
+print(severidad(21), severidad(443))
+```
 
-A) Para que el servidor acepte más de una conexión a la vez
-B) Para evitar el error `Address already in use` al reiniciar un servidor en el mismo puerto
-C) Para cifrar el tráfico del socket
-D) Es obligatorio en cualquier socket TCP
+A) `INSEGURO OK`
+B) `OK INSEGURO`
+C) `REVISAR OK`
+D) `INSEGURO REVISAR`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El 21 es FTP (en <code>INSEGUROS</code>); el 443 es HTTPS, que no está en ninguno de los dos conjuntos, así que cae en <code>"OK"</code>.</details>
 
-**5.** ¿Por qué el escaneo concurrente con `ThreadPoolExecutor` es mucho más rápido que el secuencial?
+**3.** Comparas estas dos formas de escanear los mismos 200 puertos:
 
-A) Python ejecuta cálculos matemáticos más rápido en paralelo
-B) Muchas esperas de red se solapan en vez de sumarse una tras otra
-C) El GIL desaparece al usar hilos
-D) No hay diferencia real de velocidad
+```python
+# Versión A
+abiertos_a = [p for p in puertos if puerto_abierto(host, p, 0.3)]
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Como sondear un puerto es esperar una respuesta de red (I/O), varios hilos pueden esperar a la vez sin que el GIL lo impida.</details>
+# Versión B
+from concurrent.futures import ThreadPoolExecutor
+with ThreadPoolExecutor(max_workers=50) as ex:
+    resultados = ex.map(lambda p: (p, puerto_abierto(host, p, 0.3)), puertos)
+abiertos_b = [p for p, ok in resultados if ok]
+```
 
-**6.** Según `severidad()`, ¿qué devuelve `severidad(3389)` (puerto de RDP)?
+¿Por qué la versión B es mucho más rápida, aunque el resultado final (`abiertos_a == abiertos_b`) sea el mismo?
 
-A) `"OK"`
-B) `"REVISAR"`
-C) `"INSEGURO"`
-D) Lanza una excepción
+A) Porque `ThreadPoolExecutor` cambia el `timeout` de cada conexión
+B) Porque muchas esperas de red se solapan en paralelo en vez de sumarse una tras otra
+C) Porque la versión A tiene un error de sintaxis que la ralentiza
+D) No hay diferencia real de velocidad entre ambas
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> 3389 está en el conjunto <code>INSEGUROS</code>.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Sondear un puerto es esperar una respuesta de red (I/O). En la versión A, cada espera ocurre una detrás de otra; en la B, hasta 50 esperas ocurren a la vez, así que el tiempo total es el de la espera más larga, no la suma de las 200.</details>
 
-**7.** ¿Qué catálogo público organiza las técnicas de ataque reales por fases, y sirve de vocabulario común entre atacantes simulados y defensores?
+**4.** ¿Qué ocurre al ejecutar este código?
 
-A) RGPD
-B) ISO 27000
-C) MITRE ATT&CK
-D) CVE
+```python
+def rango(ini: int, fin: int) -> list[int]:
+    if ini > fin:
+        raise ValueError("ini > fin")
+    return list(range(ini, fin + 1))
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b></details>
+print(rango(50, 10))
+```
 
-**8.** ¿Qué ocurre al llamar a `rango(10, 5)` (inicio mayor que fin)?
-
-A) Devuelve una lista vacía
-B) Devuelve `[10, 9, 8, 7, 6, 5]` en orden descendente
+A) `[50, 49, ..., 10]` en orden descendente
+B) `[]`
 C) Lanza `ValueError`
-D) Devuelve `None`
+D) `[10, 11, ..., 50]`, la función corrige el orden sola
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La función comprueba explícitamente <code>if ini > fin:</code> y rechaza el rango sin sentido.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La función comprueba explícitamente que <code>ini</code> no sea mayor que <code>fin</code> y rechaza el rango sin sentido en vez de devolver algo raro.</details>
 
-**9.** ¿Qué devuelve `servicio_de(443)`?
+**5.** ¿Qué imprime este código?
 
-A) `"SSH"`
-B) `"HTTP"`
-C) `"HTTPS"`
-D) `"desconocido"`
+```python
+def servicio_de(puerto: int) -> str:
+    return {22: "SSH", 80: "HTTP", 443: "HTTPS", 3389: "RDP"}.get(puerto, "desconocido")
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Es la entrada directa del diccionario de puertos conocidos.</details>
+print(servicio_de(3389), servicio_de(9999))
+```
 
-**10.** Con `clasificado = {23: "INSEGURO", 80: "REVISAR", 443: "OK", 3389: "INSEGURO"}`, ¿qué devuelve `resumen(clasificado)`?
+A) `RDP desconocido`
+B) `desconocido RDP`
+C) `RDP None`
+D) Lanza `KeyError` en la segunda llamada
 
-A) `{'INSEGURO': 1, 'REVISAR': 1, 'OK': 1}`
-B) `{'INSEGURO': 2, 'REVISAR': 1, 'OK': 1}`
-C) `{23: 1, 80: 1, 443: 1, 3389: 1}`
-D) `4`
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>dict.get(clave, valor_por_defecto)</code> nunca lanza <code>KeyError</code>: si la clave no existe, devuelve el valor por defecto.</details>
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>Counter</code> cuenta cuántas veces aparece cada valor de severidad; hay dos puertos <code>INSEGURO</code>.</details>
+**6.** ¿Qué imprime este código?
 
-**11.** Con `anterior = [80]` y `actual = [80, 443, 8080]`, ¿qué devuelve `nuevos_puertos(anterior, actual)`?
+```python
+def informe(clasificado: dict) -> list[str]:
+    orden = {"INSEGURO": 0, "REVISAR": 1, "OK": 2}
+    return [f"{p}:{s}" for p, s in sorted(clasificado.items(), key=lambda kv: (orden[kv[1]], kv[0]))]
 
-A) `[80]`
-B) `[443, 8080]`
-C) `[80, 443, 8080]`
+print(informe({443: "OK", 21: "INSEGURO", 80: "REVISAR"}))
+```
+
+A) `['21:INSEGURO', '80:REVISAR', '443:OK']`
+B) `['443:OK', '80:REVISAR', '21:INSEGURO']`
+C) `['21:INSEGURO', '443:OK', '80:REVISAR']`
+D) El orden es el mismo que en el diccionario original
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El <code>sorted</code> ordena primero por gravedad (<code>INSEGURO</code> antes que <code>REVISAR</code> antes que <code>OK</code>), no por número de puerto ni por orden de inserción.</details>
+
+**7.** ¿Qué imprime este código?
+
+```python
+from collections import Counter
+
+def resumen(clasificado: dict) -> dict:
+    return dict(Counter(clasificado.values()))
+
+print(resumen({21: "INSEGURO", 23: "INSEGURO", 443: "OK"}))
+```
+
+A) `{'INSEGURO': 2, 'OK': 1}`
+B) `{21: 1, 23: 1, 443: 1}`
+C) `{'INSEGURO': 1, 'OK': 1}`
+D) `3`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>Counter</code> sobre los <b>valores</b> del diccionario (las severidades) cuenta cuántas veces aparece cada una, no cuántos puertos hay.</details>
+
+**8.** ¿Qué imprime este código?
+
+```python
+def solo_inseguros(clasificado: dict) -> list[int]:
+    return sorted(p for p, s in clasificado.items() if s == "INSEGURO")
+
+print(solo_inseguros({21: "INSEGURO", 443: "OK", 23: "INSEGURO"}))
+```
+
+A) `[21, 23]`
+B) `[23, 21]`
+C) `[21, 23, 443]`
 D) `[]`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Es la diferencia de conjuntos <code>set(actual) - set(anterior)</code>: lo que aparece ahora y no estaba antes.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Se filtran solo los puertos con severidad <code>"INSEGURO"</code> (21 y 23) y se devuelven ordenados.</details>
 
-**12.** ¿Qué ocurre al llamar a `escaneo_seguro("192.168.1.1", [80])` si esa IP no está en el laboratorio autorizado?
+**9.** ¿Qué imprime este código?
 
-A) Escanea igualmente, solo avisa por consola
+```python
+def nuevos_puertos(anterior: list[int], actual: list[int]) -> list[int]:
+    return sorted(set(actual) - set(anterior))
+
+print(nuevos_puertos([22, 80], [22, 80, 3389]))
+```
+
+A) `[3389]`
+B) `[22, 80]`
+C) `[22, 80, 3389]`
+D) `[]`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> La diferencia de conjuntos <code>set(actual) - set(anterior)</code> deja solo lo que aparece ahora y no estaba en el escaneo anterior.</details>
+
+**10.** ¿Qué imprime este código?
+
+```python
+import math
+
+def tiempo_estimado(n_puertos: int, hilos: int, timeout: float) -> float:
+    tandas = math.ceil(n_puertos / hilos)
+    return round(tandas * timeout, 2)
+
+print(tiempo_estimado(n_puertos=1000, hilos=50, timeout=0.3))
+```
+
+A) `300.0`
+B) `6.0`
+C) `20.0`
+D) `0.3`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>1000 ÷ 50 = 20</code> tandas de 50 hilos cada una; <code>20 × 0.3 = 6.0</code> segundos en el peor caso.</details>
+
+**11.** ¿Qué imprime este código?
+
+```python
+def es_objetivo_valido(host: str) -> bool:
+    return host in ("127.0.0.1", "localhost") or host.startswith("10.0.20.")
+
+print(es_objetivo_valido("10.0.20.55"))
+print(es_objetivo_valido("172.20.0.5"))
+```
+
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>10.0.20.55</code> empieza por el prefijo autorizado de laboratorio; <code>172.20.0.5</code> no está en la lista de excepciones ni empieza por ese prefijo.</details>
+
+**12.** ¿Qué ocurre al ejecutar este código?
+
+```python
+def es_objetivo_valido(host: str) -> bool:
+    return host in ("127.0.0.1", "localhost") or host.startswith("10.0.20.")
+
+def escaneo_seguro(host: str, puertos: list[int]):
+    if not es_objetivo_valido(host):
+        raise ValueError(f"no autorizado: {host}")
+    return "escaneado"
+
+print(escaneo_seguro("8.8.8.8", [80]))
+```
+
+A) Imprime `"escaneado"`
 B) Lanza `ValueError` antes de escanear nada
+C) Imprime `None`
+D) Escanea igualmente y solo muestra un aviso por consola
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>8.8.8.8</code> no es un objetivo de laboratorio válido, así que el guardarraíl lanza <code>ValueError</code> <b>antes</b> de intentar ningún escaneo.</details>
+
+**13.** ¿Qué imprime este código?
+
+```python
+INSEGUROS = {21, 23, 25, 135, 445, 3389}
+REVISAR = {80, 8080, 110, 143}
+
+def severidad(p: int) -> str:
+    if p in INSEGUROS: return "INSEGURO"
+    if p in REVISAR: return "REVISAR"
+    return "OK"
+
+def clasificar(abiertos: list[int]) -> dict:
+    return {p: severidad(p) for p in abiertos}
+
+print(clasificar([80, 3389, 443]))
+```
+
+A) `{80: 'REVISAR', 3389: 'INSEGURO', 443: 'OK'}`
+B) `{80: 'INSEGURO', 3389: 'REVISAR', 443: 'OK'}`
+C) `{80: 'OK', 3389: 'OK', 443: 'OK'}`
+D) `['REVISAR', 'INSEGURO', 'OK']`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Cada puerto se clasifica según su propia severidad: 80 está en <code>REVISAR</code>, 3389 en <code>INSEGUROS</code>, y 443 no está en ninguno de los dos.</details>
+
+**14.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+def generar_informe(host: str, clasificado: dict) -> list[str]:
+    orden = {"INSEGURO": 0, "REVISAR": 1, "OK": 2}
+    lineas = [f"Informe de {host}"]
+    for p, s in sorted(clasificado.items(), key=lambda kv: (orden[kv[1]], kv[0])):
+        lineas.append(f"[{s}] puerto {p}")
+    if not clasificado:
+        lineas.append("(ningún puerto abierto)")
+    return lineas
+
+print(generar_informe("srv1", {3389: "INSEGURO", 443: "OK"}))
+```
+
+A) `['Informe de srv1', '[INSEGURO] puerto 3389', '[OK] puerto 443']`
+B) `['Informe de srv1', '[OK] puerto 443', '[INSEGURO] puerto 3389']`
+C) `['Informe de srv1', '(ningún puerto abierto)']`
+D) `['[INSEGURO] puerto 3389', '[OK] puerto 443']` sin cabecera
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El puerto INSEGURO se lista primero por gravedad; como <code>clasificado</code> no está vacío, no se añade la línea de "ningún puerto abierto".</details>
+
+**15.** *(Sobre el reto de la unidad)* ¿Qué ocurre al ejecutar este código?
+
+```python
+def es_objetivo_valido(host: str) -> bool:
+    return host in ("127.0.0.1", "localhost") or host.startswith("10.0.20.")
+
+def escanear(host: str, puertos: list[int]) -> list[int]:
+    if not es_objetivo_valido(host):
+        raise ValueError(f"objetivo no autorizado: {host}")
+    return [p for p in puertos if puerto_abierto(host, p, 0.1)]
+
+print(escanear("192.168.99.99", [80, 443]))
+```
+
+A) Escanea `192.168.99.99` normalmente y muestra los puertos abiertos
+B) Lanza `ValueError` sin llegar a sondear ningún puerto
 C) Devuelve una lista vacía silenciosamente
-D) Se conecta pero no imprime resultados
+D) Se queda esperando indefinidamente
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El guardarraíl ético comprueba <code>es_objetivo_valido</code> <b>antes</b> de escanear, y rechaza explícitamente cualquier objetivo no autorizado.</details>
-
-**13.** ¿Por qué ese guardarraíl se implementa **en el código** en vez de solo advertirlo en la documentación?
-
-A) Por exigencia legal explícita del RGPD
-B) Porque previene errores humanos (escanear la IP equivocada por accidente); una nota en la documentación es fácil de pasar por alto
-C) Porque el código es más rápido de leer que la documentación
-D) No hay ninguna ventaja real, es solo redundancia
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
-
-**14.** En el reto resuelto, si `escanear()` no encuentra ningún puerto abierto en el rango, ¿qué añade `generar_informe` al final?
-
-A) Nada, el informe queda con solo la cabecera
-B) `"(ningún puerto abierto en el rango escaneado)"`
-C) Lanza una excepción, porque un informe vacío no es válido
-D) Repite la cabecera dos veces
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El código comprueba <code>if not clasificado:</code> y añade una línea explicativa en vez de dejar un informe vacío sin contexto.</details>
-
-**15.** Un puerto 3389 (RDP) abierto a Internet es más grave si, además, el sistema tiene contraseñas débiles. ¿Qué relaciona esto con las unidades anteriores?
-
-A) No tiene relación, son temas independientes
-B) Combina un servicio de acceso remoto expuesto (UT5) con credenciales vulnerables a fuerza bruta (UT2/UT4): el escaneo encuentra la puerta, la contraseña débil es la llave fácil
-C) Solo importa la UT1, porque ahí se habló de contraseñas
-D) RDP nunca se ve afectado por fuerza bruta
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Esta unidad conecta directamente con la detección de fuerza bruta (UT2) y la política de contraseñas (UT4): un puerto expuesto es la mitad del problema.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>192.168.99.99</code> no cumple <code>es_objetivo_valido</code> (no es <code>127.0.0.1</code>, <code>localhost</code>, ni empieza por <code>10.0.20.</code>), así que <code>escanear</code> rechaza el objetivo antes de tocar ningún socket.</details>

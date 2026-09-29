@@ -658,139 +658,334 @@ El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la t�
 
 ## Simulacro de examen tipo test
 
-> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+> 15 preguntas de opción múltiple. Cada una trae su propio código.
 
-**1.** ¿Qué devuelve `base_valida("  CONTRATO ")` (con espacios y en mayúsculas)?
+**1.** ¿Qué imprime este código?
 
-A) `False`, porque no coincide exactamente con `"contrato"`
-B) `True`, porque la función normaliza con `.strip().lower()` antes de comparar
-C) Lanza una excepción por los espacios
-D) `True` solo si se escribe todo en minúsculas
+```python
+BASES = {"consentimiento", "contrato", "obligacion_legal",
+         "interes_vital", "interes_publico", "interes_legitimo"}
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>base_valida</code> hace <code>.strip().lower()</code> antes de comprobar si está en el conjunto de bases válidas.</details>
+def base_valida(b: str) -> bool:
+    return b.strip().lower() in BASES
 
-**2.** Una tienda usa el email del cliente para enviar la factura (necesario para el contrato) y también para publicidad no solicitada. Según el RGPD, ¿necesita la misma base de licitud para ambos usos?
+print(base_valida("  Contrato "))
+print(base_valida("interes_comercial"))
+```
 
-A) Sí, basta con una base de licitud por cliente
-B) No: cada finalidad distinta necesita su propia base — la factura tiene base "contrato", pero la publicidad no solicitada carece de una base válida (necesitaría consentimiento)
-C) No hace falta base de licitud si el cliente ya está registrado
-D) Solo hace falta declarar la base una vez al año
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>.strip().lower()</code> normaliza <code>"  Contrato "</code> a <code>"contrato"</code>, que sí está en el conjunto. <code>"interes_comercial"</code> no es ninguna de las seis bases válidas.</details>
 
-**3.** ¿Por qué `seudonimo("12345678Z")` debe devolver siempre el mismo valor cada vez que se llama?
+**2.** ¿Qué imprime este código?
 
-A) Es un error del código; debería cambiar cada vez
-B) Porque hay que poder agrupar registros de la misma persona sin conocer su identidad — es la propiedad determinista del hash, igual que en la UT1
-C) Porque `hashlib` obliga a cachear el resultado
-D) Solo es determinista la primera vez que se ejecuta
+```python
+import hashlib
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+def seudonimo(dni: str, sal: str = "cmo314") -> str:
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
 
-**4.** ¿Sigue siendo un dato personal, a efectos del RGPD, un DNI ya seudonimizado?
-
-A) No, en cuanto se aplica un hash deja de ser dato personal
-B) Sí: la seudonimización no saca el dato del ámbito del RGPD, porque en teoría (con la sal) se podría revertir
-C) Depende del algoritmo de hash usado
-D) Solo si el hash tiene menos de 10 caracteres
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Solo la anonimización real (irreversible incluso en teoría) queda fuera del ámbito del RGPD.</details>
-
-**5.** ¿Qué devuelve `enmascarar_email("jj@dominio.com")` (usuario de 2 caracteres)?
-
-A) `"j*@dominio.com"`
-B) `"**@dominio.com"`
-C) `"jj@dominio.com"` sin cambios
-D) Lanza una excepción porque el usuario es demasiado corto
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Con <code>len(usuario) &lt;= 2</code>, la función usa la rama corta: <code>usuario[0] + "*@" + dominio</code>.</details>
-
-**6.** Un ticket de soporte contiene un DNI, un email **y** un teléfono. Le pasas ese texto a `anonimizar_texto` (tal como está definida en la unidad, sin el patrón de teléfono del Reto rápido 2). ¿Qué ocurre con el teléfono?
-
-A) Se sustituye por `[TEL]` automáticamente
-B) Se sustituye por `[DNI]` por error
-C) Se queda tal cual, sin anonimizar — solo hay patrones para DNI y email
-D) La función lanza una excepción al encontrar un patrón desconocido
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> <code>anonimizar_texto</code> solo aplica <code>PATRON_DNI</code> y <code>PATRON_EMAIL</code>; el teléfono queda expuesto a menos que añadas el tercer patrón, como pide el Reto rápido 2.</details>
-
-**7.** ¿Qué ocurre al llamar a `plazo_ok(-5)`?
-
-A) Devuelve `False`
-B) Devuelve `True`, porque -5 es un número válido
-C) Lanza `ValueError`, porque el plazo no puede ser negativo
-D) Devuelve `0`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La función comprueba explícitamente <code>if meses &lt; 0: raise ValueError(...)</code> antes de evaluar el rango.</details>
-
-**8.** ¿Qué regula específicamente la LSSI-CE, además de lo que ya cubre el RGPD?
-
-A) La seguridad de los sistemas del sector público español
-B) El comercio electrónico y las comunicaciones comerciales por vía electrónica en España
-C) La ciberseguridad de infraestructuras críticas en toda la UE
-D) Es un sinónimo español del RGPD, regula lo mismo
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
-
-**9.** Un tratamiento tiene `base="marketing_directo"` (no está en las bases válidas) y `finalidad=""` (vacía). ¿Qué devuelve `evaluar_tratamiento(t)`?
-
-A) `[]` (lista vacía, porque el plazo no se ha comprobado todavía)
-B) `["base de licitud no válida", "sin finalidad declarada"]`
-C) Lanza una excepción al encontrar dos errores a la vez
-D) Solo `["sin finalidad declarada"]`, porque la base se comprueba después
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> A diferencia de <code>valida_activo</code> en la UT4, aquí <b>no</b> se usa <code>raise</code>: se acumulan <b>todos</b> los fallos encontrados en una lista.</details>
-
-**10.** Con un tratamiento que tiene base válida, finalidad declarada y plazo de 24 meses, ¿qué devuelve `cumple(t)`?
+print(seudonimo("11111111h") == seudonimo("11111111H"))
+```
 
 A) `True`
 B) `False`
-C) `None`
-D) La lista de fallos vacía, no un booleano
+C) Lanza una excepción, los DNIs deben ir en mayúsculas
+D) Depende del sistema operativo
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>cumple(t)</code> es <code>not evaluar_tratamiento(t)</code>; si no hay fallos, la lista vacía es "falsy" y <code>not []</code> es <code>True</code>.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> La función aplica <code>.upper()</code> al DNI antes de hashear, así que <code>"11111111h"</code> y <code>"11111111H"</code> producen el mismo seudónimo.</details>
 
-**11.** Seudonimizas el mismo DNI en dos sistemas distintos usando la **misma** sal. ¿Qué detecta `sal_reutilizada(mapa1, mapa2)`?
+**3.** ¿Qué imprime este código?
 
-A) Nada, porque compara diccionarios distintos
-B) Que hay al menos un seudónimo coincidente entre ambos mapas — indicio de sal compartida
-C) Solo detecta DNIs coincidentes, no seudónimos
-D) Siempre devuelve una lista vacía si los DNIs son distintos
+```python
+import hashlib
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Usa la intersección de conjuntos <code>set(mapa1.values()) & set(mapa2.values())</code>: si aparece el mismo seudónimo en los dos sistemas, es señal de que comparten sal.</details>
+def seudonimo(dni: str, sal: str = "cmo314") -> str:
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
 
-**12.** `anonimizar_csv(texto_csv, columnas=["dni"])` recibe un CSV con columnas `nombre,dni,email`. ¿Qué le ocurre a la columna `nombre` en el resultado?
+print(seudonimo("11111111H", "salA") == seudonimo("11111111H", "salB"))
+```
 
-A) También se seudonimiza, por seguridad
-B) Se conserva tal cual — solo se seudonimizan las columnas indicadas en `columnas`
-C) Se elimina por completo del CSV
-D) Se sustituye por `[NOMBRE]`
+A) `True`, porque el DNI es el mismo
+B) `False`, porque la sal forma parte de lo que se hashea
+C) Lanza una excepción, la sal debe ser siempre la misma
+D) `True` solo si las dos sales tienen la misma longitud
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La función solo aplica <code>seudonimo()</code> a las columnas que le pases explícitamente en la lista <code>columnas</code>; el resto se copia sin tocar.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La sal se concatena con el DNI antes de hashear; sales distintas producen seudónimos distintos para el mismo DNI. Por eso reutilizar la misma sal entre sistemas es lo que permite cruzarlos.</details>
 
-**13.** `informe_cumplimiento` ordena las líneas del informe. Si el tratamiento `"A"` cumple y el `"B"` no, ¿en qué orden aparecen?
+**4.** ¿Qué imprime este código?
 
-A) Alfabético: A antes que B
-B) `"B"` (incumple) antes que `"A"` (cumple)
-C) En el orden en que aparecen en la lista original, sin reordenar
-D) Los que cumplen siempre van al final del todo, sin excepción
+```python
+def enmascarar_email(email: str) -> str:
+    u, _, d = email.partition("@")
+    if len(u) <= 2:
+        return u[0] + "*@" + d
+    return u[0] + "*" * (len(u) - 2) + u[-1] + "@" + d
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El <code>sorted(..., key=lambda l: ": OK" in l)</code> pone primero las líneas donde <code>": OK"</code> es <code>False</code> (los incumplimientos), y al final las que sí terminan en <code>": OK"</code>.</details>
+print(enmascarar_email("laura.gomez@iesx.es"))
+```
 
-**14.** En el reto resuelto, el tratamiento `"Logs acceso"` tiene `base="porque_si"`, `finalidad=""` y `plazo_meses=-1`. ¿Cuántos fallos distintos reporta la auditoría para ese tratamiento?
+A) `l**********z@iesx.es`
+B) `l*********z@iesx.es`
+C) `**@iesx.es`
+D) `laura.gomez@iesx.es` sin cambios
 
-A) 1
-B) 2
-C) 3
-D) 0, porque los logs de acceso no necesitan base de licitud
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El usuario <code>"laura.gomez"</code> tiene 11 caracteres; se conserva el primero y el último, y los 9 del medio se sustituyen por asteriscos.</details>
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Los tres a la vez: base de licitud no válida, sin finalidad declarada, y plazo de conservación fuera de rango (negativo).</details>
+**5.** ¿Qué imprime este código?
 
-**15.** Ejecutas `cumplimiento.py anonimizar tickets.txt tickets_anon.txt` sobre un fichero con la línea `"Usuario 12345678Z (ana.perez@iesx.es) reporta un fallo"`. ¿Qué contiene `tickets_anon.txt`?
+```python
+import re
 
-A) La misma línea, sin cambios
-B) `"Usuario [DNI] ([EMAIL]) reporta un fallo"`
-C) El fichero queda vacío
-D) Lanza un error porque el fichero de entrada no es JSON
+PATRON_DNI = re.compile(r"\b\d{8}[A-Za-z]\b")
+PATRON_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>anonimizar_fichero</code> aplica <code>anonimizar_texto</code> línea a línea, sustituyendo el DNI y el email por sus marcadores.</details>
+def anonimizar_texto(t: str) -> str:
+    t = PATRON_DNI.sub("[DNI]", t)
+    t = PATRON_EMAIL.sub("[EMAIL]", t)
+    return t
+
+print(anonimizar_texto("Cliente 87654321X, tel 699123456, email laura@x.com"))
+```
+
+A) `Cliente [DNI], tel [TEL], email [EMAIL]`
+B) `Cliente [DNI], tel 699123456, email [EMAIL]`
+C) `Cliente 87654321X, tel 699123456, email [EMAIL]`
+D) `[DNI], [DNI], [EMAIL]` — el teléfono también encaja con el patrón de DNI
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El DNI y el email encajan con sus patrones y se sustituyen. El teléfono (9 dígitos, sin letra final) no encaja con <code>PATRON_DNI</code> (que exige una letra al final) ni existe un patrón de teléfono en esta versión de la función, así que queda expuesto.</details>
+
+**6.** ¿Qué imprime este código?
+
+```python
+def plazo_ok(meses: int) -> bool:
+    if meses < 0:
+        raise ValueError(f"negativo: {meses}")
+    return 1 <= meses <= 60
+
+print(plazo_ok(0))
+print(plazo_ok(36))
+```
+
+A) `True True`
+B) `False True`
+C) `True False`
+D) `False False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>0</code> no cumple <code>1 &lt;= meses</code> (el rango empieza en 1) → <code>False</code>. <code>36</code> sí está dentro de <code>[1,60]</code> → <code>True</code>.</details>
+
+**7.** ¿Qué imprime este código?
+
+```python
+BASES = {"consentimiento", "contrato", "obligacion_legal", "interes_vital", "interes_publico", "interes_legitimo"}
+def base_valida(b): return b.strip().lower() in BASES
+
+def evaluar_tratamiento(t: dict) -> list[str]:
+    fallos = []
+    if not base_valida(t.get("base", "")):
+        fallos.append("base_invalida")
+    if not t.get("finalidad", "").strip():
+        fallos.append("sin_finalidad")
+    plazo = t.get("plazo_meses", -1)
+    if plazo < 0 or plazo > 60:
+        fallos.append("plazo_fuera_rango")
+    return fallos
+
+t = {"base": "consentimiento", "finalidad": "envío de newsletter", "plazo_meses": -3}
+print(evaluar_tratamiento(t))
+```
+
+A) `[]`
+B) `['plazo_fuera_rango']`
+C) Lanza `ValueError`, porque el plazo es negativo
+D) `['base_invalida', 'plazo_fuera_rango']`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La base es válida y la finalidad no está vacía, pero el plazo es negativo. A diferencia de <code>plazo_ok</code>, aquí la comparación es directa (<code>plazo &lt; 0</code>) para poder acumular el fallo en la lista sin interrumpir la función con una excepción.</details>
+
+**8.** ¿Qué imprime este código?
+
+```python
+def evaluar_tratamiento(t: dict) -> list[str]:
+    # (misma función de la pregunta anterior)
+    ...
+
+def cumple(t: dict) -> bool:
+    return not evaluar_tratamiento(t)
+
+t = {"base": "consentimiento", "finalidad": "newsletter", "plazo_meses": 12}
+print(cumple(t))
+```
+
+A) `True`
+B) `False`
+C) `[]`
+D) `None`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Con base válida, finalidad declarada y plazo dentro de rango, <code>evaluar_tratamiento</code> devuelve una lista vacía; <code>not []</code> es <code>True</code>.</details>
+
+**9.** ¿Qué imprime este código?
+
+```python
+import hashlib
+
+def seudonimo(dni, sal="cmo314"):
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
+
+def seudonimizar_lote(dnis: list[str], sal: str) -> dict[str, str]:
+    return {d: seudonimo(d, sal) for d in dnis}
+
+lote = seudonimizar_lote(["11111111H", "22222222J"], "salX")
+print(len(lote), all(len(v) == 12 for v in lote.values()))
+```
+
+A) `2 True`
+B) `1 True`
+C) `2 False`
+D) `12 True`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El diccionario tiene una entrada por cada DNI (2), y cada seudónimo generado tiene exactamente 12 caracteres (por el <code>[:12]</code> del hexdigest).</details>
+
+**10.** Dos sistemas seudonimizan el mismo DNI con la **misma** sal, por error de configuración compartida:
+
+```python
+def sal_reutilizada(mapa1: dict, mapa2: dict) -> list[str]:
+    return sorted(set(mapa1.values()) & set(mapa2.values()))
+
+mapaA = {"11111111H": seudonimo("11111111H", "comun")}
+mapaB = {"11111111H": seudonimo("11111111H", "comun")}
+print(len(sal_reutilizada(mapaA, mapaB)) > 0)
+```
+
+A) `True`, se detecta la coincidencia
+B) `False`, los diccionarios son distintos así que nunca coinciden
+C) Lanza una excepción, no se pueden comparar sets de hashes
+D) Depende del orden de las claves en cada diccionario
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Como ambos sistemas usan la misma sal para el mismo DNI, generan el <b>mismo</b> seudónimo; la intersección de conjuntos lo detecta — es la señal de alarma de re-identificación cruzada.</details>
+
+**11.** ¿Qué le ocurre a la columna `"nombre"` al ejecutar esto?
+
+```python
+import csv, io
+
+def anonimizar_csv(texto_csv: str, columnas: list[str]) -> str:
+    lector = csv.DictReader(io.StringIO(texto_csv))
+    filas = []
+    for fila in lector:
+        for col in columnas:
+            if col in fila:
+                fila[col] = seudonimo(fila[col])
+        filas.append(fila)
+    salida = io.StringIO()
+    escritor = csv.DictWriter(salida, fieldnames=lector.fieldnames or [])
+    escritor.writeheader()
+    escritor.writerows(filas)
+    return salida.getvalue()
+
+resultado = anonimizar_csv("nombre,dni\nAna,11111111H\n", columnas=["dni"])
+print("11111111H" in resultado, "Ana" in resultado)
+```
+
+A) `False True`
+B) `True False`
+C) `False False`
+D) `True True`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Solo se seudonimizan las columnas indicadas en <code>columnas</code> (aquí, solo <code>"dni"</code>); <code>"nombre"</code> se copia tal cual, así que <code>"Ana"</code> sigue en el resultado y el DNI original ya no.</details>
+
+**12.** ¿Qué imprime este código?
+
+```python
+def informe_cumplimiento(tratamientos: list[dict]) -> list[str]:
+    lineas = []
+    for t in tratamientos:
+        f = evaluar_tratamiento(t)
+        lineas.append(f"{t['nombre']}: {'OK' if not f else ','.join(f)}")
+    return sorted(lineas, key=lambda l: ": OK" in l)
+
+tratamientos = [
+    {"nombre": "X", "base": "contrato", "finalidad": "a", "plazo_meses": 10},
+    {"nombre": "Y", "base": "mala", "finalidad": "", "plazo_meses": -1},
+]
+print(informe_cumplimiento(tratamientos))
+```
+
+A) `['X: OK', 'Y: base_invalida,sin_finalidad,plazo_fuera_rango']`
+B) `['Y: base_invalida,sin_finalidad,plazo_fuera_rango', 'X: OK']`
+C) Están en el mismo orden que la lista original
+D) Solo aparece `Y`, porque `X` se omite al cumplir
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El <code>sorted(..., key=lambda l: ": OK" in l)</code> pone <code>False</code> antes que <code>True</code>: las líneas que <b>no</b> terminan en <code>": OK"</code> (los incumplimientos) van primero.</details>
+
+**13.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+import re
+
+PATRON_DNI = re.compile(r"\b\d{8}[A-Za-z]\b")
+PATRON_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+
+def anonimizar_texto(t):
+    t = PATRON_DNI.sub("[DNI]", t)
+    t = PATRON_EMAIL.sub("[EMAIL]", t)
+    return t
+
+def anonimizar_fichero(texto: str) -> str:
+    return "\n".join(anonimizar_texto(l) for l in texto.splitlines())
+
+texto = "Cliente 12345678Z solicita baja\nContacto: ana@empresa.com"
+print(anonimizar_fichero(texto))
+```
+
+A) `Cliente [DNI] solicita baja` / `Contacto: [EMAIL]` (dos líneas)
+B) `Cliente 12345678Z solicita baja` / `Contacto: ana@empresa.com` (sin cambios)
+C) Todo el texto en una sola línea, sin el salto
+D) Lanza una excepción porque hay dos líneas
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>anonimizar_fichero</code> aplica <code>anonimizar_texto</code> línea a línea y las vuelve a unir con <code>"\n"</code>, conservando la estructura del fichero original.</details>
+
+**14.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+def evaluar_tratamiento(t: dict) -> list[str]:
+    # (misma función de las preguntas anteriores)
+    ...
+
+t = {"base": "obligacion_legal", "finalidad": "cumplimiento fiscal", "plazo_meses": 60}
+print(evaluar_tratamiento(t))
+```
+
+A) `[]`
+B) `['plazo_fuera_rango']`, porque 60 es el límite exacto
+C) `['base_invalida']`
+D) Lanza una excepción, 60 meses son demasiados años
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>"obligacion_legal"</code> es una base válida, la finalidad no está vacía, y <code>60</code> cumple <code>plazo &lt;= 60</code> (el límite es inclusive) — no hay ningún fallo.</details>
+
+**15.** *(Sobre el reto de la unidad)* Este tratamiento **no incluye la clave** `"plazo_meses"` en absoluto:
+
+```python
+def evaluar_tratamiento(t: dict) -> list[str]:
+    fallos = []
+    if not base_valida(t.get("base", "")):
+        fallos.append("base_invalida")
+    if not t.get("finalidad", "").strip():
+        fallos.append("sin_finalidad")
+    plazo = t.get("plazo_meses", -1)
+    if plazo < 0 or plazo > 60:
+        fallos.append("plazo_fuera_rango")
+    return fallos
+
+t = {"base": "contrato", "finalidad": "factura"}
+print(evaluar_tratamiento(t))
+```
+
+A) `[]`, porque no se puede validar lo que no existe
+B) `['plazo_fuera_rango']`
+C) Lanza `KeyError`, falta la clave `"plazo_meses"`
+D) `['sin_finalidad', 'plazo_fuera_rango']`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>t.get("plazo_meses", -1)</code> no lanza <code>KeyError</code>: como la clave no existe, devuelve el valor por defecto <code>-1</code>, que es negativo y por tanto incumple.</details>

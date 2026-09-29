@@ -728,148 +728,320 @@ El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la t�
 
 ## Simulacro de examen tipo test
 
-> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+> 15 preguntas de opción múltiple. Cada una trae su propio código.
 
-**1.** ¿Qué devuelve `nivel_riesgo(impacto=4, probabilidad=2)`?
-
-A) `"ALTO"`
-B) `"MEDIO"`
-C) `"BAJO"`
-D) Lanza una excepción
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>4 × 2 = 8</code>, y 8 está en el rango <code>[7, 15)</code> → <code>"MEDIO"</code>.</details>
-
-**2.** ¿Qué devuelve `calcular_ale(valor_activo=20000, factor_exposicion=0.25, aro=1)`?
-
-A) `20000.0`
-B) `5000.0`
-C) `0.25`
-D) `500.0`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>SLE = 20000 × 0.25 = 5000</code>; <code>ALE = 5000 × 1 = 5000.0</code>.</details>
-
-**3.** ¿Qué diferencia hay entre `raise ValueError(...)` y `raise TypeError(...)`?
-
-A) Son sinónimos, da igual cuál uses
-B) `ValueError` es para un valor sin sentido (fuera de rango); `TypeError` es para cuando el tipo de dato no es el esperado
-C) `TypeError` solo existe en Python 2
-D) `ValueError` detiene el programa; `TypeError` no
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
-
-**4.** `class PoliticaError(ValueError): pass`. ¿Se puede capturar un `PoliticaError` con `except ValueError:`?
-
-A) No, son tipos incompatibles
-B) Sí, porque `PoliticaError` hereda de `ValueError` — un `PoliticaError` **es** un `ValueError`
-C) Solo si se importa `PoliticaError` explícitamente en el `except`
-D) Solo en modo `strict` de `mypy`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
-
-**5.** ¿Qué imprime este fragmento?
+**1.** ¿Qué imprime este código?
 
 ```python
-try:
-    if 1.5 > 1:
-        raise ValueError("fuera de rango")
-except ValueError as e:
-    print("capturado:", e)
-print("sigue")
+def nivel_riesgo(impacto: int, probabilidad: int) -> str:
+    v = impacto * probabilidad
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
+
+print(nivel_riesgo(3, 3))
+print(nivel_riesgo(5, 1))
 ```
 
-A) Solo `capturado: fuera de rango`
-B) `capturado: fuera de rango` y después `sigue`
-C) Solo `sigue`, porque el error se ignora
-D) El programa se detiene con una traza de error
+A) `ALTO` y `ALTO`
+B) `MEDIO` y `BAJO`
+C) `BAJO` y `MEDIO`
+D) `MEDIO` y `MEDIO`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El <code>except</code> maneja la excepción y el programa continúa con normalidad tras el bloque <code>try</code>.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>3×3=9</code> cae en <code>[7,15)</code> → <code>MEDIO</code>. <code>5×1=5</code> cae por debajo de 7 → <code>BAJO</code>.</details>
 
-**6.** ¿Por qué se usa `secrets.choice` en vez de `random.choice` para generar contraseñas?
+**2.** ¿Qué imprime este código?
 
-A) `secrets` es más rápido
-B) `random` es predecible si se conoce su estado interno; `secrets` usa el generador del sistema operativo, pensado para criptografía
-C) `random.choice` no existe en Python 3
-D) No hay diferencia real
+```python
+def calcular_ale(valor: float, exposicion: float, aro: float) -> float:
+    return round(valor * exposicion * aro, 2)
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+print(calcular_ale(valor=50000, exposicion=0.4, aro=0.25))
+```
 
-**7.** ¿Qué devuelve `entropia("abcdefgh")` frente a `entropia("12345678")` (misma longitud, 8 caracteres)?
+A) `5000.0`
+B) `50000.0`
+C) `20000.0`
+D) `2000.0`
 
-A) Los mismos bits, porque ambas tienen 8 caracteres
-B) Más bits para las letras (alfabeto de 26) que para los dígitos (alfabeto de 10)
-C) Más bits para los dígitos, porque son más difíciles de recordar
-D) Ambas dan 0.0, porque no tienen símbolos
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>50000 × 0.4 × 0.25 = 5000.0</code>.</details>
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>entropia("abcdefgh") = 37.6</code> (alfabeto de 26 minúsculas) frente a <code>entropia("12345678") = 26.6</code> (alfabeto de solo 10 dígitos) — a igual longitud, más variedad de caracteres da más entropía.</details>
+**3.** ¿Qué ocurre al ejecutar este código?
 
-**8.** `cumple_politica("SoloMayusculas")` (14 caracteres, con mayúsculas y minúsculas, sin dígitos ni símbolos). ¿Qué devuelve?
+```python
+def calcular_ale(valor: float, exposicion: float, aro: float) -> float:
+    if not 0 <= exposicion <= 1:
+        raise ValueError(f"factor fuera de rango: {exposicion}")
+    return round(valor * exposicion * aro, 2)
+
+print(calcular_ale(1000, 2.0, 1))
+```
+
+A) Imprime `2000.0` sin problema
+B) Lanza `ValueError`, porque `exposicion=2.0` está fuera de `[0,1]`
+C) Imprime `1000.0`, ignorando el valor inválido
+D) Lanza `TypeError`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Un factor de exposición representa un porcentaje (0-100%), así que debe estar entre 0 y 1; la función lo valida explícitamente antes de calcular.</details>
+
+**4.** ¿Qué imprime este código?
+
+```python
+class RiesgoInvalidoError(ValueError):
+    pass
+
+def valida_probabilidad(p: float) -> float:
+    if not 0 <= p <= 1:
+        raise RiesgoInvalidoError(f"fuera de rango: {p}")
+    return p
+
+try:
+    valida_probabilidad(-0.1)
+except ValueError as e:
+    print("capturado como ValueError:", e)
+```
+
+A) No imprime nada, porque `ValueError` no captura `RiesgoInvalidoError`
+B) `capturado como ValueError: fuera de rango: -0.1`
+C) Lanza `RiesgoInvalidoError` sin capturarla, el programa se detiene
+D) Imprime `-0.1` sin más
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>RiesgoInvalidoError</code> hereda de <code>ValueError</code>, así que un <code>except ValueError:</code> también la captura — un <code>RiesgoInvalidoError</code> <b>es</b> un <code>ValueError</code>.</details>
+
+**5.** ¿Qué imprime este código?
+
+```python
+def procesa(valor: int):
+    try:
+        if valor < 0:
+            raise ValueError("negativo")
+        return valor * 2
+    except ValueError as e:
+        return f"error: {e}"
+
+print(procesa(5))
+print(procesa(-3))
+```
+
+A) `10` y `error: negativo`
+B) `10` y `-6`
+C) `error: negativo` y `10`
+D) El programa se detiene en la segunda llamada
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>procesa(5)</code> no entra en el <code>if</code>, devuelve <code>5*2=10</code>. <code>procesa(-3)</code> lanza la excepción dentro del <code>try</code>, que el propio <code>except</code> captura y convierte en un mensaje.</details>
+
+**6.** ¿Qué imprime este código?
+
+```python
+def cumple_politica(pwd: str) -> tuple[bool, list[str]]:
+    fallos = []
+    if len(pwd) < 12: fallos.append("corta")
+    if not any(c.isupper() for c in pwd): fallos.append("sin mayuscula")
+    if not any(c.isdigit() for c in pwd): fallos.append("sin digito")
+    if all(c.isalnum() for c in pwd): fallos.append("sin simbolo")
+    return (not fallos, fallos)
+
+print(cumple_politica("Elefante99"))
+```
 
 A) `(True, [])`
-B) `(False, ['sin dígito', 'sin símbolo'])`
-C) `(False, ['corta'])`
-D) `(False, ['sin mayúscula'])`
+B) `(False, ['corta'])`
+C) `(False, ['corta', 'sin simbolo'])`
+D) `(False, ['sin mayuscula', 'sin digito'])`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Tiene longitud suficiente (14 ≥ 12) y sí tiene mayúscula, pero le faltan un dígito y un símbolo.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> <code>"Elefante99"</code> tiene 10 caracteres (menos de 12 → corta), tiene mayúscula y dígito, pero ningún símbolo (todos los caracteres son alfanuméricos).</details>
 
-**9.** Dos factores de autenticación: `"contraseña"` y `"PIN"`. ¿Es MFA de verdad según `es_mfa`?
+**7.** ¿Qué imprime este código?
 
-A) Sí, son dos factores distintos
-B) No, ambos son "algo que sabes" — la misma categoría
-C) Sí, porque son dos cadenas de texto diferentes
-D) Depende de la longitud del PIN
+```python
+import math
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> MFA exige categorías <b>distintas</b> (saber/tener/ser); dos formas de "saber" no cuentan como MFA.</details>
+def entropia(pwd: str) -> float:
+    alf = 0
+    if any(c.islower() for c in pwd): alf += 26
+    if any(c.isupper() for c in pwd): alf += 26
+    if any(c.isdigit() for c in pwd): alf += 10
+    if any(not c.isalnum() for c in pwd): alf += 32
+    return round(len(pwd) * math.log2(alf), 1) if alf else 0.0
 
-**10.** ¿Qué devuelve `merece_la_pena(ale_actual=10000, ale_residual=9000, coste_anual=2000)`?
+e1 = entropia("password")
+e2 = entropia("P4ss#w0rd")
+print(e1 < e2)
+```
 
-A) `True`, porque cualquier reducción de riesgo merece la pena
-B) `False`, porque el ahorro (1000) no supera el coste (2000)
-C) `True`, porque el ALE actual es mayor que el coste
-D) Lanza una excepción, porque `ale_residual` es positivo
+A) `True`
+B) `False`
+C) `e1 == e2` siempre, porque tienen longitud parecida
+D) Lanza `ValueError` con `math.log2`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El ahorro es <code>10000 − 9000 = 1000</code>, que no supera el coste de <code>2000</code>.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>"password"</code> solo usa minúsculas (alfabeto de 26); <code>"P4ss#w0rd"</code> combina mayúscula, minúscula, dígito y símbolo (alfabeto mucho más amplio) — más variedad da más bits de entropía.</details>
 
-**11.** ¿Por qué `merece_la_pena` compara `ahorro > coste_anual` en vez de `ale_actual > coste_anual`?
+**8.** ¿Qué imprime este código?
 
-A) Es equivalente, da igual cuál se use
-B) Porque lo relevante es cuánto **reduce** la salvaguarda el riesgo, no el riesgo total
-C) Porque `ale_actual` nunca es mayor que el coste
-D) Por convención de estilo, sin motivo técnico
+```python
+def es_mfa(factores: list[str]) -> bool:
+    cat = set()
+    for f in factores:
+        if f in ("contrasena", "pin"): cat.add("saber")
+        elif f in ("movil", "token", "tarjeta"): cat.add("tener")
+        elif f in ("huella", "cara"): cat.add("ser")
+    return len(cat) >= 2
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Una salvaguarda puede ser cara y seguir mereciendo la pena si reduce mucho el riesgo — lo que importa es el ahorro neto, no el ALE de partida.</details>
+print(es_mfa(["huella", "token", "movil"]))
+```
 
-**12.** ¿Qué ocurre al llamar a `riesgo_medio([])` (lista vacía)?
+A) `True`
+B) `False`
+C) Lanza `KeyError`
+D) `3`
 
-A) Devuelve `0.0`
-B) Devuelve `None`
-C) Lanza `ValueError`
-D) Se queda en un bucle infinito
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>"huella"</code> aporta la categoría "ser"; <code>"token"</code> y <code>"movil"</code> aportan ambos "tener" (categoría repetida, no cuenta dos veces). En total hay 2 categorías distintas → <code>True</code>.</details>
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La función comprueba explícitamente <code>if not valores:</code> y lanza <code>ValueError</code> en vez de dividir por cero silenciosamente.</details>
+**9.** ¿Qué ocurre al ejecutar este código?
 
-**13.** En `valida_activo(nombre, valor, prob)` (ejercicio 15), si `nombre` está vacío **y además** `valor` es negativo, ¿qué excepción ves?
+```python
+def riesgo_medio(valores: list[float]) -> float:
+    if not valores:
+        raise ValueError("lista vacía")
+    return round(sum(valores) / len(valores), 2)
 
-A) Las dos a la vez, en una lista
-B) Solo la del nombre vacío: la primera comprobación que falla detiene la función
-C) Solo la del valor negativo, porque se comprueba primero
-D) Ninguna, los dos errores se cancelan entre sí
+print(riesgo_medio([]))
+```
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>raise</code> interrumpe la función en el primer fallo encontrado; nunca llega a comprobar <code>valor</code>.</details>
+A) Imprime `0.0`
+B) Imprime `None`
+C) Lanza `ValueError`, sin llegar a dividir
+D) Lanza `ZeroDivisionError`
 
-**14.** ¿Por qué el código de la unidad evita `except Exception:` a secas?
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La función comprueba <code>if not valores:</code> <b>antes</b> de dividir, así que nunca llega a un <code>ZeroDivisionError</code> — falla con un mensaje claro en su lugar.</details>
 
-A) Python no permite capturar `Exception` directamente
-B) Porque oculta errores de programación reales (como una variable mal escrita) junto con los esperados
-C) Porque es más lento que capturar tipos concretos
-D) No hay ninguna razón, es solo una preferencia de estilo
+**10.** ¿Qué imprime este código?
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
+```python
+def prioriza(activos: list[dict]) -> list[dict]:
+    return sorted(activos, key=lambda a: a["impacto"] * a["probabilidad"], reverse=True)
 
-**15.** En el reto resuelto, `nivel_riesgo` recibe `impacto=8`. Según la validación de `auditor.py`, ¿qué ocurre?
+activos = [{"nombre": "A", "impacto": 2, "probabilidad": 2}, {"nombre": "B", "impacto": 5, "probabilidad": 4}]
+print([a["nombre"] for a in prioriza(activos)])
+```
 
-A) Se acepta igual, `nivel_riesgo` no valida nada
-B) Lanza `RiesgoInvalidoError`, porque 8 está fuera del rango `[1, 5]`
-C) Devuelve `"ALTO"` automáticamente para cualquier valor mayor que 5
-D) Se trunca a 5 silenciosamente
+A) `['A', 'B']`
+B) `['B', 'A']`
+C) `['A']`
+D) Lanza `TypeError`, no se puede ordenar por dos campos
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>auditor.py</code> valida explícitamente <code>1 &lt;= impacto &lt;= 5</code> y lanza <code>RiesgoInvalidoError</code> si no se cumple, en vez de calcular con un dato sin sentido.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El riesgo de <code>A</code> es <code>2×2=4</code>; el de <code>B</code> es <code>5×4=20</code>. Con <code>reverse=True</code>, el de mayor riesgo va primero.</details>
+
+**11.** ¿Qué imprime este código?
+
+```python
+def merece_la_pena(ale_actual: float, ale_residual: float, coste_anual: float) -> bool:
+    ahorro = ale_actual - ale_residual
+    return ahorro > coste_anual
+
+print(merece_la_pena(ale_actual=20000, ale_residual=5000, coste_anual=10000))
+```
+
+A) `True`
+B) `False`
+C) `15000`
+D) Lanza una excepción, faltan validar los valores
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El ahorro es <code>20000-5000=15000</code>, que supera el coste de <code>10000</code> — la salvaguarda compensa.</details>
+
+**12.** ¿Qué imprime este código?
+
+```python
+class ActivoInvalidoError(ValueError):
+    pass
+
+def valida_activo(nombre: str, valor: float, prob: float) -> None:
+    if not nombre.strip():
+        raise ActivoInvalidoError("sin nombre")
+    if valor < 0:
+        raise ActivoInvalidoError("valor negativo")
+    if not 0 <= prob <= 1:
+        raise ActivoInvalidoError("prob fuera de rango")
+
+try:
+    valida_activo("", -50, 2.0)
+except ActivoInvalidoError as e:
+    print(e)
+```
+
+A) `sin nombre`
+B) `valor negativo`
+C) `prob fuera de rango`
+D) Imprime los tres errores, uno por línea
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Aunque los tres campos son inválidos, la función comprueba en orden y <code>raise</code> detiene la ejecución en el <b>primer</b> fallo encontrado — nunca llega a comprobar <code>valor</code> ni <code>prob</code>.</details>
+
+**13.** ¿Qué imprime este código?
+
+```python
+def cumple_politica(pwd: str) -> tuple[bool, list[str]]:
+    fallos = []
+    if len(pwd) < 12: fallos.append("corta")
+    if not any(c.isupper() for c in pwd): fallos.append("sin mayuscula")
+    if not any(c.isdigit() for c in pwd): fallos.append("sin digito")
+    if all(c.isalnum() for c in pwd): fallos.append("sin simbolo")
+    return (not fallos, fallos)
+
+def audita(usuarios: dict[str, str]) -> dict[str, list[str]]:
+    return {u: cumple_politica(pwd)[1] for u, pwd in usuarios.items()}
+
+print(audita({"ana": "Elefante99", "bob": "1234"}))
+```
+
+A) `{'ana': [], 'bob': []}`
+B) `{'ana': ['corta', 'sin simbolo'], 'bob': ['corta', 'sin mayuscula', 'sin simbolo']}`
+C) `{'ana': True, 'bob': False}`
+D) Lanza `KeyError`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>audita</code> se queda solo con la lista de fallos (segundo elemento de la tupla) de cada usuario, sin el booleano.</details>
+
+**14.** *(Sobre el reto de la unidad)* ¿Qué ocurre al ejecutar este código?
+
+```python
+class RiesgoInvalidoError(ValueError):
+    pass
+
+def nivel_riesgo(impacto: int, probabilidad: int) -> str:
+    if not 1 <= impacto <= 5:
+        raise RiesgoInvalidoError(f"impacto fuera de [1,5]: {impacto}")
+    if not 1 <= probabilidad <= 5:
+        raise RiesgoInvalidoError(f"probabilidad fuera de [1,5]: {probabilidad}")
+    v = impacto * probabilidad
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
+
+print(nivel_riesgo(impacto=8, probabilidad=3))
+```
+
+A) Imprime `"ALTO"`, porque `8×3=24` es un riesgo alto
+B) Lanza `RiesgoInvalidoError`, porque `impacto=8` está fuera del rango `[1,5]`
+C) Imprime `"MEDIO"`
+D) Trunca el impacto a 5 automáticamente
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> A diferencia de la versión sin validar, esta comprueba primero que <code>impacto</code> esté en la escala <code>[1,5]</code> y rechaza el dato sin sentido antes de calcular nada.</details>
+
+**15.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+def nivel_riesgo(impacto: int, probabilidad: int) -> str:
+    v = impacto * probabilidad
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
+
+def prioriza(activos: list[dict]) -> list[dict]:
+    return sorted(activos, key=lambda a: a["impacto"] * a["probabilidad"], reverse=True)
+
+def generar_informe(activos: list[dict]) -> list[str]:
+    return [f"[{nivel_riesgo(a['impacto'], a['probabilidad'])}] {a['nombre']}" for a in prioriza(activos)]
+
+activos = [{"nombre": "Web", "impacto": 2, "probabilidad": 2}, {"nombre": "BD", "impacto": 5, "probabilidad": 4}]
+print(generar_informe(activos))
+```
+
+A) `['[BAJO] Web', '[ALTO] BD']`
+B) `['[ALTO] BD', '[BAJO] Web']`
+C) `['[ALTO] Web', '[BAJO] BD']`
+D) `['[MEDIO] BD', '[MEDIO] Web']`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>prioriza</code> ordena primero por riesgo descendente (BD con 20 antes que Web con 4), y luego cada línea muestra su nivel: BD es ALTO (20≥15), Web es BAJO (4&lt;7).</details>

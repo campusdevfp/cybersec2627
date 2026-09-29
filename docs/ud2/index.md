@@ -715,139 +715,301 @@ El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la t�
 
 ## Simulacro de examen tipo test
 
-> 15 preguntas de opción múltiple sobre **todo el código práctico** de la unidad — teoría, actividades y reto.
+> 15 preguntas de opción múltiple. Cada una trae su propio código.
 
-**1.** Según `clasificar_malware.py`, ¿qué devuelve `clasifica("cifra_y_pide_rescate")`?
+**1.** ¿Qué imprime este código?
 
-A) `"virus"`
-B) `"ransomware"`
-C) `"gusano"`
-D) `"desconocido"`
+```python
+MAPA = {
+    "cifra_y_pide_rescate": "ransomware",
+    "autorreplica_por_red": "gusano",
+    "roba_datos_en_silencio": "spyware",
+}
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Es la entrada directa del diccionario <code>COMPORTAMIENTO_A_TIPO</code>.</details>
+def clasifica(c: str) -> str:
+    return MAPA.get(c, "desconocido")
 
-**2.** ¿Qué diferencia a un virus de un gusano, según la tabla de la unidad?
+print(clasifica("roba_datos_en_silencio"))
+print(clasifica("ataque_nuevo"))
+```
 
-A) El virus es más peligroso
-B) El gusano necesita un fichero hospedador; el virus no
-C) El virus necesita un fichero hospedador para propagarse; el gusano se replica solo por la red
-D) No hay diferencia real, son sinónimos
+A) `spyware` y `desconocido`
+B) `desconocido` y `spyware`
+C) `spyware` y `None`
+D) Lanza `KeyError` en la segunda llamada
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b></details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>dict.get(clave, valor_por_defecto)</code> devuelve el valor si la clave existe, y el valor por defecto (<code>"desconocido"</code>) si no — sin lanzar excepción.</details>
 
-**3.** Un atacante consulta muchas IPs de destino distintas en poco tiempo desde una sola IP origen. ¿Qué tipo de ataque es, según la tabla de §2?
+**2.** ¿Qué imprime este código?
 
-A) Fuerza bruta
-B) Phishing
-C) Escaneo de puertos
-D) Man-in-the-middle
+```python
+import re
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Es la pista típica del escaneo de puertos: reconocimiento previo a un ataque.</details>
+texto = "El servidor 10.0.5.9 recibió tráfico en el puerto 443 y en el puerto 8080"
+print(re.findall(r"puerto (\d+)", texto))
+```
 
-**4.** Con `texto = "Conexión desde 10.0.20.5 al puerto 22"`, ¿qué devuelve `re.findall(r"puerto (\d+)", texto)`?
+A) `['puerto 443', 'puerto 8080']`
+B) `['443', '8080']`
+C) `['443']`
+D) `[]`
 
-A) `["puerto 22"]`
-B) `["22"]`
-C) `[]`
-D) `"22"`
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>findall</code> devuelve una lista con el contenido de los grupos capturados (lo que hay dentro del paréntesis), no del texto completo que coincide.</details>
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>findall</code> devuelve una <b>lista</b> con el contenido del grupo capturado, no de todo el match.</details>
+**3.** ¿Qué imprime este código?
 
-**5.** Con `m = patron.search(linea)` y un grupo con nombre `ip`, ¿cómo accedes al valor capturado?
+```python
+import re
 
-A) `m.ip`
-B) `m["ip"]` o `m.group("ip")`
-C) `m[1]` siempre
-D) `m.groupdict("ip")`
+patron = re.compile(r"usuario=(?P<usuario>\S+)\s+intentos=(?P<intentos>\d+)")
+m = patron.search("log: usuario=marta intentos=7 hora=10:00")
+print(m["usuario"], m["intentos"])
+```
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Ambas formas son equivalentes para un grupo con nombre.</details>
+A) `marta 7`
+B) `usuario intentos`
+C) `None None`
+D) Lanza un error porque hay dos grupos con nombre
 
-**6.** La línea es `"usuario=root ip=1.2.3.4 estado=FALLO"`. ¿Qué devuelve `re.match(r"usuario=", linea)` frente a `re.search(r"usuario=", linea)`?
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Cada grupo con nombre se accede como una clave de diccionario sobre el objeto <code>match</code>.</details>
 
-A) Ambos encuentran el patrón, dan igual
-B) Ambos fallan porque falta `^`
-C) Los dos coinciden porque el patrón está al principio de la cadena
-D) `match` falla y `search` sí lo encuentra
+**4.** ¿Qué ocurre al ejecutar este código?
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Como <code>"usuario="</code> está justo al principio de la línea, en este caso concreto <code>match</code> también lo encuentra — pero solo porque coincide con el inicio; si la línea empezara con la fecha, como en los ejemplos reales de log, <code>match</code> fallaría y <code>search</code> seguiría funcionando.</details>
+```python
+import re
 
-**7.** `parsear_log` recibe un texto con 3 líneas: dos válidas y una corrupta que no encaja con el patrón. ¿Cuántos eventos devuelve?
+m = re.search(r"error=(\d+)", "todo correcto, sin fallos")
+print(m["error"])
+```
 
-A) 3
-B) 2
-C) 1
-D) Lanza una excepción
+A) Imprime una cadena vacía
+B) Imprime `None`
+C) Lanza `TypeError`, porque `m` es `None` y no se puede indexar
+D) Imprime `0`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Las líneas que no encajan se descartan silenciosamente; el parser sobrevive a la basura.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Como el patrón no encaja, <code>re.search</code> devuelve <code>None</code>; intentar hacer <code>None["error"]</code> lanza <code>TypeError</code>. Por eso siempre hay que comprobar <code>if m:</code> antes de usar el resultado.</details>
 
-**8.** Con eventos donde la IP `1.1.1.1` tiene 3 `FALLO` y 1 `OK`, y la IP `2.2.2.2` tiene 1 `FALLO`, ¿qué devuelve `contar_fallos_por_ip(eventos)`?
+**5.** ¿Qué imprime este código?
 
-A) `{'1.1.1.1': 4, '2.2.2.2': 1}`
-B) `{'1.1.1.1': 3, '2.2.2.2': 1}`
-C) `{'1.1.1.1': 3}`
-D) `{'1.1.1.1': 1, '2.2.2.2': 1}`
+```python
+import re
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Solo se cuentan los eventos con <code>estado == "FALLO"</code>; el <code>OK</code> de <code>1.1.1.1</code> no suma, pero la IP sigue apareciendo con sus 3 fallos.</details>
+PATRON = re.compile(r"usuario=(?P<usuario>\S+)\s+ip=(?P<ip>\S+)\s+estado=(?P<estado>OK|FALLO)")
 
-**9.** Sobre los mismos eventos de la pregunta anterior, ¿qué devuelve `hubo_acceso_correcto(eventos, "2.2.2.2")`?
+def parsear_evento(linea: str) -> dict | None:
+    m = PATRON.search(linea)
+    return m.groupdict() if m else None
 
-A) `True`
-B) `False`
-C) `None`
+def parsear_log(texto: str) -> list[dict]:
+    return [e for l in texto.splitlines() if (e := parsear_evento(l)) is not None]
+
+log = "usuario=x ip=1.1.1.1 estado=OK\n####corrupta####\nusuario=y ip=2.2.2.2 estado=FALLO\n"
+print(len(parsear_log(log)))
+```
+
+A) `3`
+B) `2`
+C) `1`
+D) Lanza una excepción al llegar a la línea corrupta
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La línea corrupta no encaja con el patrón, así que <code>parsear_evento</code> devuelve <code>None</code> y esa línea se descarta silenciosamente — el parser sobrevive.</details>
+
+**6.** ¿Qué imprime este código?
+
+```python
+from collections import Counter
+
+eventos = [{"ip": "3.3.3.3", "estado": "FALLO"}] * 4 + [{"ip": "3.3.3.3", "estado": "OK"}] * 10
+c = Counter(e["ip"] for e in eventos if e["estado"] == "FALLO")
+print(dict(c))
+```
+
+A) `{'3.3.3.3': 14}`
+B) `{'3.3.3.3': 4}`
+C) `{'3.3.3.3': 10}`
+D) `{}`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El generador solo produce las IPs cuyo evento tiene <code>estado == "FALLO"</code>; los 10 eventos <code>"OK"</code> ni se cuentan.</details>
+
+**7.** ¿Qué imprime este código?
+
+```python
+def hubo_acceso_correcto(eventos: list[dict], ip: str) -> bool:
+    return any(e["ip"] == ip and e["estado"] == "OK" for e in eventos)
+
+eventos = [{"ip": "5.5.5.5", "estado": "FALLO"}] * 20
+print(hubo_acceso_correcto(eventos, "5.5.5.5"))
+```
+
+A) `True`, porque hay 20 intentos
+B) `False`, porque ningún evento tiene `estado == "OK"`
+C) Lanza `IndexError`
+D) `True`, porque la IP coincide 20 veces
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Por muchos fallos que haya, <code>any(...)</code> solo es <code>True</code> si <b>alguno</b> de los eventos tiene <code>estado == "OK"</code> — y aquí no hay ninguno.</details>
+
+**8.** ¿Qué imprime este código?
+
+```python
+import ipaddress
+
+print(ipaddress.ip_address("192.168.50.2").is_private)
+print(ipaddress.ip_address("93.184.216.34").is_private)
+```
+
+A) `True` y `True`
+B) `False` y `False`
+C) `True` y `False`
+D) `False` y `True`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> <code>192.168.x.x</code> es un rango privado (RFC 1918); <code>93.184.216.34</code> es una IP pública real de Internet.</details>
+
+**9.** Tienes esta función de detección de *password spraying* (pocas contraseñas contra muchos usuarios):
+
+```python
+from collections import defaultdict
+
+def spraying(eventos: list[dict], min_usuarios: int = 3) -> list[str]:
+    usuarios_por_ip = defaultdict(set)
+    for e in eventos:
+        if e["estado"] == "FALLO":
+            usuarios_por_ip[e["ip"]].add(e["usuario"])
+    return sorted(ip for ip, us in usuarios_por_ip.items() if len(us) >= min_usuarios)
+
+eventos = [{"ip": "7.7.7.7", "usuario": f"u{i}", "estado": "FALLO"} for i in range(2)]
+print(spraying(eventos, min_usuarios=3))
+```
+
+A) `['7.7.7.7']`
+B) `[]`
+C) `['u0', 'u1']`
 D) Lanza `KeyError`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>2.2.2.2</code> solo tiene un evento <code>FALLO</code>, ningún <code>OK</code>.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Solo hay 2 usuarios distintos probados desde <code>7.7.7.7</code>, y el umbral pide al menos 3 — no se marca como spraying.</details>
 
-**10.** ¿Qué hace un SIEM, según la unidad?
+**10.** ¿Qué imprime este código?
 
-A) Cifra el tráfico de red automáticamente
-B) Centraliza logs de muchas fuentes, los correla en tiempo real y dispara alertas
-C) Sustituye al cortafuegos
-D) Genera contraseñas seguras para los usuarios
+```python
+def en_ventana(marcas: list[int], segundos: int) -> int:
+    mejor = i = 0
+    for j in range(len(marcas)):
+        while marcas[j] - marcas[i] > segundos:
+            i += 1
+        mejor = max(mejor, j - i + 1)
+    return mejor
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
-
-**11.** ¿Qué devuelve `ipaddress.ip_address("8.8.4.4").is_private`?
-
-A) `True`, porque es una IP conocida
-B) `False`, porque 8.8.4.4 es una IP pública
-C) Lanza una excepción, no es una IP válida
-D) `True` siempre que la IP tenga 4 octetos
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El rango 8.0.0.0/8 es público (de hecho, es un DNS de Google); no pertenece a ningún rango privado RFC 1918.</details>
-
-**12.** En el ejercicio de *password spraying*, ¿por qué la función cuenta **usuarios distintos** por IP en vez de fallos totales?
-
-A) Porque así se ejecuta más rápido
-B) Porque el spraying prueba pocas contraseñas contra muchos usuarios; contar solo fallos totales no lo distinguiría de una fuerza bruta normal
-C) Porque `Counter` no puede contar fallos
-D) No hay ninguna razón especial, es solo estilo
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b></details>
-
-**13.** `en_ventana([0, 5, 10, 12, 50], segundos=10)` calcula el máximo de marcas que caben en cualquier ventana deslizante de 10 segundos. ¿Qué devuelve?
+print(en_ventana([1, 2, 3, 20, 21], segundos=5))
+```
 
 A) `2`
 B) `3`
-C) `4`
-D) `5`
+C) `5`
+D) `1`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Las marcas 0, 5 y 10 caben en una ventana de 10 segundos (10−0=10); al llegar a 12, la marca 0 queda fuera. El máximo es 3.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Las marcas 1, 2 y 3 caben todas en una ventana de 5 segundos (<code>3-1=2 ≤ 5</code>); al llegar a 20, las anteriores quedan fuera de rango. El máximo es 3.</details>
 
-**14.** `codigos()` cuenta el código HTTP de cada línea con una regex sobre líneas de log tipo Apache. Si le pasas 1 línea con código `200` y 2 líneas con código `404`, ¿qué devuelve?
+**11.** ¿Qué imprime este código?
 
-A) `{'200': 1, '404': 1}`
-B) `{'200': 1, '404': 2}`
-C) `{'404': 2}`
-D) `Counter()` vacío
+```python
+import re
+from collections import Counter
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>Counter</code> acumula una entrada por cada código encontrado; los dos 404 se suman en la misma clave.</details>
+def codigos(lineas: list[str]) -> Counter:
+    c = Counter()
+    for l in lineas:
+        m = re.search(r'"\s+(\d{3})\b', l)
+        if m:
+            c[m.group(1)] += 1
+    return c
 
-**15.** En el reto resuelto, `generar_informe` etiqueta una IP como `"CRÍTICO (acceso logrado)"` en vez de `"alerta"`. ¿Qué condición dispara esa etiqueta?
+lineas = ['1.1.1.1 "GET / HTTP/1.1" 200'] * 3 + ['1.1.1.1 "GET /a HTTP/1.1" 500']
+print(dict(codigos(lineas)))
+```
 
-A) Que la IP tenga más de 100 fallos
-B) Que `hubo_acceso_correcto(eventos, ip)` devuelva `True`
-C) Que la IP sea privada
-D) Que el usuario objetivo sea `"root"`
+A) `{'200': 3, '500': 1}`
+B) `{'200': 1, '500': 1}`
+C) `{'200': 4}`
+D) `{}`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Una IP sospechosa que además logró un <code>OK</code> tras sus fallos es la señal de que probablemente entró — de ahí la etiqueta crítica.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El patrón extrae el código de 3 dígitos al final de cada línea; se cuentan las 3 apariciones de <code>200</code> y la 1 de <code>500</code> por separado.</details>
+
+**12.** ¿Qué diferencia hay en el comportamiento de estas dos líneas con `linea = "sshd usuario=root ip=1.2.3.4"` (que **no** empieza por la fecha, como en un log real)?
+
+```python
+resultado_match = re.match(r"ip=", linea)
+resultado_search = re.search(r"ip=", linea)
+```
+
+A) Ambas dan el mismo resultado, porque el patrón es idéntico
+B) `resultado_match` es `None` (el patrón no está al principio); `resultado_search` sí encuentra la coincidencia en cualquier parte
+C) `resultado_match` encuentra la coincidencia; `resultado_search` no
+D) Las dos lanzan una excepción porque falta `^` en el patrón
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>match</code> solo comprueba si el patrón encaja justo al principio de la cadena; como la línea empieza por <code>"sshd..."</code>, no por <code>"ip="</code>, <code>match</code> falla. <code>search</code> sí lo encuentra, esté donde esté.</details>
+
+**13.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+from collections import Counter
+
+def contar_fallos_por_ip(eventos: list[dict]) -> dict:
+    return dict(Counter(e["ip"] for e in eventos if e["estado"] == "FALLO"))
+
+def ips_sospechosas(eventos: list[dict], umbral: int) -> list[str]:
+    fallos = contar_fallos_por_ip(eventos)
+    return sorted([ip for ip, n in fallos.items() if n >= umbral], key=lambda ip: -fallos[ip])
+
+eventos = [{"ip": "9.9.9.9", "estado": "FALLO"}] * 3 + [{"ip": "8.8.8.8", "estado": "FALLO"}] * 7
+print(ips_sospechosas(eventos, umbral=5))
+```
+
+A) `['9.9.9.9', '8.8.8.8']`
+B) `['8.8.8.8']`
+C) `['8.8.8.8', '9.9.9.9']`
+D) `[]`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>9.9.9.9</code> solo tiene 3 fallos, por debajo del umbral de 5; <code>8.8.8.8</code> tiene 7, así que supera el umbral y es la única IP sospechosa.</details>
+
+**14.** *(Sobre el reto de la unidad)* Con las funciones `contar_fallos_por_ip`, `ips_sospechosas` y `hubo_acceso_correcto` ya definidas, ¿qué imprime esto?
+
+```python
+def generar_informe(eventos: list[dict], umbral: int) -> list[str]:
+    fallos = contar_fallos_por_ip(eventos)
+    out = []
+    for ip in ips_sospechosas(eventos, umbral):
+        etiqueta = "CRÍTICO" if hubo_acceso_correcto(eventos, ip) else "alerta"
+        out.append(f"[{etiqueta}] {ip} ({fallos[ip]} fallos)")
+    return out
+
+eventos = [{"ip": "9.9.9.9", "estado": "FALLO"}] * 6 + [{"ip": "9.9.9.9", "estado": "OK"}]
+print(generar_informe(eventos, umbral=5))
+```
+
+A) `['[alerta] 9.9.9.9 (6 fallos)']`
+B) `['[CRÍTICO] 9.9.9.9 (6 fallos)']`
+C) `['[CRÍTICO] 9.9.9.9 (7 fallos)']`
+D) `[]`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>9.9.9.9</code> tiene 6 fallos (supera el umbral de 5) <b>y además</b> un <code>OK</code> posterior — <code>hubo_acceso_correcto</code> da <code>True</code>, así que se etiqueta como <code>CRÍTICO</code>, no como una simple alerta.</details>
+
+**15.** *(Sobre el reto de la unidad)* Tienes esta configuración de línea de comandos:
+
+```python
+import argparse
+
+ap = argparse.ArgumentParser()
+ap.add_argument("log")
+ap.add_argument("--umbral", type=int, default=5)
+args = ap.parse_args(["log.txt"])   # sin pasar --umbral
+
+print(args.umbral)
+```
+
+¿Qué imprime?
+
+A) `None`
+B) `5`
+C) Lanza un error porque `--umbral` es obligatorio
+D) `0`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Como <code>--umbral</code> no se indicó al llamar al programa, <code>argparse</code> usa el valor <code>default=5</code> definido en el propio <code>add_argument</code>.</details>
