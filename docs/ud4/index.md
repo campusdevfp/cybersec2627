@@ -1,1204 +1,1047 @@
-# Unidad 4 · Fundamentos de la programación orientada a objetos
+# Unidad 4 · Riesgos, bastionado y autenticación
 
-> **Módulo:** CMO-313 · Fundamentos de programación
-> **Resultado de aprendizaje:** RA4 · **Duración:** 8 h · **Peso:** 15 %
-> **Lenguaje:** Python 3 (tipado)
+> **Módulo:** CMO-314 · Ciberseguridad · **RA4** · **Duración:** 12 h · **Peso:** 15 % · **Herramienta:** Python 3 (tipado) + validación/excepciones
 
-Hasta ahora has separado el programa en **funciones** (acciones) y has guardado los datos en variables sueltas. La programación orientada a objetos (POO) da un paso más: **junta los datos y las acciones que operan sobre ellos** en una sola pieza, el objeto.
+Después de proteger datos, detectar ataques y filtrar tráfico, toca dar un paso atrás: **¿cuánto riesgo corre realmente la organización, y dónde conviene invertir?** Esta unidad va de medir el riesgo con números, y de la primera línea de defensa contra el acceso indebido: contraseñas fuertes y autenticación multifactor. La técnica de Python que vas a dominar es **validar entradas con excepciones** — rechazar con criterio los datos que no tienen sentido, en vez de dejar que el programa falle de formas imprevisibles.
 
-Es el modelo con el que están escritos casi todos los programas grandes, y el que usarás en segundo curso constantemente.
+!!! reto "El reto de la unidad"
+    **Pon nota al riesgo y exige contraseñas decentes.** Vas a construir una herramienta que calcula el riesgo de un activo y valida contraseñas contra una política real.
 
----
+```mermaid
+flowchart TB
+    A["Activos, amenazas<br/>y vulnerabilidades"] --> B["Riesgo cualitativo<br/>y cuantitativo (ALE)"]
+    B --> C["Validación con<br/>try / raise"]
+    C --> D["Bastionado y<br/>políticas de contraseñas"]
+    D --> E["Autenticación<br/>multifactor (MFA)"]
+    B --> P["RETO<br/>Riesgo y contraseñas"]
+    D --> P
+    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
+```
 
-## Mapa de la unidad
+**Qué sabrás hacer al terminar:** distinguir activo, amenaza, vulnerabilidad e impacto · calcular riesgo cualitativo y cuantitativo (ALE) · **validar entradas** con `raise`/`try`/`except`, incluidas excepciones propias · diseñar una política de contraseñas y medir su fuerza · explicar los tres factores de autenticación y por qué el MFA los combina · construir una herramienta de auditoría de riesgo y contraseñas, tipada y probada.
 
-<figure markdown>
-  ![Mapa de la unidad 4](../assets/diagramas/ud4-mapa.svg#only-light)
-  ![Mapa de la unidad 4](../assets/diagramas/ud4-mapa-dark.svg#only-dark)
-  <figcaption>Una clase define cómo son los objetos; la herencia permite especializarla.</figcaption>
-</figure>
-
-### Qué vas a saber hacer al terminar
-
-- [ ] Distinguir **clase** de **objeto**.
-- [ ] Definir una clase con `__init__`, atributos y métodos.
-- [ ] Entender qué es `self` y por qué está en todos los métodos.
-- [ ] Controlar el acceso a los atributos (**encapsulación**) con `property`.
-- [ ] Crear clases derivadas mediante **herencia** y usar `super()`.
-- [ ] Sobrescribir métodos y definir `__str__`.
+**Cómo se trabaja (aula invertida):** lees la sección y ejecutas los ejemplos antes de clase → en clase resuelves las actividades y avanzas el reto en parejas.
 
 ---
 
-!!! tip "Cómo se trabaja esta unidad"
-    Cada sección de teoría termina con **Practica lo de esta sección**: tres o cuatro
-    ejercicios cortos con la solución desplegable, que solo usan lo que acabas de leer.
+## 1. Activos, amenazas, vulnerabilidades e impacto
 
-    **Hazlos en el momento, antes de seguir.** Ese es el trato: la teoría la lees tú
-    —en casa o en clase— y el tiempo de aula se dedica a resolver dudas y a lo que de
-    verdad cuesta. Si llegas a la siguiente sección sin haber tocado el teclado, la
-    unidad se te va a hacer cuesta arriba.
+Ya viste amenaza/vulnerabilidad/riesgo en la UT1 (§1.2). Aquí lo llevamos a números:
 
-    Después vienen las **actividades guiadas**, el **proyecto** de la unidad y el
-    **simulacro** de examen. En ese orden.
+| Concepto | Pregunta que responde | Ejemplo |
+|---|---|---|
+| **Activo** | ¿Qué protegemos? | Base de datos de clientes |
+| **Amenaza** | ¿Qué puede pasarle? | Robo, ransomware, fallo eléctrico |
+| **Vulnerabilidad** | ¿Qué lo hace posible? | Servidor sin parchear |
+| **Impacto** | ¿Cuánto duele si pasa? | Coste económico, legal, reputacional |
+
+```mermaid
+flowchart LR
+    Ac["Activo<br/>(qué protegemos)"] --> Ri["Riesgo"]
+    Am["Amenaza<br/>(qué puede pasar)"] --> Ri
+    Vu["Vulnerabilidad<br/>(qué lo permite)"] --> Ri
+    Ri --> Im["Impacto<br/>(cuánto duele)"]
+```
+
+### 1.1 Riesgo cualitativo: una matriz simple
+
+```python title="matriz_riesgo.py"
+def nivel_riesgo(impacto: int, probabilidad: int) -> str:
+    """impacto y probabilidad en escala 1-5. Devuelve BAJO, MEDIO o ALTO."""
+    valor = impacto * probabilidad
+    if valor >= 15:
+        return "ALTO"
+    if valor >= 7:
+        return "MEDIO"
+    return "BAJO"
+
+print(nivel_riesgo(impacto=5, probabilidad=4))   # servidor crítico, exploit conocido
+print(nivel_riesgo(impacto=3, probabilidad=3))   # riesgo moderado
+print(nivel_riesgo(impacto=2, probabilidad=2))   # riesgo menor
+```
+
+```text title="Salida"
+ALTO
+MEDIO
+BAJO
+```
+
+!!! reto "Reto rápido 1"
+    Un activo con impacto 5 (crítico) pero probabilidad 1 (rarísimo que pase) da `5×1=5` → `BAJO`. ¿Te parece razonable tratarlo igual que un riesgo bajo de verdad? ¿Qué matiz se pierde al reducirlo a un solo número?
 
 ---
 
-## 1. Clase y objeto
+## 2. Riesgo cuantitativo: la pérdida anual esperada (ALE)
 
-Una **clase** es un molde: describe qué datos tiene algo y qué sabe hacer. Un **objeto** es cada ejemplar concreto creado a partir de ese molde.
+El riesgo cualitativo (ALTO/MEDIO/BAJO) es rápido pero subjetivo. El cuantitativo lo pone en **euros**:
 
-> **Analogía.** La clase es el **plano de un piso**; los objetos son los pisos construidos con ese plano. Todos comparten la estructura, pero cada uno tiene sus propios muebles.
+| Sigla | Significado | Fórmula |
+|---|---|---|
+| **SLE** | Single Loss Expectancy — pérdida por un solo incidente | `valor_activo × factor_exposición` |
+| **ARO** | Annualized Rate of Occurrence — veces al año que se espera que pase | (una estimación, p. ej. `0.5` = una vez cada 2 años) |
+| **ALE** | Annualized Loss Expectancy — pérdida anual esperada | `SLE × ARO` |
 
-```python
-class Coche:
+```python title="ale.py"
+def calcular_ale(valor_activo: float, factor_exposicion: float, aro: float) -> float:
+    """factor_exposicion en [0,1]: qué % del valor se pierde si el riesgo se materializa."""
+    sle = valor_activo * factor_exposicion
+    return round(sle * aro, 2)
+
+# Servidor de 100.000€, un incidente destruiría el 30% de su valor,
+# y se espera que pase una vez cada 2 años (ARO = 0.5)
+print(calcular_ale(valor_activo=100_000, factor_exposicion=0.3, aro=0.5))
+```
+
+```text title="Salida"
+15000.0
+```
+
+> Con el ALE puedes comparar: si una salvaguarda cuesta 3.000 €/año y reduce el ALE de 15.000 € a 4.000 €, **ahorra** 8.000 €/año. Es matemática de decisión, no intuición.
+
+!!! analogia "Analogía"
+    El ALE es como calcular cuánto te compensa un seguro: si pagar la póliza te cuesta menos que la pérdida esperada, tiene sentido pagarla.
+
+---
+
+## 3. Validar entradas: `raise`, `try`/`except` y excepciones propias
+
+Hasta ahora tus funciones asumían que los datos venían bien. En seguridad, **nunca** puedes asumir eso: un dato mal formado, negativo o fuera de rango debe **rechazarse explícitamente**, no colarse silenciosamente.
+
+```python title="validar_basico.py"
+def calcular_ale(valor_activo: float, factor_exposicion: float, aro: float) -> float:
+    if valor_activo < 0:
+        raise ValueError(f"el valor del activo no puede ser negativo: {valor_activo}")
+    if not 0 <= factor_exposicion <= 1:
+        raise ValueError(f"el factor de exposición debe estar en [0,1]: {factor_exposicion}")
+    if aro < 0:
+        raise ValueError(f"el ARO no puede ser negativo: {aro}")
+    return round(valor_activo * factor_exposicion * aro, 2)
+
+print(calcular_ale(100_000, 0.3, 0.5))   # válido
+
+try:
+    calcular_ale(100_000, 1.5, 0.5)       # factor_exposicion fuera de rango
+except ValueError as e:
+    print("Rechazado:", e)
+```
+
+```text title="Salida"
+15000.0
+Rechazado: el factor de exposición debe estar en [0,1]: 1.5
+```
+
+### 3.1 Excepciones propias: cuando `ValueError` se queda corto
+
+Puedes crear **tu propio tipo de excepción**, heredando de una ya existente, para que quien use tu código pueda capturar justo *ese* error:
+
+```python title="excepcion_propia.py"
+class RiesgoInvalidoError(ValueError):
+    """Se lanza cuando un parámetro de riesgo no tiene sentido."""
     pass
 
-mi_coche = Coche()          # un objeto
-otro_coche = Coche()        # otro objeto distinto
+def valida_probabilidad(p: float) -> float:
+    if not 0 <= p <= 1:
+        raise RiesgoInvalidoError(f"probabilidad fuera de [0,1]: {p}")
+    return p
+
+try:
+    valida_probabilidad(1.5)
+except RiesgoInvalidoError as e:
+    print("Riesgo mal formado:", e)
+except ValueError:
+    print("Esto no se ejecuta: RiesgoInvalidoError ya lo capturó antes")
 ```
 
-| Concepto | Qué es | Ejemplo |
-|---|---|---|
-| **Clase** | El molde | `Coche` |
-| **Objeto / instancia** | Un ejemplar | `mi_coche` |
-| **Atributo** | Un dato del objeto | `marca`, `velocidad` |
-| **Método** | Una acción del objeto | `describir()`, `acelerar()` |
-
----
-
-> **Reto rápido 1.** Piensa en la clase `Libro`: ¿qué tres atributos tendría? ¿Y dos objetos concretos suyos? *(Solución: título, autor y año; «El Quijote» y «Rayuela».)*
-
-## 2. Atributos y `__init__`
-
-`__init__` es el **constructor**: se ejecuta automáticamente al crear el objeto y sirve para darle sus datos iniciales.
-
-```python
-class Coche:
-    def __init__(self, marca: str, velocidad: int) -> None:
-        self.marca = marca              # atributo del objeto
-        self.velocidad = velocidad
-
-mi_coche = Coche("Seat", 120)
-print(mi_coche.marca)        # Seat
-print(mi_coche.velocidad)    # 120
+```text title="Salida"
+Riesgo mal formado: probabilidad fuera de [0,1]: 1.5
 ```
 
-### 2.1 Qué es `self`
+> `RiesgoInvalidoError` **es** un `ValueError` (herencia, como en la UT3), así que quien no quiera ser tan específico puede seguir capturando `ValueError` a secas. Y quien quiera distinguir tus errores de riesgo de cualquier otro `ValueError`, ya puede.
 
-`self` es **el propio objeto**. Python lo pasa automáticamente como primer parámetro de todos los métodos, para que dentro sepas sobre qué objeto trabajas.
-
-```python
-mi_coche = Coche("Seat", 120)     # self será mi_coche
-otro = Coche("Ford", 90)          # aquí self será otro
-```
-
-Por eso `self.marca` significa «la marca **de este** objeto».
-
-!!! warning "Los tres errores de `self`"
-    ```python
-    class Coche:
-        def __init__(marca):          # ✗ falta self
-            self.marca = marca
-
-        def describir(self) -> str:
-            return marca              # ✗ falta self. delante
-
-    mi_coche.describir(mi_coche)      # ✗ self no se pasa a mano
-    ```
-    Lo correcto: `def __init__(self, marca)`, `return self.marca`, y llamar `mi_coche.describir()`.
-
-> **Reto rápido 1.** Crea una clase `Alumno` con atributos `nombre` y `nota`, y crea dos objetos.
-
-## 3. Métodos
-
-Un **método** es una función definida dentro de la clase. Siempre lleva `self` como primer parámetro.
-
-```python
-class Coche:
-    def __init__(self, marca: str, velocidad: int) -> None:
-        self.marca = marca
-        self.velocidad = velocidad
-
-    def describir(self) -> str:
-        """Devuelve una descripción del coche."""
-        return f"Coche {self.marca} a {self.velocidad} km/h"
-
-    def acelerar(self, incremento: int) -> None:
-        """Aumenta la velocidad."""
-        self.velocidad = self.velocidad + incremento
-
-
-mi_coche = Coche("Seat", 120)
-print(mi_coche.describir())      # Coche Seat a 120 km/h
-mi_coche.acelerar(20)
-print(mi_coche.velocidad)        # 140
-```
-
-!!! tip "Métodos que consultan y métodos que modifican"
-    `describir()` **devuelve** información (`-> str`).
-    `acelerar()` **cambia** el objeto y no devuelve nada (`-> None`).
-    Conviene no mezclar ambas cosas en un mismo método.
-
-### 3.1 `__str__`: cómo se ve el objeto
-
-Sin `__str__`, imprimir un objeto da algo ilegible:
-
-```python
-print(mi_coche)     # <__main__.Coche object at 0x7f8b1c0>
-```
-
-Definiéndolo, decides tú qué se muestra:
-
-```python
-class Coche:
-    def __init__(self, marca: str) -> None:
-        self.marca = marca
-
-    def __str__(self) -> str:
-        return f"Coche {self.marca}"
-
-print(Coche("Seat"))     # Coche Seat
-```
-
-> **Reto rápido 2.** Añade a `Alumno` un método `aprueba(self) -> bool` que indique si su nota es ≥ 5.
-
-## 4. Encapsulación: proteger los datos
-
-Por defecto cualquiera puede tocar los atributos, incluso poniendo valores absurdos:
-
-```python
-mi_coche.velocidad = -500      # nadie lo impide: el objeto queda en un estado imposible
-```
-
-**Encapsular** es controlar cómo se accede a los datos del objeto.
-
-### 4.1 La convención del guion bajo
-
-En Python no existen atributos verdaderamente privados; se usa una **convención**:
-
-| Nombre | Significado |
+| Patrón | Cuándo usarlo |
 |---|---|
-| `velocidad` | público: cualquiera puede usarlo |
-| `_velocidad` | «uso interno, no lo toques desde fuera» |
-| `__velocidad` | Python le cambia el nombre para dificultar el acceso |
+| `raise ValueError(...)` | Un valor no tiene sentido (fuera de rango, formato incorrecto) |
+| `raise TypeError(...)` | El tipo de dato no es el esperado |
+| Excepción propia (`class MiError(ValueError)`) | Quieres que quien llame pueda distinguir **tu** error de otros |
+| `try` / `except` | Vas a intentar algo que **puede** fallar, y sabes cómo reaccionar |
 
-### 4.2 `property`: la forma correcta
+!!! warning "Atención"
+    No captures `except Exception:` a secas "por si acaso": eso oculta errores de programación reales (una variable mal escrita, por ejemplo) junto con los que sí esperabas. Captura el tipo **concreto** de error.
 
-Permite validar al asignar, manteniendo una sintaxis cómoda:
+!!! reto "Reto rápido 2"
+    Escribe `valida_impacto(i: int) -> int` que lance `RiesgoInvalidoError` si `i` no está entre 1 y 5. Pruébala con `i=10`.
 
-```python
-class Coche:
-    def __init__(self, marca: str, velocidad: int) -> None:
-        self.marca = marca
-        self._velocidad = 0
-        self.velocidad = velocidad      # pasa por el setter y valida
+---
 
-    @property
-    def velocidad(self) -> int:
-        """Velocidad actual en km/h."""
-        return self._velocidad
+## 4. Bastionado y política de contraseñas
 
-    @velocidad.setter
-    def velocidad(self, valor: int) -> None:
-        if valor < 0:
-            raise ValueError("La velocidad no puede ser negativa")
-        self._velocidad = valor
+**Bastionar** un sistema es reducir su superficie de ataque: cerrar puertos que no se usan, desactivar servicios innecesarios, aplicar el principio de mínimo privilegio. La contraseña sigue siendo el primer muro.
 
+```python title="politica_contrasenas.py"
+def cumple_politica(contrasena: str) -> tuple[bool, list[str]]:
+    """Política mínima: 12+ caracteres, mayúscula, dígito, símbolo."""
+    fallos = []
+    if len(contrasena) < 12:
+        fallos.append("menos de 12 caracteres")
+    if not any(c.isupper() for c in contrasena):
+        fallos.append("sin mayúscula")
+    if not any(c.isdigit() for c in contrasena):
+        fallos.append("sin dígito")
+    if all(c.isalnum() for c in contrasena):
+        fallos.append("sin símbolo")
+    return (not fallos, fallos)
 
-coche = Coche("Seat", 120)
-print(coche.velocidad)        # 120   (llama al getter)
-coche.velocidad = 140         # ✓     (llama al setter y valida)
-coche.velocidad = -10         # ✗ ValueError
+print(cumple_politica("Caballo-Verde7x"))
+print(cumple_politica("1234"))
 ```
 
-Lo bueno: **quien usa la clase no nota nada**, sigue escribiendo `coche.velocidad`. Pero ahora es imposible dejar el objeto en un estado inválido.
-
-> **Reto rápido 3.** Protege la `nota` de `Alumno` para que solo admita valores entre 0 y 10.
-
-## 5. Herencia
-
-La **herencia** permite crear una clase nueva a partir de otra, aprovechando lo que ya tiene y añadiendo o cambiando lo que haga falta.
-
-```python
-class Vehiculo:
-    def __init__(self, marca: str, velocidad: int) -> None:
-        self.marca = marca
-        self.velocidad = velocidad
-
-    def describir(self) -> str:
-        return f"Vehículo {self.marca} a {self.velocidad} km/h"
-
-
-class Coche(Vehiculo):          # Coche hereda de Vehiculo
-    def describir(self) -> str:  # sobrescribe el método
-        return f"Coche {self.marca} a {self.velocidad} km/h"
-
-
-class Moto(Vehiculo):
-    def describir(self) -> str:
-        return f"Moto {self.marca} a {self.velocidad} km/h"
-
-
-print(Coche("Seat", 120).describir())    # Coche Seat a 120 km/h
-print(Moto("Honda", 90).describir())     # Moto Honda a 90 km/h
+```text title="Salida"
+(True, [])
+(False, ['menos de 12 caracteres', 'sin mayúscula', 'sin símbolo'])
 ```
 
-`Coche` y `Moto` **no repiten** el `__init__`: lo heredan de `Vehiculo`.
+### 4.1 Generar contraseñas fuertes: `secrets`, no `random`
 
-Vocabulario: `Vehiculo` es la clase **base** (o padre); `Coche` y `Moto` son **derivadas** (o hijas). **Sobrescribir** es redefinir en la hija un método que ya existía en la madre.
+```python title="generar_contrasena.py"
+import secrets, string
 
-### 5.1 `super()`: reutilizar lo de la clase base
+def genera(n: int = 16) -> str:
+    alfabeto = string.ascii_letters + string.digits + "!@#$%*-_"
+    return "".join(secrets.choice(alfabeto) for _ in range(n))
 
-Cuando la hija necesita añadir algo pero también quiere lo de la madre:
-
-```python
-class Camion(Vehiculo):
-    def __init__(self, marca: str, velocidad: int, carga: float) -> None:
-        super().__init__(marca, velocidad)     # ejecuta el __init__ de Vehiculo
-        self.carga = carga                      # y añade lo suyo
-
-    def describir(self) -> str:
-        base = super().describir()              # aprovecha el texto de la madre
-        return f"{base} con {self.carga} t de carga"
+print(len(genera()))
+print(genera())
 ```
 
-!!! tip "Cuándo usar herencia"
-    Solo cuando puedas decir «**X es un** Y»: un coche **es un** vehículo. Si lo que quieres decir es «X **tiene un** Y» (un coche tiene un motor), eso no es herencia: es un atributo.
+```text title="Salida"
+16
+xQ4!mZ9-vB2@pL6#   (varía cada vez que lo ejecutas)
+```
 
-> **Reto rápido 4.** Crea `Bicicleta(Vehiculo)` que sobrescriba `describir()`.
+!!! warning "`random` no es seguro para contraseñas"
+    `random` está diseñado para simulaciones y juegos, **no** para criptografía: es predecible si alguien conoce el estado interno. `secrets` usa el generador aleatorio del sistema operativo, pensado justo para esto. La UT1 ya te lo enseñó para sales de hash — misma razón.
 
-## 6. Errores frecuentes
+### 4.2 Medir la fuerza: entropía aproximada
 
-| Síntoma | Causa | Solución |
+```python title="entropia.py"
+import math
+
+def entropia(pwd: str) -> float:
+    """Bits de entropía aproximados, según el alfabeto usado."""
+    alfabeto = 0
+    if any(c.islower() for c in pwd): alfabeto += 26
+    if any(c.isupper() for c in pwd): alfabeto += 26
+    if any(c.isdigit() for c in pwd): alfabeto += 10
+    if any(not c.isalnum() for c in pwd): alfabeto += 32
+    return round(len(pwd) * math.log2(alfabeto), 1) if alfabeto else 0.0
+
+print(entropia("Abcdef1!"))     # 8 caracteres, alfabeto amplio
+print(entropia("abcdefgh"))     # 8 caracteres, solo minúsculas
+```
+
+```text title="Salida"
+52.4
+37.6
+```
+
+> Más longitud y más variedad de caracteres = más bits de entropía = más intentos necesarios para adivinarla por fuerza bruta. 80 bits o más se considera robusto hoy.
+
+---
+
+## 5. Autenticación multifactor (MFA)
+
+Hay tres **factores** de autenticación, y cada uno responde a una pregunta distinta:
+
+| Factor | Pregunta | Ejemplo |
 |---|---|---|
-| `TypeError: __init__() takes 2 positional arguments but 3 were given` | falta `self` en la definición | `def __init__(self, ...)` |
-| `NameError` dentro de un método | usaste `marca` en vez de `self.marca` | pon `self.` delante |
-| `AttributeError: 'Coche' object has no attribute 'x'` | no se creó en `__init__` o hay una errata | créalo en el constructor |
-| Al imprimir sale `<object at 0x…>` | falta `__str__` | defínelo |
-| La clase hija pierde los atributos | olvidaste `super().__init__(...)` | llámalo al principio |
-| El `property` entra en bucle infinito | dentro del setter asignas a `self.velocidad` | asigna a `self._velocidad` |
+| **Algo que sabes** | ¿Qué conoces? | Contraseña, PIN |
+| **Algo que tienes** | ¿Qué posees? | Móvil, token físico, tarjeta |
+| **Algo que eres** | ¿Qué eres? | Huella, cara, iris |
+
+**MFA** exige **al menos dos categorías distintas** — no dos contraseñas, que siguen siendo "algo que sabes".
+
+```python title="es_mfa.py"
+def es_mfa(factores: list[str]) -> bool:
+    categorias: set[str] = set()
+    for f in factores:
+        if f in ("contrasena", "pin"):
+            categorias.add("saber")
+        elif f in ("movil", "token", "tarjeta"):
+            categorias.add("tener")
+        elif f in ("huella", "cara"):
+            categorias.add("ser")
+    return len(categorias) >= 2
+
+print(es_mfa(["contrasena", "movil"]))   # saber + tener -> MFA de verdad
+print(es_mfa(["contrasena", "pin"]))     # saber + saber -> NO es MFA
+```
+
+```text title="Salida"
+True
+False
+```
+
+!!! reto "Reto rápido 3"
+    Un sistema pide contraseña **y** pregunta de seguridad ("¿nombre de tu mascota?"). ¿Es MFA de verdad? ¿Por qué las preguntas de seguridad se consideran una mala práctica hoy?
 
 ---
 
+## 6. Errores frecuentes (ten esto a mano)
+
+| Error | Causa | Solución |
+|---|---|---|
+| El programa acepta un riesgo con probabilidad `1.5` | Falta validar el rango | `raise ValueError` si está fuera de `[0,1]` |
+| `except Exception:` que oculta bugs | Capturar "todo por si acaso" | Captura el tipo concreto de error |
+| Contraseñas generadas con `random` | No es criptográficamente seguro | Usa `secrets.choice` |
+| ALE negativo o absurdo | No se validaron los parámetros de entrada | Valida **antes** de calcular, no después |
+| "2FA" que en realidad no lo es | Dos factores de la misma categoría (dos contraseñas) | Comprueba que son **categorías** distintas |
+
 ---
 
-## 7. Ejercicios
+## 7. Actividades: de lo más sencillo a preguntas tipo examen
 
-Aquí están **todos los ejercicios de la unidad**, agrupados por el
-tema al que corresponden y con la solución desplegable.
-
-**Haz los de un tema en cuanto termines de leerlo.** No esperes al final: son cortos y solo
-usan lo que acabas de ver, así que si algo no ha quedado claro lo descubres en el momento y
-no tres semanas después.
-
-!!! warning "Intenta antes de desplegar"
-    Abrir la solución sin haberlo intentado da sensación de aprender, y no enseña nada. Si
-    llevas quince minutos sin avanzar, mírala. Si llevas dos, no.
-
-
-### Tema 1 · Clase y objeto
-
-**1.1.** Explica con tus palabras la diferencia entre **clase** y **objeto**, con un ejemplo que no sea de programación.
-<details><summary>Solución</summary>
-
-```text
-Clase  = el molde, el plano, la receta. Se escribe UNA vez.
-Objeto = cada cosa concreta hecha con ese molde. Puede haber miles.
-
-Ejemplo: la clase es el plano de un piso; los objetos son el 1ºA, el 1ºB,
-el 2ºA... Todos tienen cocina y bano (los mismos atributos), pero cada uno
-con sus propios valores: distinto propietario, distinto numero.
-
-En codigo:
-    class Piso:      <- el plano, se escribe una vez
-    piso1 = Piso()   <- un piso concreto
-    piso2 = Piso()   <- otro piso, independiente del anterior
-```
-</details>
-
-**1.2.** Identifica la clase y los objetos en esta frase: «En el taller hay tres coches: un Ibiza rojo, un Clio azul y un Golf blanco».
-<details><summary>Solución</summary>
-
-```text
-Clase:   Coche
-Atributos: modelo, color
-Objetos: tres instancias de Coche
-         Coche("Ibiza", "rojo")
-         Coche("Clio", "azul")
-         Coche("Golf", "blanco")
-
-Truco: los nombres COMUNES suelen ser clases (coche, alumno, factura);
-los nombres PROPIOS o los ejemplares concretos son objetos.
-```
-</details>
-
-**1.3.** Escribe la clase más pequeña posible, `Punto`, y crea dos objetos distintos.
-<details><summary>Solución</summary>
+**1 · 🟢 Nivel de riesgo** — `nivel(impacto: int, prob: int) -> str`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class Punto:
-    """Un punto cualquiera."""
-
-
-a = Punto()
-b = Punto()
-
-print(type(a).__name__)   # -> Punto
-print(a is b)             # -> False   son dos objetos distintos
+def nivel(impacto: int, prob: int) -> str:
+    v = impacto * prob
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
 ```
 </details>
 
-
-**1.4.** Escribe la clase más pequeña posible, `Perro`, y crea tres objetos. Comprueba que son tres cosas distintas aunque salgan del mismo molde.
-<details><summary>Solución</summary>
+**2 · 🟢 ALE simple** — `ale(sle: float, aro: float) -> float`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class Perro:
-    """Un perro cualquiera."""
-
-
-a = Perro()
-b = Perro()
-c = Perro()
-
-print(a is b, b is c)          # -> False False
-print(type(a) is type(b))      # -> True
-
-# Mismo molde (misma clase), tres objetos independientes.
+def ale(sle: float, aro: float) -> float:
+    return round(sle * aro, 2)
 ```
 </details>
 
-
-### Tema 2 · Atributos y `__init__`
-
-**2.1.** Escribe la clase `Alumno` con `nombre` y `nota`, y crea dos alumnos.
-<details><summary>Solución</summary>
+**3 · 🟢 ¿Cumple longitud mínima?** — `longitud_ok(pwd: str, minimo: int = 12) -> bool`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class Alumno:
-    """Alumno con su nota."""
-
-    def __init__(self, nombre: str, nota: float) -> None:
-        self.nombre = nombre
-        self.nota = nota
-
-
-ada = Alumno("Ada", 9.5)
-alan = Alumno("Alan", 7.0)
-
-print(ada.nombre, ada.nota)     # -> Ada 9.5
-print(alan.nombre, alan.nota)   # -> Alan 7.0
+def longitud_ok(pwd: str, minimo: int = 12) -> bool:
+    return len(pwd) >= minimo
 ```
 </details>
 
-**2.2.** ¿Qué es `self`? Comprueba que cada objeto tiene sus **propios** atributos.
-<details><summary>Solución</summary>
+**4 · 🟢 ¿Tiene símbolo?** — `tiene_simbolo(pwd: str) -> bool`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class Contador:
-    """Contador independiente."""
-
-    def __init__(self) -> None:
-        self.valor = 0   # self = ESTE objeto concreto, no la clase
-
-
-a = Contador()
-b = Contador()
-
-a.valor = 10
-
-print(a.valor)   # -> 10
-print(b.valor)   # -> 0     b no se entera de nada: son objetos distintos
+def tiene_simbolo(pwd: str) -> bool:
+    return any(not c.isalnum() for c in pwd)
 ```
 </details>
 
-**2.3.** Añade a `Alumno` un atributo `grupo` con valor por defecto `"1DAW"`.
-<details><summary>Solución</summary>
+**5 · 🟡 Validar con excepción** — `ale_validado(sle, aro) -> float`, lanza `ValueError` si alguno es negativo.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class Alumno:
-    """Alumno con su nota y su grupo."""
-
-    def __init__(self, nombre: str, nota: float, grupo: str = "1DAW") -> None:
-        self.nombre = nombre
-        self.nota = nota
-        self.grupo = grupo
-
-
-print(Alumno("Ada", 9.5).grupo)          # -> 1DAW
-print(Alumno("Alan", 7.0, "1DAM").grupo) # -> 1DAM
+def ale_validado(sle: float, aro: float) -> float:
+    if sle < 0 or aro < 0:
+        raise ValueError("sle y aro no pueden ser negativos")
+    return round(sle * aro, 2)
 ```
 </details>
 
-**2.4.** Este código falla. ¿Por qué?
+**6 · 🟡 Excepción propia** — `class PoliticaError(ValueError)` y `valida_longitud(pwd, minimo=12)` que la lanza si es corta.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class Coche:
-    def __init__(modelo):
-        self.modelo = modelo
-```
-<details><summary>Solución</summary>
+class PoliticaError(ValueError):
+    pass
 
-```python
-class Coche:
-    """Coche con modelo."""
-
-    def __init__(self, modelo: str) -> None:   # faltaba self como PRIMER parámetro
-        self.modelo = modelo
-
-
-print(Coche("Ibiza").modelo)   # -> Ibiza
-
-# Sin self, Python pasa el objeto en el primer hueco y 'modelo' acaba siendo
-# el propio coche. El error tipico: "takes 1 positional argument but 2 were given".
+def valida_longitud(pwd: str, minimo: int = 12) -> None:
+    if len(pwd) < minimo:
+        raise PoliticaError(f"contraseña de {len(pwd)} caracteres, mínimo {minimo}")
 ```
 </details>
 
-
-### Tema 3 · Métodos
-
-**3.1.** Añade a `Alumno` un método `aprueba()` que diga si llega a 5.
-<details><summary>Solución</summary>
+**7 · 🟡 Contraseña segura** — `genera(n=16) -> str` con `secrets`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class Alumno:
-    """Alumno con su nota."""
-
-    def __init__(self, nombre: str, nota: float) -> None:
-        self.nombre = nombre
-        self.nota = nota
-
-    def aprueba(self) -> bool:
-        """Indica si la nota llega a 5."""
-        return self.nota >= 5
-
-
-print(Alumno("Ada", 9.5).aprueba())   # -> True
-print(Alumno("Alan", 3.0).aprueba())  # -> False
+import secrets, string
+def genera(n: int = 16) -> str:
+    alfabeto = string.ascii_letters + string.digits + "!@#$%*-_"
+    return "".join(secrets.choice(alfabeto) for _ in range(n))
 ```
 </details>
 
-**3.2.** Añade `__str__` a `Alumno` para que `print(alumno)` muestre `Ada (9.50)`.
-<details><summary>Solución</summary>
+**8 · 🟡 Política completa** — `cumple_politica(pwd) -> tuple[bool, list[str]]`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class Alumno:
-    """Alumno con su nota."""
-
-    def __init__(self, nombre: str, nota: float) -> None:
-        self.nombre = nombre
-        self.nota = nota
-
-    def __str__(self) -> str:
-        return f"{self.nombre} ({self.nota:.2f})"
-
-
-print(Alumno("Ada", 9.5))   # -> Ada (9.50)
-
-# Sin __str__ saldria algo como <__main__.Alumno object at 0x7f...>
+def cumple_politica(pwd: str) -> tuple[bool, list[str]]:
+    fallos = []
+    if len(pwd) < 12: fallos.append("corta")
+    if not any(c.isupper() for c in pwd): fallos.append("sin mayúscula")
+    if not any(c.isdigit() for c in pwd): fallos.append("sin dígito")
+    if all(c.isalnum() for c in pwd): fallos.append("sin símbolo")
+    return (not fallos, fallos)
 ```
 </details>
 
-**3.3.** Escribe `Rectangulo` con métodos `area()` y `perimetro()`.
-<details><summary>Solución</summary>
-
-```python
-class Rectangulo:
-    """Rectángulo definido por su base y su altura."""
-
-    def __init__(self, base: float, altura: float) -> None:
-        self.base = base
-        self.altura = altura
-
-    def area(self) -> float:
-        """Área del rectángulo."""
-        return self.base * self.altura
-
-    def perimetro(self) -> float:
-        """Perímetro del rectángulo."""
-        return 2 * (self.base + self.altura)
-
-
-r = Rectangulo(3, 4)
-print(r.area())        # -> 12
-print(r.perimetro())   # -> 14
-```
-</details>
-
-
-**3.4.** Añade a `Rectangulo` un método `es_cuadrado()` que diga si la base y la altura coinciden.
-<details><summary>Solución</summary>
-
-```python
-class Rectangulo:
-    """Rectángulo definido por su base y su altura."""
-
-    def __init__(self, base: float, altura: float) -> None:
-        self.base = base
-        self.altura = altura
-
-    def area(self) -> float:
-        """Área del rectángulo."""
-        return self.base * self.altura
-
-    def es_cuadrado(self) -> bool:
-        """Indica si los cuatro lados miden lo mismo."""
-        return self.base == self.altura
-
-
-print(Rectangulo(3, 3).es_cuadrado())   # -> True
-print(Rectangulo(3, 4).es_cuadrado())   # -> False
-```
-</details>
-
-
-### Tema 4 · Encapsulación con `property`
-
-**4.1.** Convierte `nota` en una **property** que no admita valores fuera de 0–10.
-<details><summary>Solución</summary>
-
-```python
-class Alumno:
-    """Alumno con la nota validada."""
-
-    def __init__(self, nombre: str, nota: float) -> None:
-        self.nombre = nombre
-        self._nota = 0.0
-        self.nota = nota          # pasa por el setter: se valida también al crear
-
-    @property
-    def nota(self) -> float:
-        """Nota del alumno."""
-        return self._nota
-
-    @nota.setter
-    def nota(self, valor: float) -> None:
-        if not 0 <= valor <= 10:
-            raise ValueError("la nota debe estar entre 0 y 10")
-        self._nota = valor
-
-
-a = Alumno("Ada", 9.5)
-print(a.nota)   # -> 9.5
-
-try:
-    a.nota = 11
-except ValueError as e:
-    print("Error:", e)   # -> Error: la nota debe estar entre 0 y 10
-```
-</details>
-
-**4.2.** ¿Por qué el `__init__` debe asignar `self.nota = nota` y no `self._nota = nota`?
-<details><summary>Solución</summary>
-
-```text
-Porque self.nota = nota pasa por el SETTER, y el setter es quien valida.
-
-Si escribes self._nota = nota te saltas la validacion justo en el momento
-mas peligroso: la creacion del objeto. Entonces esto colaria:
-
-    Alumno("Ada", 500)   # nota imposible, y el objeto nace ya corrupto
-
-Regla: dentro de __init__, asigna siempre por la property.
-```
-</details>
-
-**4.3.** Añade a `Producto` una property `precio` que rechace negativos, y comprueba los dos momentos: al crear y al asignar.
-<details><summary>Solución</summary>
-
-```python
-class Producto:
-    """Producto con precio validado."""
-
-    def __init__(self, nombre: str, precio: float) -> None:
-        self.nombre = nombre
-        self._precio = 0.0
-        self.precio = precio
-
-    @property
-    def precio(self) -> float:
-        """Precio del producto."""
-        return self._precio
-
-    @precio.setter
-    def precio(self, valor: float) -> None:
-        if valor < 0:
-            raise ValueError("el precio no puede ser negativo")
-        self._precio = valor
-
-
-try:
-    Producto("Roto", -5)
-except ValueError:
-    print("rechazado al crear")     # -> rechazado al crear
-
-p = Producto("Gorra", 10.0)
-try:
-    p.precio = -1
-except ValueError:
-    print("rechazado al asignar")   # -> rechazado al asignar
-
-p.precio = 0
-print(p.precio)   # -> 0     cero no es negativo: se acepta
-```
-</details>
-
-
-**4.4.** Haz que la *property* `nota` acepte también el 0 y el 10 (los extremos), y compruébalo con los tres casos límite: 0, 10 y 10.1.
-<details><summary>Solución</summary>
-
-```python
-class Alumno:
-    """Alumno con la nota validada entre 0 y 10, extremos incluidos."""
-
-    def __init__(self, nombre: str, nota: float) -> None:
-        self.nombre = nombre
-        self._nota = 0.0
-        self.nota = nota
-
-    @property
-    def nota(self) -> float:
-        """Nota del alumno."""
-        return self._nota
-
-    @nota.setter
-    def nota(self, valor: float) -> None:
-        if not 0 <= valor <= 10:          # <= en los dos lados: los extremos entran
-            raise ValueError("la nota debe estar entre 0 y 10")
-        self._nota = valor
-
-
-print(Alumno("A", 0).nota)    # -> 0
-print(Alumno("B", 10).nota)   # -> 10
-
-try:
-    Alumno("C", 10.1)
-except ValueError:
-    print("10.1 rechazado")   # -> 10.1 rechazado
-```
-</details>
-
-
-### Tema 5 · Herencia
-
-**5.1.** Crea `Vehiculo` con `describir()` y una clase `Moto` que **herede** y sobrescriba solo ese método.
-<details><summary>Solución</summary>
-
-```python
-class Vehiculo:
-    """Vehículo genérico."""
-
-    def __init__(self, matricula: str) -> None:
-        self.matricula = matricula
-
-    def describir(self) -> str:
-        """Descripción."""
-        return f"Vehículo {self.matricula}"
-
-
-class Moto(Vehiculo):
-    """Motocicleta."""
-
-    def describir(self) -> str:
-        return f"Moto {self.matricula}"
-
-
-print(Vehiculo("1234ABC").describir())   # -> Vehículo 1234ABC
-print(Moto("5678XYZ").describir())       # -> Moto 5678XYZ
-
-# Moto NO repite __init__: lo hereda tal cual.
-```
-</details>
-
-**5.2.** Comprueba que `Moto` hereda de verdad, y que hereda el constructor sin repetirlo.
-<details><summary>Solución</summary>
-
-```python
-class Vehiculo:
-    """Vehículo genérico."""
-
-    def __init__(self, matricula: str) -> None:
-        self.matricula = matricula
-
-
-class Moto(Vehiculo):
-    """Motocicleta."""
-
-
-print(issubclass(Moto, Vehiculo))       # -> True
-print(isinstance(Moto("1234ABC"), Vehiculo))   # -> True
-print(Moto("1234ABC").matricula)        # -> 1234ABC   el __init__ es heredado
-```
-</details>
-
-**5.3.** Desde `Camion.describir()`, reutiliza lo que ya hace la clase base con `super()`.
-<details><summary>Solución</summary>
-
-```python
-class Vehiculo:
-    """Vehículo genérico."""
-
-    def __init__(self, matricula: str) -> None:
-        self.matricula = matricula
-
-    def describir(self) -> str:
-        """Descripción."""
-        return f"Vehículo {self.matricula}"
-
-
-class Camion(Vehiculo):
-    """Camión con carga máxima."""
-
-    def __init__(self, matricula: str, toneladas: float) -> None:
-        super().__init__(matricula)      # reutiliza el __init__ del padre
-        self.toneladas = toneladas
-
-    def describir(self) -> str:
-        return f"{super().describir()} · {self.toneladas} t"
-
-
-print(Camion("1234ABC", 12.5).describir())   # -> Vehículo 1234ABC · 12.5 t
-```
-</details>
-
-**5.4.** Este código repite el `__init__` en la clase derecha sin necesidad. Quítalo:
-
-```python
-class Coche(Vehiculo):
-    def __init__(self, matricula):
-        self.matricula = matricula
-```
-<details><summary>Solución</summary>
-
-```python
-class Vehiculo:
-    """Vehículo genérico."""
-
-    def __init__(self, matricula: str) -> None:
-        self.matricula = matricula
-
-
-class Coche(Vehiculo):
-    """Coche: no aporta nada nuevo al constructor, así que no lo repite."""
-
-    def describir(self) -> str:
-        """Descripción."""
-        return f"Coche {self.matricula}"
-
-
-print(Coche("1234ABC").describir())   # -> Coche 1234ABC
-
-# Repetir el __init__ es duplicar codigo: si manana el padre valida la matricula,
-# el hijo se queda sin esa validacion y nadie se entera.
-```
-</details>
-
-
-### Actividades guiadas
-
-#### Actividad 1 — Tu primera clase
-`Persona` con `nombre` y `edad`, y un método `saludar()` que devuelva `"Hola, soy Ada"`.
-<details><summary>Solución</summary>
-
-```python
-class Persona:
-    def __init__(self, nombre: str, edad: int) -> None:
-        self.nombre = nombre
-        self.edad = edad
-
-    def saludar(self) -> str:
-        return f"Hola, soy {self.nombre}"
-
-print(Persona("Ada", 36).saludar())
-```
-</details>
-
-#### Actividad 2 — Método que modifica
-Añade `cumplir_anios()` que sume 1 a la edad.
-<details><summary>Solución</summary>
-
-```python
-    def cumplir_anios(self) -> None:
-        self.edad = self.edad + 1
-```
-</details>
-
-#### Actividad 3 — Encapsular
-Protege `edad` para que no admita valores negativos.
-<details><summary>Solución</summary>
-
-```python
-class Persona:
-    def __init__(self, nombre: str, edad: int) -> None:
-        self.nombre = nombre
-        self._edad = 0
-        self.edad = edad
-
-    @property
-    def edad(self) -> int:
-        return self._edad
-
-    @edad.setter
-    def edad(self, valor: int) -> None:
-        if valor < 0:
-            raise ValueError("La edad no puede ser negativa")
-        self._edad = valor
-```
-</details>
-
-#### Actividad 4 — Herencia
-`Empleado(Persona)` con un atributo `sueldo`, usando `super()`.
-<details><summary>Solución</summary>
-
-```python
-class Empleado(Persona):
-    def __init__(self, nombre: str, edad: int, sueldo: float) -> None:
-        super().__init__(nombre, edad)
-        self.sueldo = sueldo
-
-    def saludar(self) -> str:
-        return f"Hola, soy {self.nombre} y cobro {self.sueldo} €"
-```
-</details>
-
-### Ejercicios propuestos
-
-**E1 ○ · Rectángulo.** Clase con `base` y `altura` y métodos `area()` y `perimetro()`.
-<details><summary>Solución</summary>
-
-```python
-class Rectangulo:
-    def __init__(self, base: float, altura: float) -> None:
-        self.base = base
-        self.altura = altura
-
-    def area(self) -> float:
-        return self.base * self.altura
-
-    def perimetro(self) -> float:
-        return 2 * (self.base + self.altura)
-```
-</details>
-
-**E2 ○ · Cuenta bancaria.** `saldo`, `ingresar(cantidad)` y `saldo_actual()`.
-<details><summary>Solución</summary>
-
-```python
-class Cuenta:
-    def __init__(self, saldo: float = 0.0) -> None:
-        self.saldo = saldo
-
-    def ingresar(self, cantidad: float) -> None:
-        self.saldo += cantidad
-
-    def saldo_actual(self) -> float:
-        return self.saldo
-```
-</details>
-
-**E3 ◐ · Retirar con control.** Añade `retirar(cantidad)` que lance `ValueError` si no hay saldo.
-<details><summary>Solución</summary>
-
-```python
-    def retirar(self, cantidad: float) -> None:
-        if cantidad > self.saldo:
-            raise ValueError("Saldo insuficiente")
-        self.saldo -= cantidad
-```
-</details>
-
-**E4 ◐ · `__str__`.** Haz que imprimir un `Rectangulo` muestre `"Rectangulo 4x3"`.
-<details><summary>Solución</summary>
-
-```python
-    def __str__(self) -> str:
-        return f"Rectangulo {self.base}x{self.altura}"
-```
-</details>
-
-**E5 ● · Jerarquía de figuras.** `Figura` con `area()` que devuelva `0.0`, y `Circulo` y `Cuadrado` que la sobrescriban.
-<details><summary>Solución</summary>
+**9 · 🟠 Entropía** — `entropia(pwd: str) -> float` (bits, según alfabeto usado).
+<details class="sol"><summary>Solución</summary>
 
 ```python
 import math
-
-class Figura:
-    def area(self) -> float:
-        return 0.0
-
-class Circulo(Figura):
-    def __init__(self, radio: float) -> None:
-        self.radio = radio
-    def area(self) -> float:
-        return math.pi * self.radio ** 2
-
-class Cuadrado(Figura):
-    def __init__(self, lado: float) -> None:
-        self.lado = lado
-    def area(self) -> float:
-        return self.lado ** 2
+def entropia(pwd: str) -> float:
+    alf = 0
+    if any(c.islower() for c in pwd): alf += 26
+    if any(c.isupper() for c in pwd): alf += 26
+    if any(c.isdigit() for c in pwd): alf += 10
+    if any(not c.isalnum() for c in pwd): alf += 32
+    return round(len(pwd) * math.log2(alf), 1) if alf else 0.0
 ```
 </details>
 
-**E6 ○ · Clase Libro.** Escribe la clase `Libro` con `titulo`, `autor` y `anio`, y un `__str__` que devuelva `El Quijote (Cervantes, 1605)`.
-<details><summary>Pista</summary>El <code>__str__</code> es una f-string con los tres atributos.</details>
-<details><summary>Solución</summary>
+**10 · 🟠 ¿Es MFA de verdad?** — `es_mfa(factores: list[str]) -> bool` (al menos dos categorías distintas).
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class Libro:
-    """Un libro del catálogo."""
-
-    def __init__(self, titulo: str, autor: str, anio: int) -> None:
-        self.titulo = titulo
-        self.autor = autor
-        self.anio = anio
-
-    def __str__(self) -> str:
-        return f"{self.titulo} ({self.autor}, {self.anio})"
+def es_mfa(factores: list[str]) -> bool:
+    cat: set[str] = set()
+    for f in factores:
+        if f in ("contrasena", "pin"): cat.add("saber")
+        elif f in ("movil", "token", "tarjeta"): cat.add("tener")
+        elif f in ("huella", "cara"): cat.add("ser")
+    return len(cat) >= 2
 ```
 </details>
 
-**E7 ◐ · Cuenta bancaria.** `CuentaBancaria` con un atributo `saldo` **validado con `property`** que no admite negativos (lanza `ValueError`), y un método `ingresar(cantidad)` que lo aumenta.
-<details><summary>Pista</summary>El <code>__init__</code> tiene que asignar con <code>self.saldo = ...</code> para que pase por el setter y se valide también al crear la cuenta.</details>
-<details><summary>Solución</summary>
+**11 · 🟠 Riesgo medio de un inventario** — `riesgo_medio(valores: list[float]) -> float`, lanza `ValueError` si la lista está vacía.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-class CuentaBancaria:
-    """Cuenta con saldo que nunca puede ser negativo."""
-
-    def __init__(self, titular: str, saldo: float) -> None:
-        self.titular = titular
-        self._saldo = 0.0
-        self.saldo = saldo
-
-    @property
-    def saldo(self) -> float:
-        """Saldo actual."""
-        return self._saldo
-
-    @saldo.setter
-    def saldo(self, valor: float) -> None:
-        if valor < 0:
-            raise ValueError("el saldo no puede ser negativo")
-        self._saldo = valor
-
-    def ingresar(self, cantidad: float) -> None:
-        """Aumenta el saldo."""
-        self.saldo = self._saldo + cantidad
+def riesgo_medio(valores: list[float]) -> float:
+    if not valores:
+        raise ValueError("lista de riesgos vacía")
+    return round(sum(valores) / len(valores), 2)
 ```
 </details>
 
-**E8 ● · Figuras con herencia.** Clase base `Figura` con un método `area()` que devuelve `0.0`, y dos derivadas, `Cuadrado` y `Circulo`, que lo sobrescriben. Las derivadas **no repiten** el `__init__`.
-<details><summary>Pista</summary>Dale a <code>Figura</code> un <code>__init__</code> con el único dato que comparten (la medida) y que las hijas lo hereden tal cual.</details>
-<details><summary>Solución</summary>
+**12 · 🟠 Priorizar activos** — `prioriza(activos: list[dict]) -> list[dict]` ordenados por `impacto*probabilidad` descendente.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-import math
+def prioriza(activos: list[dict]) -> list[dict]:
+    return sorted(activos, key=lambda a: a["impacto"] * a["probabilidad"], reverse=True)
+```
+</details>
 
+**13 · 🔴 Salvaguarda rentable** — `merece_la_pena(ale_actual, ale_residual, coste_anual) -> bool`: ¿el ahorro supera el coste?
+<details class="sol"><summary>Solución</summary>
 
-class Figura:
-    """Figura genérica definida por una medida."""
+```python
+def merece_la_pena(ale_actual: float, ale_residual: float, coste_anual: float) -> bool:
+    ahorro = ale_actual - ale_residual
+    return ahorro > coste_anual
+```
+</details>
 
-    def __init__(self, medida: float) -> None:
-        self.medida = medida
+**14 · 🔴 Auditoría de un lote de contraseñas** — `audita(usuarios: dict[str,str]) -> dict[str, list[str]]`: usuario → lista de fallos (vacía si cumple).
+<details class="sol"><summary>Solución</summary>
 
-    def area(self) -> float:
-        """Área de la figura."""
-        return 0.0
+```python
+def audita(usuarios: dict[str, str]) -> dict[str, list[str]]:
+    resultado = {}
+    for u, pwd in usuarios.items():
+        _, fallos = cumple_politica(pwd)
+        resultado[u] = fallos
+    return resultado
+```
+</details>
 
+**15 · 🔴 Cadena de validaciones** — `valida_activo(nombre, valor, prob) -> None`: valida los tres campos y, si todo es correcto, no devuelve nada; si algo falla, lanza la excepción con **el primer** problema encontrado.
+<details class="sol"><summary>Solución</summary>
 
-class Cuadrado(Figura):
-    """Cuadrado de lado `medida`."""
+```python
+class ActivoInvalidoError(ValueError):
+    pass
 
-    def area(self) -> float:
-        return self.medida ** 2
-
-
-class Circulo(Figura):
-    """Círculo de radio `medida`."""
-
-    def area(self) -> float:
-        return math.pi * self.medida ** 2
+def valida_activo(nombre: str, valor: float, prob: float) -> None:
+    if not nombre.strip():
+        raise ActivoInvalidoError("el activo necesita un nombre")
+    if valor < 0:
+        raise ActivoInvalidoError(f"valor negativo: {valor}")
+    if not 0 <= prob <= 1:
+        raise ActivoInvalidoError(f"probabilidad fuera de [0,1]: {prob}")
 ```
 </details>
 
 ---
 
----
+## 8. Reto resuelto, paso a paso — Auditor de riesgo y contraseñas
 
-## 8. Práctica tipo examen
+El cliente de la consultora te pasa una lista de activos y una lista de usuarios con sus contraseñas. Te piden un informe: qué activos son de riesgo alto, y qué contraseñas incumplen la política.
 
-Los ejercicios de arriba tienen la solución a la vista. Lo que viene
-ahora **no**: aquí se comprueba si sabes hacerlo solo, que es lo que mide el examen.
-
-Son dos escalones, y en este orden:
-
-| | Qué es | Cómo sabes si va bien |
-|---|---|---|
-| **Proyecto de la unidad** | Un proyecto Python completo, para trabajar con calma | Sus tests, que ejecutas tú |
-| **Simulacro** | Mismo formato, tamaño y rúbrica que el examen, contrarreloj | Sus tests, y la tabla de apartados |
-
----
-
-## 9. Proyecto de la unidad
-
-Toda la práctica de esta unidad se hace sobre un **proyecto base**: una jerarquía de clases con encapsulación y herencia. Está montado
-con la estructura real de un proyecto Python y trae una **batería de tests** que puedes
-ejecutar en cualquier momento para ver si va todo bien.
-
-**[Proyecto Flota de vehículos →](../proyectos/ud4/README.md)**
-
-```
-proyecto-ud4/
-├── src/      ← tu código (funciones con TODO)
-└── tests/    ← 13 tests que comprueban tu trabajo
+```mermaid
+flowchart LR
+    Ac["activos.json"] --> R["calcular riesgo"]
+    U["usuarios.json"] --> P["auditar contraseñas"]
+    R --> Inf["informe.txt"]
+    P --> Inf
 ```
 
-### Cómo se trabaja
+**Paso 1 — Riesgo por activo, validado.**
 
-```bash
-pip install -r requirements.txt
-pytest
+```python title="auditor.py"
+class RiesgoInvalidoError(ValueError):
+    pass
+
+def nivel_riesgo(impacto: int, probabilidad: int) -> str:
+    if not 1 <= impacto <= 5:
+        raise RiesgoInvalidoError(f"impacto fuera de [1,5]: {impacto}")
+    if not 1 <= probabilidad <= 5:
+        raise RiesgoInvalidoError(f"probabilidad fuera de [1,5]: {probabilidad}")
+    v = impacto * probabilidad
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
 ```
 
-La primera vez falla casi todo: aún no has escrito nada. A partir de ahí, lee una función,
-escríbela, vuelve a lanzar `pytest` y comprueba si ese test ya pasa. Terminas cuando está
-**todo en verde** y `mypy src` dice *Success*.
+**Paso 2 — Cargar activos desde JSON y priorizarlos.**
 
-!!! tip "De uno en uno"
-    `pytest -x` se detiene en el primer fallo. Arreglas esa función y sigues. Mucho más
-    llevadero que enfrentarse a todos los errores a la vez.
+```python title="auditor.py (continúa)"
+import json
+from pathlib import Path
 
-!!! warning "Los tests son la especificación"
-    No los modifiques para que pasen: describen exactamente lo que tu código debe hacer, y
-    el examen usará una batería equivalente.
+def cargar_activos(ruta: Path) -> list[dict]:
+    return json.loads(ruta.read_text(encoding="utf-8"))
 
-Detalles y comandos útiles en **[Proyectos](../proyectos/index.md)**.
+def priorizar(activos: list[dict]) -> list[dict]:
+    return sorted(activos, key=lambda a: a["impacto"] * a["probabilidad"], reverse=True)
+```
+
+**Paso 3 — Política de contraseñas y auditoría del lote.**
+
+```python title="auditor.py (continúa)"
+def cumple_politica(pwd: str) -> tuple[bool, list[str]]:
+    fallos = []
+    if len(pwd) < 12: fallos.append("menos de 12 caracteres")
+    if not any(c.isupper() for c in pwd): fallos.append("sin mayúscula")
+    if not any(c.isdigit() for c in pwd): fallos.append("sin dígito")
+    if all(c.isalnum() for c in pwd): fallos.append("sin símbolo")
+    return (not fallos, fallos)
+
+def auditar_usuarios(usuarios: dict[str, str]) -> dict[str, list[str]]:
+    return {u: cumple_politica(pwd)[1] for u, pwd in usuarios.items()}
+```
+
+**Paso 4 — Generar el informe.**
+
+```python title="auditor.py (continúa)"
+def generar_informe(activos: list[dict], usuarios: dict[str, str]) -> list[str]:
+    lineas = ["=== RIESGO DE ACTIVOS ==="]
+    for a in priorizar(activos):
+        nivel = nivel_riesgo(a["impacto"], a["probabilidad"])
+        lineas.append(f"[{nivel:6}] {a['nombre']}")
+    lineas.append("")
+    lineas.append("=== CONTRASEÑAS ===")
+    for usuario, fallos in auditar_usuarios(usuarios).items():
+        estado = "OK" if not fallos else ", ".join(fallos)
+        lineas.append(f"{usuario:12} {estado}")
+    return lineas
+```
+
+**Paso 5 — CLI con `argparse`.**
+
+```python title="auditor.py (continúa)"
+import argparse
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="auditor", description="Auditoría de riesgo y contraseñas")
+    ap.add_argument("activos", type=Path)
+    ap.add_argument("usuarios", type=Path)
+    args = ap.parse_args()
+    activos = cargar_activos(args.activos)
+    usuarios = json.loads(args.usuarios.read_text(encoding="utf-8"))
+    for linea in generar_informe(activos, usuarios):
+        print(linea)
+
+if __name__ == "__main__":
+    main()
+```
+
+**Paso 6 — Pruébalo con Docker, sin `sudo`.**
+
+```yaml title="docker-compose.yml"
+services:
+  demo:
+    image: python:3.12-alpine
+    volumes: ["./auditor.py:/auditor.py"]
+    working_dir: /app
+    command: >
+      sh -c "mkdir -p /app; cd /app;
+      echo '[{\"nombre\":\"Servidor BD\",\"impacto\":5,\"probabilidad\":4},{\"nombre\":\"Web pública\",\"impacto\":2,\"probabilidad\":2}]' > activos.json;
+      echo '{\"ana\":\"Caballo-Verde7!\",\"luis\":\"1234\"}' > usuarios.json;
+      python /auditor.py activos.json usuarios.json"
+```
+
+```bash title="Ejecutar"
+docker compose run --rm demo
+```
+
+```text title="Salida esperada"
+=== RIESGO DE ACTIVOS ===
+[ALTO  ] Servidor BD
+[BAJO  ] Web pública
+
+=== CONTRASEÑAS ===
+ana          OK
+luis         menos de 12 caracteres, sin mayúscula, sin símbolo
+```
+
+<details class="sol"><summary>📄 auditor.py completo</summary>
+
+```python
+import argparse, json
+from pathlib import Path
+
+class RiesgoInvalidoError(ValueError):
+    pass
+
+def nivel_riesgo(impacto: int, probabilidad: int) -> str:
+    if not 1 <= impacto <= 5:
+        raise RiesgoInvalidoError(f"impacto fuera de [1,5]: {impacto}")
+    if not 1 <= probabilidad <= 5:
+        raise RiesgoInvalidoError(f"probabilidad fuera de [1,5]: {probabilidad}")
+    v = impacto * probabilidad
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
+
+def cargar_activos(ruta: Path) -> list[dict]:
+    return json.loads(ruta.read_text(encoding="utf-8"))
+
+def priorizar(activos: list[dict]) -> list[dict]:
+    return sorted(activos, key=lambda a: a["impacto"] * a["probabilidad"], reverse=True)
+
+def cumple_politica(pwd: str) -> tuple[bool, list[str]]:
+    fallos = []
+    if len(pwd) < 12: fallos.append("menos de 12 caracteres")
+    if not any(c.isupper() for c in pwd): fallos.append("sin mayúscula")
+    if not any(c.isdigit() for c in pwd): fallos.append("sin dígito")
+    if all(c.isalnum() for c in pwd): fallos.append("sin símbolo")
+    return (not fallos, fallos)
+
+def auditar_usuarios(usuarios: dict[str, str]) -> dict[str, list[str]]:
+    return {u: cumple_politica(pwd)[1] for u, pwd in usuarios.items()}
+
+def generar_informe(activos: list[dict], usuarios: dict[str, str]) -> list[str]:
+    lineas = ["=== RIESGO DE ACTIVOS ==="]
+    for a in priorizar(activos):
+        lineas.append(f"[{nivel_riesgo(a['impacto'], a['probabilidad']):6}] {a['nombre']}")
+    lineas += ["", "=== CONTRASEÑAS ==="]
+    for usuario, fallos in auditar_usuarios(usuarios).items():
+        estado = "OK" if not fallos else ", ".join(fallos)
+        lineas.append(f"{usuario:12} {estado}")
+    return lineas
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="auditor", description="Auditoría de riesgo y contraseñas")
+    ap.add_argument("activos", type=Path)
+    ap.add_argument("usuarios", type=Path)
+    args = ap.parse_args()
+    activos = cargar_activos(args.activos)
+    usuarios = json.loads(args.usuarios.read_text(encoding="utf-8"))
+    for linea in generar_informe(activos, usuarios):
+        print(linea)
+
+if __name__ == "__main__":
+    main()
+```
+</details>
 
 ---
 
----
+## 9. Reto para ti (propuesto, sin solución)
 
-## 10. Simulacro de examen
+### 💰 Calculadora de ALE y salvaguardas rentables
 
-Cuando tengas el proyecto terminado, mídete: el **simulacro** es un examen de mentira con
-**el mismo formato, tamaño y rúbrica** que el de verdad — y con los tests publicados.
+Amplía tu auditor con la parte **cuantitativa**: dado un conjunto de activos con su ALE actual, y una lista de salvaguardas posibles (con su coste anual y el ALE residual que dejarían), decide **cuáles merece la pena implantar**.
 
-**[Simulacro RA4 · Catálogo de dispositivos →](../simulacros/ra4/README.md)** · 14 tests · 45–50 min
+```mermaid
+flowchart LR
+    A["activos + ALE actual"] --> S["salvaguardas<br/>candidatas"]
+    S --> C["calcular ahorro =<br/>ALE actual - ALE residual"]
+    C -->|ahorro > coste| Si["✅ recomendada"]
+    C -->|ahorro <= coste| No["❌ no rentable"]
+```
 
-Hazlo **contrarreloj y sin ayuda**, como si fuera el examen. Al terminar, aplica la rúbrica
-y tendrás una estimación bastante fiel de tu nota.
+**Objetivo.** CLI `python salvaguardas.py activos.json salvaguardas.json` que, para cada salvaguarda, calcule si **ahorro > coste_anual** y saque un informe ordenado por ahorro neto (`ahorro - coste`) de mayor a menor.
 
-!!! warning "El examen de verdad va sin tests"
-    Allí solo tendrás los **docstrings** y unos ejemplos. Por eso, en el simulacro, intenta
-    resolver cada función leyendo solo su docstring y mira el test únicamente cuando falle.
+**Requisitos**
 
----
+- Reutiliza `RiesgoInvalidoError` y el patrón de validación del reto resuelto.
+- Cada salvaguarda del JSON tiene: `nombre`, `activo` (a qué activo protege), `coste_anual`, `ale_residual`.
+- Valida que `ale_residual >= 0` y `coste_anual >= 0`; lanza tu excepción si no.
+- Código tipado, `mypy` limpio.
+- Demuéstralo con Docker.
 
----
+**Criterios de aceptación**
 
-## 11. Retos opcionales
+1. Una salvaguarda con `ahorro <= coste` aparece marcada como no rentable, no se omite del informe.
+2. El informe está ordenado por ahorro neto descendente.
+3. Si el `activo` de una salvaguarda no existe en la lista de activos, se informa el error sin tumbar el programa entero.
 
-- **R1.** Añade `Camion(Vehiculo)` con carga, usando `super()` en `__init__` y en `describir()`.
-- **R2.** Crea una lista de vehículos distintos y recórrela llamando a `describir()` en cada uno. Fíjate en que cada objeto responde a su manera: eso es **polimorfismo**.
-- **R3.** Investiga `@dataclass` y reescribe `Rectangulo` con él.
+**Pistas** (no solución): reutiliza `merece_la_pena` (ejercicio 13) como base · para "no tumbar el programa entero" ante un activo inexistente, captura la excepción **por salvaguarda** dentro del bucle, no alrededor de todo el programa.
 
-- **R4.** Modela una `Biblioteca` que guarde una lista de `Libro` y sepa buscar por autor.
-- **R5.** Añade a la jerarquía de figuras un método `describir()` en la base que use `area()`, y comprueba que cada derivada lo hereda dando su resultado correcto.
-- **R6.** Escribe una clase `Temperatura` con una *property* que permita leer el valor en Celsius y en Fahrenheit, calculando la segunda a partir de la primera.
----
+**Si te sobra tiempo:** añade una opción `--top N` que solo muestre las N salvaguardas más rentables · exporta el informe a CSV con el módulo `csv`.
 
----
-
-## 12. Autoevaluación rápida
-
-<details><summary>1. Diferencia entre clase y objeto.</summary>La clase es el molde; el objeto es un ejemplar creado con ese molde.</details>
-<details><summary>2. ¿Qué es <code>self</code>?</summary>El propio objeto. Python lo pasa solo como primer parámetro de cada método.</details>
-<details><summary>3. ¿Cuándo se ejecuta <code>__init__</code>?</summary>Automáticamente, al crear el objeto.</details>
-<details><summary>4. ¿Para qué sirve <code>super()</code>?</summary>Para llamar a un método de la clase base desde la derivada.</details>
-<details><summary>5. ¿Qué hace <code>__str__</code>?</summary>Define el texto que se muestra al imprimir el objeto.</details>
-<details><summary>6. ¿Qué aporta <code>property</code>?</summary>Validar al leer o asignar un atributo sin cambiar la forma de usarlo.</details>
+> Esto es justo el tipo de reto que resolverás en el **test práctico**.
 
 ---
 
----
+## Autoevaluación rápida (conceptos)
 
-## 13. Glosario
+<details><summary>1. ¿Qué es el ALE?</summary>La pérdida anual esperada: SLE × ARO.</details>
+<details><summary>2. ¿Cuándo conviene lanzar una excepción propia en vez de <code>ValueError</code>?</summary>Cuando quieres que quien use tu código pueda distinguir tu tipo de error de otros <code>ValueError</code> genéricos.</details>
+<details><summary>3. ¿Por qué <code>secrets</code> y no <code>random</code> para contraseñas?</summary><code>random</code> es predecible; <code>secrets</code> es criptográficamente seguro.</details>
+<details><summary>4. ¿Qué hace falta para que algo sea MFA de verdad?</summary>Al menos dos factores de <b>categorías distintas</b> (saber, tener, ser).</details>
+<details><summary>5. ¿Qué es bastionar un sistema?</summary>Reducir su superficie de ataque: cerrar puertos y servicios innecesarios.</details>
+
+## Glosario
 
 | Término | Definición |
 |---|---|
-| **Clase** | Molde que define atributos y métodos. |
-| **Objeto / instancia** | Ejemplar concreto de una clase. |
-| **Atributo** | Dato asociado a un objeto. |
-| **Método** | Función definida dentro de una clase. |
-| **`self`** | Referencia al propio objeto. |
-| **`__init__`** | Constructor: inicializa el objeto. |
-| **Encapsulación** | Controlar el acceso a los datos internos. |
-| **`property`** | Mecanismo para validar el acceso a un atributo. |
-| **Herencia** | Crear una clase a partir de otra. |
-| **Sobrescribir** | Redefinir en la hija un método de la madre. |
+| **SLE / ARO / ALE** | Pérdida por incidente / frecuencia anual / pérdida anual esperada. |
+| **Bastionado** | Reducir la superficie de ataque de un sistema. |
+| **Excepción propia** | Clase que hereda de una excepción existente para errores específicos del dominio. |
+| **`secrets`** | Módulo de Python para aleatoriedad criptográficamente segura. |
+| **Entropía (contraseñas)** | Medida en bits de lo difícil que es adivinar una contraseña. |
+| **MFA** | Autenticación con al menos dos factores de categorías distintas. |
+
+## Cómo se evalúa esta unidad (RA4)
+
+El instrumento principal es un **test práctico**: resuelves en Python un reto parecido al de esta unidad y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún ejercicio práctico).
+
+!!! reto "La nota, sin sorpresas"
+    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5.
+
+El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, **validar** con `try`/`raise`), pasar `mypy` y documentar el código.
 
 ---
 
----
+## Simulacro de examen tipo test
 
-## 14. Cómo se evalúa esta unidad (RA4)
+> 15 preguntas de opción múltiple. Cada una trae su propio código.
 
-El examen es **100 % práctico**: se entrega un proyecto con las funciones vacías y una
-especificación, y hay que escribir el código.
+**1.** ¿Qué imprime este código?
 
-**La nota sale solo de los casos de prueba.** No hay puntos por presentación ni por
-esfuerzo: cada apartado del examen vale en proporción a los casos que tiene, de modo que
-**todos los casos valen lo mismo**.
+```python
+def nivel_riesgo(impacto: int, probabilidad: int) -> str:
+    v = impacto * probabilidad
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
 
-`nota del apartado = (casos superados ÷ casos del apartado) × puntos del apartado`
+print(nivel_riesgo(3, 3))
+print(nivel_riesgo(5, 1))
+```
 
-`nota del examen = suma de los apartados`
+A) `ALTO` y `ALTO`
+B) `MEDIO` y `BAJO`
+C) `BAJO` y `MEDIO`
+D) `MEDIO` y `MEDIO`
 
-### Así es el examen
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>3×3=9</code> cae en <code>[7,15)</code> → <code>MEDIO</code>. <code>5×1=5</code> cae por debajo de 7 → <code>BAJO</code>.</details>
 
-**Jerarquía de empleados** · entrega `src/empleados.py` · **50 min**
+**2.** ¿Qué imprime este código?
 
-| # | Apartado | Casos | Puntos |
-|:---:|---|:---:|:---:|
-| **A** | Clase base y descripción | 4 | **3,64** |
-| **B** | Herencia | 4 | **3,64** |
-| **C** | Validación con `property` | 3 | **2,72** |
-| | **TOTAL** | **11** | **10,00** |
+```python
+def calcular_ale(valor: float, exposicion: float, aro: float) -> float:
+    return round(valor * exposicion * aro, 2)
 
-Esta tabla viene en el enunciado, así que sabes desde el primer minuto **qué vale cada
-parte** y por dónde empezar si vas justo de tiempo.
+print(calcular_ale(valor=50000, exposicion=0.4, aro=0.25))
+```
 
-!!! warning "El examen se reparte sin tests"
-    La carpeta `tests/` viene vacía. La especificación son los **docstrings** de cada
-    función y los ejemplos del enunciado. Por eso conviene que en el simulacro te
-    acostumbres a resolver leyendo el docstring y no el test.
+A) `5000.0`
+B) `50000.0`
+C) `20000.0`
+D) `2000.0`
 
-### Así se corrige
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>50000 × 0.4 × 0.25 = 5000.0</code>.</details>
 
-Alguien que entrega el examen con **9 de los 11 casos** superados
-—se le ha escapado el apartado **B**, donde falla 2 de
-4 casos—:
+**3.** ¿Qué ocurre al ejecutar este código?
 
-| # | Apartado | Casos superados | Puntos |
-|:---:|---|:---:|---|
-| A | Clase base y descripción | 4 / 4 | 3,64 / 3,64 |
-| B | Herencia | 2 / 4 | 1,82 / 3,64  ← |
-| C | Validación con `property` | 3 / 3 | 2,72 / 2,72 |
-| | | | **NOTA: 8,18** |
+```python
+def calcular_ale(valor: float, exposicion: float, aro: float) -> float:
+    if not 0 <= exposicion <= 1:
+        raise ValueError(f"factor fuera de rango: {exposicion}")
+    return round(valor * exposicion * aro, 2)
 
-La corrección es automática: se monta un proyecto con la batería completa más el fichero
-entregado, se ejecuta y se reparte la nota con esa cuenta. **Nadie interpreta nada.**
+print(calcular_ale(1000, 2.0, 1))
+```
 
-Además recibes un informe con los casos concretos que han fallado, con el valor que
-esperaba y el que devolvió tu función.
+A) Imprime `2000.0` sin problema
+B) Lanza `ValueError`, porque `exposicion=2.0` está fuera de `[0,1]`
+C) Imprime `1000.0`, ignorando el valor inválido
+D) Lanza `TypeError`
 
-!!! note "Los tres requisitos de la entrega"
-    No puntúan por separado, pero forman parte de la especificación:
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Un factor de exposición representa un porcentaje (0-100%), así que debe estar entre 0 y 1; la función lo valida explícitamente antes de calcular.</details>
 
-    1. Entregar **el fichero de `src/`**, con ese nombre.
-    2. `mypy src` sin errores.
-    3. Cada función con su **docstring**.
+**4.** ¿Qué imprime este código?
 
-    Un fichero que no compila o que no se puede importar da **0 casos superados**, así que
-    en la práctica valen mucho más que unos puntos.
+```python
+class RiesgoInvalidoError(ValueError):
+    pass
+
+def valida_probabilidad(p: float) -> float:
+    if not 0 <= p <= 1:
+        raise RiesgoInvalidoError(f"fuera de rango: {p}")
+    return p
+
+try:
+    valida_probabilidad(-0.1)
+except ValueError as e:
+    print("capturado como ValueError:", e)
+```
+
+A) No imprime nada, porque `ValueError` no captura `RiesgoInvalidoError`
+B) `capturado como ValueError: fuera de rango: -0.1`
+C) Lanza `RiesgoInvalidoError` sin capturarla, el programa se detiene
+D) Imprime `-0.1` sin más
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>RiesgoInvalidoError</code> hereda de <code>ValueError</code>, así que un <code>except ValueError:</code> también la captura — un <code>RiesgoInvalidoError</code> <b>es</b> un <code>ValueError</code>.</details>
+
+**5.** ¿Qué imprime este código?
+
+```python
+def procesa(valor: int):
+    try:
+        if valor < 0:
+            raise ValueError("negativo")
+        return valor * 2
+    except ValueError as e:
+        return f"error: {e}"
+
+print(procesa(5))
+print(procesa(-3))
+```
+
+A) `10` y `error: negativo`
+B) `10` y `-6`
+C) `error: negativo` y `10`
+D) El programa se detiene en la segunda llamada
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>procesa(5)</code> no entra en el <code>if</code>, devuelve <code>5*2=10</code>. <code>procesa(-3)</code> lanza la excepción dentro del <code>try</code>, que el propio <code>except</code> captura y convierte en un mensaje.</details>
+
+**6.** ¿Qué imprime este código?
+
+```python
+def cumple_politica(pwd: str) -> tuple[bool, list[str]]:
+    fallos = []
+    if len(pwd) < 12: fallos.append("corta")
+    if not any(c.isupper() for c in pwd): fallos.append("sin mayuscula")
+    if not any(c.isdigit() for c in pwd): fallos.append("sin digito")
+    if all(c.isalnum() for c in pwd): fallos.append("sin simbolo")
+    return (not fallos, fallos)
+
+print(cumple_politica("Elefante99"))
+```
+
+A) `(True, [])`
+B) `(False, ['corta'])`
+C) `(False, ['corta', 'sin simbolo'])`
+D) `(False, ['sin mayuscula', 'sin digito'])`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> <code>"Elefante99"</code> tiene 10 caracteres (menos de 12 → corta), tiene mayúscula y dígito, pero ningún símbolo (todos los caracteres son alfanuméricos).</details>
+
+**7.** ¿Qué imprime este código?
+
+```python
+import math
+
+def entropia(pwd: str) -> float:
+    alf = 0
+    if any(c.islower() for c in pwd): alf += 26
+    if any(c.isupper() for c in pwd): alf += 26
+    if any(c.isdigit() for c in pwd): alf += 10
+    if any(not c.isalnum() for c in pwd): alf += 32
+    return round(len(pwd) * math.log2(alf), 1) if alf else 0.0
+
+e1 = entropia("password")
+e2 = entropia("P4ss#w0rd")
+print(e1 < e2)
+```
+
+A) `True`
+B) `False`
+C) `e1 == e2` siempre, porque tienen longitud parecida
+D) Lanza `ValueError` con `math.log2`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>"password"</code> solo usa minúsculas (alfabeto de 26); <code>"P4ss#w0rd"</code> combina mayúscula, minúscula, dígito y símbolo (alfabeto mucho más amplio) — más variedad da más bits de entropía.</details>
+
+**8.** ¿Qué imprime este código?
+
+```python
+def es_mfa(factores: list[str]) -> bool:
+    cat = set()
+    for f in factores:
+        if f in ("contrasena", "pin"): cat.add("saber")
+        elif f in ("movil", "token", "tarjeta"): cat.add("tener")
+        elif f in ("huella", "cara"): cat.add("ser")
+    return len(cat) >= 2
+
+print(es_mfa(["huella", "token", "movil"]))
+```
+
+A) `True`
+B) `False`
+C) Lanza `KeyError`
+D) `3`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>"huella"</code> aporta la categoría "ser"; <code>"token"</code> y <code>"movil"</code> aportan ambos "tener" (categoría repetida, no cuenta dos veces). En total hay 2 categorías distintas → <code>True</code>.</details>
+
+**9.** ¿Qué ocurre al ejecutar este código?
+
+```python
+def riesgo_medio(valores: list[float]) -> float:
+    if not valores:
+        raise ValueError("lista vacía")
+    return round(sum(valores) / len(valores), 2)
+
+print(riesgo_medio([]))
+```
+
+A) Imprime `0.0`
+B) Imprime `None`
+C) Lanza `ValueError`, sin llegar a dividir
+D) Lanza `ZeroDivisionError`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La función comprueba <code>if not valores:</code> <b>antes</b> de dividir, así que nunca llega a un <code>ZeroDivisionError</code> — falla con un mensaje claro en su lugar.</details>
+
+**10.** ¿Qué imprime este código?
+
+```python
+def prioriza(activos: list[dict]) -> list[dict]:
+    return sorted(activos, key=lambda a: a["impacto"] * a["probabilidad"], reverse=True)
+
+activos = [{"nombre": "A", "impacto": 2, "probabilidad": 2}, {"nombre": "B", "impacto": 5, "probabilidad": 4}]
+print([a["nombre"] for a in prioriza(activos)])
+```
+
+A) `['A', 'B']`
+B) `['B', 'A']`
+C) `['A']`
+D) Lanza `TypeError`, no se puede ordenar por dos campos
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El riesgo de <code>A</code> es <code>2×2=4</code>; el de <code>B</code> es <code>5×4=20</code>. Con <code>reverse=True</code>, el de mayor riesgo va primero.</details>
+
+**11.** ¿Qué imprime este código?
+
+```python
+def merece_la_pena(ale_actual: float, ale_residual: float, coste_anual: float) -> bool:
+    ahorro = ale_actual - ale_residual
+    return ahorro > coste_anual
+
+print(merece_la_pena(ale_actual=20000, ale_residual=5000, coste_anual=10000))
+```
+
+A) `True`
+B) `False`
+C) `15000`
+D) Lanza una excepción, faltan validar los valores
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El ahorro es <code>20000-5000=15000</code>, que supera el coste de <code>10000</code> — la salvaguarda compensa.</details>
+
+**12.** ¿Qué imprime este código?
+
+```python
+class ActivoInvalidoError(ValueError):
+    pass
+
+def valida_activo(nombre: str, valor: float, prob: float) -> None:
+    if not nombre.strip():
+        raise ActivoInvalidoError("sin nombre")
+    if valor < 0:
+        raise ActivoInvalidoError("valor negativo")
+    if not 0 <= prob <= 1:
+        raise ActivoInvalidoError("prob fuera de rango")
+
+try:
+    valida_activo("", -50, 2.0)
+except ActivoInvalidoError as e:
+    print(e)
+```
+
+A) `sin nombre`
+B) `valor negativo`
+C) `prob fuera de rango`
+D) Imprime los tres errores, uno por línea
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Aunque los tres campos son inválidos, la función comprueba en orden y <code>raise</code> detiene la ejecución en el <b>primer</b> fallo encontrado — nunca llega a comprobar <code>valor</code> ni <code>prob</code>.</details>
+
+**13.** ¿Qué imprime este código?
+
+```python
+def cumple_politica(pwd: str) -> tuple[bool, list[str]]:
+    fallos = []
+    if len(pwd) < 12: fallos.append("corta")
+    if not any(c.isupper() for c in pwd): fallos.append("sin mayuscula")
+    if not any(c.isdigit() for c in pwd): fallos.append("sin digito")
+    if all(c.isalnum() for c in pwd): fallos.append("sin simbolo")
+    return (not fallos, fallos)
+
+def audita(usuarios: dict[str, str]) -> dict[str, list[str]]:
+    return {u: cumple_politica(pwd)[1] for u, pwd in usuarios.items()}
+
+print(audita({"ana": "Elefante99", "bob": "1234"}))
+```
+
+A) `{'ana': [], 'bob': []}`
+B) `{'ana': ['corta', 'sin simbolo'], 'bob': ['corta', 'sin mayuscula', 'sin simbolo']}`
+C) `{'ana': True, 'bob': False}`
+D) Lanza `KeyError`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>audita</code> se queda solo con la lista de fallos (segundo elemento de la tupla) de cada usuario, sin el booleano.</details>
+
+**14.** *(Sobre el reto de la unidad)* ¿Qué ocurre al ejecutar este código?
+
+```python
+class RiesgoInvalidoError(ValueError):
+    pass
+
+def nivel_riesgo(impacto: int, probabilidad: int) -> str:
+    if not 1 <= impacto <= 5:
+        raise RiesgoInvalidoError(f"impacto fuera de [1,5]: {impacto}")
+    if not 1 <= probabilidad <= 5:
+        raise RiesgoInvalidoError(f"probabilidad fuera de [1,5]: {probabilidad}")
+    v = impacto * probabilidad
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
+
+print(nivel_riesgo(impacto=8, probabilidad=3))
+```
+
+A) Imprime `"ALTO"`, porque `8×3=24` es un riesgo alto
+B) Lanza `RiesgoInvalidoError`, porque `impacto=8` está fuera del rango `[1,5]`
+C) Imprime `"MEDIO"`
+D) Trunca el impacto a 5 automáticamente
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> A diferencia de la versión sin validar, esta comprueba primero que <code>impacto</code> esté en la escala <code>[1,5]</code> y rechaza el dato sin sentido antes de calcular nada.</details>
+
+**15.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+def nivel_riesgo(impacto: int, probabilidad: int) -> str:
+    v = impacto * probabilidad
+    return "ALTO" if v >= 15 else "MEDIO" if v >= 7 else "BAJO"
+
+def prioriza(activos: list[dict]) -> list[dict]:
+    return sorted(activos, key=lambda a: a["impacto"] * a["probabilidad"], reverse=True)
+
+def generar_informe(activos: list[dict]) -> list[str]:
+    return [f"[{nivel_riesgo(a['impacto'], a['probabilidad'])}] {a['nombre']}" for a in prioriza(activos)]
+
+activos = [{"nombre": "Web", "impacto": 2, "probabilidad": 2}, {"nombre": "BD", "impacto": 5, "probabilidad": 4}]
+print(generar_informe(activos))
+```
+
+A) `['[BAJO] Web', '[ALTO] BD']`
+B) `['[ALTO] BD', '[BAJO] Web']`
+C) `['[ALTO] Web', '[BAJO] BD']`
+D) `['[MEDIO] BD', '[MEDIO] Web']`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>prioriza</code> ordena primero por riesgo descendente (BD con 20 antes que Web con 4), y luego cada línea muestra su nivel: BD es ALTO (20≥15), Web es BAJO (4&lt;7).</details>

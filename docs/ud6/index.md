@@ -1,1172 +1,991 @@
-# Unidad 6 · Bases de datos relacionales
+# Unidad 6 · Normativa y protección de datos
 
-> **Módulo:** CMO-313 · Fundamentos de programación
-> **Resultado de aprendizaje:** RA6 · **Duración:** 8 h · **Peso:** 10 %
-> **Lenguaje:** Python 3 (tipado) + SQLite
+> **Módulo:** CMO-314 · Ciberseguridad · **RA6** · **Duración:** 8 h · **Peso:** 10 % · **Herramienta:** Python 3 (tipado) + `hashlib` / `re`
 
-En la UD5 guardaste datos en ficheros. Funciona para poca información, pero cuando hay miles de registros y hace falta buscarlos, ordenarlos o modificarlos, el fichero se queda corto. La solución es una **base de datos**.
+La técnica ya la dominas: hash (UT1) y expresiones regulares (UT2). Esta última unidad las reutiliza para un problema distinto: **la seguridad técnica no basta si no cumple la ley**. El RGPD, la LSSI-CE y normativas como el ENS o NIS2 marcan qué puedes hacer con datos personales y cómo debes protegerlos. Vas a construir una herramienta que evalúa si un tratamiento de datos cumple, y que **anonimiza** información sensible — la misma técnica que usan las empresas para trabajar con datos reales sin exponer identidades.
 
-Es el segundo RA de más peso (20 %) y la puerta de entrada a los módulos de bases de datos del ciclo.
+!!! reto "El reto de la unidad"
+    **Comprueba si un tratamiento de datos cumple el RGPD, y anonimiza lo que no debería ser identificable.** Todo lo de abajo es tu entrenamiento.
 
----
+```mermaid
+flowchart TB
+    A["RGPD: principios<br/>y bases de licitud"] --> B["LSSI-CE, ENS, NIS2"]
+    A --> C["Seudonimización<br/>con hashlib"]
+    C --> D["Anonimización<br/>con re"]
+    B --> P["RETO<br/>Verificador de cumplimiento"]
+    D --> P
+    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
+```
 
-## Mapa de la unidad
+**Qué sabrás hacer al terminar:** explicar los principios del RGPD y sus bases de licitud · diferenciar seudonimización de anonimización · seudonimizar un identificador con `hashlib` de forma estable e irreversible · anonimizar texto libre con `re` (DNI, emails) · situar la LSSI-CE, el ENS y NIS2 · construir un verificador de cumplimiento y anonimizador, tipado y probado.
 
-<figure markdown>
-  ![Mapa de la unidad 6](../assets/diagramas/ud6-mapa.svg#only-light)
-  ![Mapa de la unidad 6](../assets/diagramas/ud6-mapa-dark.svg#only-dark)
-  <figcaption>Tu programa habla con la base de datos mediante sqlite3 y sentencias SQL.</figcaption>
-</figure>
-
-### Qué vas a saber hacer al terminar
-
-- [ ] Explicar qué aporta una base de datos frente a un fichero.
-- [ ] Conectarte a **SQLite** desde Python con `sqlite3`.
-- [ ] Crear tablas con `CREATE TABLE`.
-- [ ] Hacer las cuatro operaciones **CRUD**: insertar, consultar, modificar y borrar.
-- [ ] Usar **consultas parametrizadas** y entender por qué son obligatorias.
-- [ ] Filtrar y ordenar con `WHERE` y `ORDER BY`.
-- [ ] Confirmar cambios con `commit()` y cerrar bien la conexión.
+**Cómo se trabaja (aula invertida):** lees la sección y ejecutas los ejemplos antes de clase → en clase resuelves las actividades y avanzas el reto en parejas.
 
 ---
 
-!!! tip "Cómo se trabaja esta unidad"
-    Cada sección de teoría termina con **Practica lo de esta sección**: tres o cuatro
-    ejercicios cortos con la solución desplegable, que solo usan lo que acabas de leer.
+## 1. RGPD: principios y bases de licitud
 
-    **Hazlos en el momento, antes de seguir.** Ese es el trato: la teoría la lees tú
-    —en casa o en clase— y el tiempo de aula se dedica a resolver dudas y a lo que de
-    verdad cuesta. Si llegas a la siguiente sección sin haber tocado el teclado, la
-    unidad se te va a hacer cuesta arriba.
+El **RGPD** (Reglamento General de Protección de Datos) regula cómo se tratan datos personales en la UE. Se apoya en principios y en la exigencia de que **todo** tratamiento tenga una base legal.
 
-    Después vienen las **actividades guiadas**, el **proyecto** de la unidad y el
-    **simulacro** de examen. En ese orden.
-
----
-
-## 1. Por qué una base de datos
-
-Con un CSV de 50 000 productos, buscar uno obliga a leer el fichero entero; y si dos personas escriben a la vez, los datos se corrompen.
-
-Un **SGBD** (Sistema Gestor de Bases de Datos) resuelve eso:
-
-| Ventaja | Qué significa |
+| Principio | Qué exige |
 |---|---|
-| **Búsquedas rápidas** | encuentra un registro entre millones sin leerlo todo |
-| **Integridad** | impide datos inválidos o duplicados |
-| **Concurrencia** | varios programas a la vez sin corromper nada |
-| **Consultas potentes** | filtrar, ordenar y agrupar con una sola instrucción |
+| **Licitud, lealtad y transparencia** | Tratar datos con base legal, informando claramente |
+| **Limitación de la finalidad** | Solo para el fin declarado, no para cualquier otro |
+| **Minimización de datos** | Recoger solo lo estrictamente necesario |
+| **Exactitud** | Mantener los datos correctos y actualizados |
+| **Limitación del plazo** | No conservar más tiempo del necesario |
+| **Integridad y confidencialidad** | Protegerlos técnicamente (aquí entra todo lo que ya sabes) |
 
-En una base de datos **relacional**, los datos se organizan en **tablas**: cada fila es un registro y cada columna un campo.
+**Seis bases de licitud** — un tratamiento necesita **al menos una**:
 
-**Usaremos SQLite**: viene incluido en Python, guarda todo en un único fichero `.db` y no necesita instalar ningún servidor. Es el mismo motor que llevan dentro tu móvil y tu navegador.
+```python title="base_licitud.py"
+BASES_VALIDAS = {
+    "consentimiento", "contrato", "obligacion_legal",
+    "interes_vital", "interes_publico", "interes_legitimo",
+}
+
+def base_valida(base: str) -> bool:
+    return base.strip().lower() in BASES_VALIDAS
+
+print(base_valida("Consentimiento"))
+print(base_valida("porque_nos_apetece"))
+```
+
+```text title="Salida"
+True
+False
+```
+
+!!! reto "Reto rápido 1"
+    Una tienda online guarda el email para enviarte la factura de tu compra (necesario para el contrato) **y también** para mandarte publicidad sin que lo hayas pedido. ¿Necesita la misma base de licitud para ambos usos? ¿Cuál falta para el segundo?
 
 ---
 
-> **Reto rápido 1.** Escribe en SQL, sin ejecutarlo, la consulta que devuelve el nombre de los productos que cuestan más de 20 €. *(Solución: `SELECT nombre FROM productos WHERE precio > 20;`)*
+## 2. Seudonimización con `hashlib`
 
-## 2. Conectarse desde Python
+**Seudonimizar** sustituye un identificador (DNI, email) por otro valor que no permite identificar a la persona **sin información adicional** — pero sigue siendo la misma técnica de hash que aprendiste en la UT1.
 
-```python
-import sqlite3
+```python title="seudonimo.py"
+import hashlib
 
-conexion = sqlite3.connect("inventario.db")   # crea el fichero si no existe
-cursor = conexion.cursor()                    # el que ejecuta las sentencias
+def seudonimo(dni: str, sal: str = "cmo314") -> str:
+    """Determinista: el mismo DNI siempre da el mismo seudónimo (permite análisis
+    estadístico sin exponer la identidad). Irreversible: no se puede volver al DNI."""
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
 
-# ... operaciones ...
-
-conexion.commit()                             # confirma los cambios
-conexion.close()                              # cierra
+a = seudonimo("12345678Z")
+b = seudonimo("12345678Z")
+print(a)
+print(a == b)     # mismo DNI -> mismo seudónimo, siempre
 ```
 
-| Pieza | Para qué sirve |
-|---|---|
-| `connect()` | abre (o crea) la base de datos |
-| `cursor()` | objeto con el que se ejecutan las sentencias SQL |
-| `commit()` | **confirma** los cambios: sin esto no se guardan |
-| `close()` | cierra la conexión |
-
-!!! danger "Sin `commit()` no se guarda nada"
-    Es el error más frecuente de esta unidad: el programa parece funcionar, no da ningún error… y al volver a abrir la base de datos está vacía. **Después de insertar, modificar o borrar, hay que llamar a `commit()`.**
-
-### 2.1 Mejor con `with`
-
-Igual que con los ficheros, `with` se encarga del cierre:
-
-```python
-import sqlite3
-
-with sqlite3.connect("inventario.db") as conexion:
-    cursor = conexion.cursor()
-    cursor.execute("INSERT INTO productos (nombre, precio) VALUES (?, ?)",
-                   ("Camisa", 19.99))
-    # el commit lo hace with al salir sin errores
+```text title="Salida"
+1026effd234a
+True
 ```
 
-> **Reto rápido 1.** ¿Qué pasa si ejecutas un `INSERT` y cierras el programa sin `commit()`? *(No se guarda nada.)*
+!!! analogia "Analogía"
+    Es exactamente el mismo principio que el hash de un fichero en la UT1: **determinista** (mismo DNI, mismo resultado) y **unidireccional** (no puedes recuperar el DNI desde el seudónimo). La diferencia es el propósito: allí verificabas integridad, aquí ocultas identidad conservando la posibilidad de agrupar registros del mismo individuo.
 
-## 3. Crear la tabla
+### 2.1 Seudonimización ≠ anonimización
 
-```python
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS productos (
-        id     INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT NOT NULL,
-        precio REAL NOT NULL,
-        stock  INTEGER NOT NULL DEFAULT 0
-    )
-""")
-```
+| | **Seudonimización** | **Anonimización** |
+|---|---|---|
+| ¿Reversible? | No directamente, pero **con la sal/clave** podrías re-identificar en teoría | No, de ningún modo |
+| ¿Sigue siendo dato personal (RGPD)? | **Sí** — sigue protegido por el reglamento | No, queda fuera del RGPD |
+| Para qué sirve | Análisis que necesita agrupar por persona sin ver quién es | Publicar o compartir datos sin ningún riesgo de identificación |
 
-| Elemento | Qué significa |
-|---|---|
-| `IF NOT EXISTS` | no falla si la tabla ya existe (imprescindible) |
-| `INTEGER PRIMARY KEY AUTOINCREMENT` | identificador único que se genera solo |
-| `NOT NULL` | el campo es obligatorio |
-| `DEFAULT 0` | valor por defecto si no se indica |
-
-Tipos de SQLite: `INTEGER`, `REAL` (decimales), `TEXT` y `BLOB`.
+!!! warning "Atención"
+    Si reutilizas la **misma sal** para seudonimizar el mismo DNI en dos sistemas distintos, alguien que cruce ambos podría re-identificar a la persona por coincidencia de seudónimos. La sal debe protegerse como un secreto, igual que en la UT1.
 
 ---
 
-> **Reto rápido 3.** Escribe el `CREATE TABLE` de una tabla `clientes` con id autonumérico, nombre obligatorio y email.
+## 3. Anonimización de texto libre con `re`
 
-## 4. CRUD: las cuatro operaciones
+A diferencia de un campo estructurado (un DNI en su propia columna), un texto libre —un ticket de soporte, un email— puede contener datos personales **mezclados** con el resto. Aquí reutilizas `re` de la UT2.
 
-**CRUD** = *Create, Read, Update, Delete*. Con esas cuatro se hace todo.
+```python title="enmascarar_email.py"
+def enmascarar_email(email: str) -> str:
+    usuario, _, dominio = email.partition("@")
+    if len(usuario) <= 2:
+        return usuario[0] + "*@" + dominio
+    return usuario[0] + "*" * (len(usuario) - 2) + usuario[-1] + "@" + dominio
 
-### 4.1 Create — `INSERT`
-
-```python
-cursor.execute(
-    "INSERT INTO productos (nombre, precio, stock) VALUES (?, ?, ?)",
-    ("Camisa", 19.99, 10)
-)
-conexion.commit()
+print(enmascarar_email("ana.perez@iesx.es"))
 ```
 
-Varios de golpe:
-
-```python
-productos = [("Gorra", 8.0, 25), ("Pantalón", 34.5, 7)]
-cursor.executemany(
-    "INSERT INTO productos (nombre, precio, stock) VALUES (?, ?, ?)",
-    productos
-)
-conexion.commit()
+```text title="Salida"
+a*******z@iesx.es
 ```
 
-### 4.2 Read — `SELECT`
+### 3.1 Anonimizar un texto completo
 
-```python
-cursor.execute("SELECT id, nombre, precio FROM productos")
+```python title="anonimizar_texto.py"
+import re
 
-filas = cursor.fetchall()        # todas, como lista de tuplas
-for id_, nombre, precio in filas:
-    print(f"{id_:>3} {nombre:<12} {precio:>8.2f} €")
+PATRON_DNI = re.compile(r"\b\d{8}[A-Za-z]\b")
+PATRON_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+
+def anonimizar_texto(texto: str) -> str:
+    texto = PATRON_DNI.sub("[DNI]", texto)
+    texto = PATRON_EMAIL.sub("[EMAIL]", texto)
+    return texto
+
+ticket = "El usuario con DNI 12345678Z (contacto: ana.perez@iesx.es) reporta un fallo de login."
+print(anonimizar_texto(ticket))
 ```
 
-| Método | Devuelve |
-|---|---|
-| `fetchall()` | todas las filas (lista de tuplas) |
-| `fetchone()` | la siguiente fila, o `None` si no hay |
-| `fetchmany(n)` | como mucho `n` filas |
-
-### 4.3 Update — `UPDATE`
-
-```python
-cursor.execute("UPDATE productos SET precio = ? WHERE id = ?", (24.99, 1))
-conexion.commit()
+```text title="Salida"
+El usuario con DNI [DNI] (contacto: [EMAIL]) reporta un fallo de login.
 ```
 
-!!! danger "`UPDATE` sin `WHERE` cambia TODAS las filas"
-    `UPDATE productos SET precio = 0` pone a cero el precio de todo el inventario. Igual con `DELETE FROM productos`, que lo borra entero. **El `WHERE` no es opcional en la práctica.**
-
-### 4.4 Delete — `DELETE`
-
-```python
-cursor.execute("DELETE FROM productos WHERE id = ?", (3,))
-conexion.commit()
-```
-
-> Ojo a la coma en `(3,)`: sin ella no es una tupla, y `execute` la necesita.
+!!! reto "Reto rápido 2"
+    Un ticket de soporte también podría contener un **teléfono** (`\b\d{9}\b` en España, simplificando). Añade un tercer patrón a `anonimizar_texto` para sustituirlo por `[TEL]`.
 
 ---
 
-> **Reto rápido 4.** ¿Qué pasa si ejecutas `DELETE FROM clientes` sin `WHERE`? *(Solución: borra **todas** las filas, y no hay deshacer.)*
+## 4. Plazos de conservación y validación
 
-## 5. Consultas parametrizadas (obligatorio)
+El principio de "limitación del plazo" exige que los datos no se guarden indefinidamente. En código, esto es **validar** un número, exactamente como en la UT4.
 
-Fíjate en que **nunca** hemos metido los valores dentro del texto SQL. Siempre `?` y una tupla aparte. Esta es la razón:
+```python title="plazo_conservacion.py"
+def plazo_ok(meses: int) -> bool:
+    """Un plazo de conservación razonable: entre 1 y 60 meses (5 años)."""
+    if meses < 0:
+        raise ValueError(f"el plazo no puede ser negativo: {meses}")
+    return 1 <= meses <= 60
 
-```python
-nombre = input("Buscar: ")
-
-# ✗ MAL: concatenando
-cursor.execute("SELECT * FROM productos WHERE nombre = '" + nombre + "'")
-
-# ✓ BIEN: parametrizada
-cursor.execute("SELECT * FROM productos WHERE nombre = ?", (nombre,))
+print(plazo_ok(12))     # un año, razonable
+print(plazo_ok(120))    # 10 años, fuera del rango típico sin justificación
+try:
+    plazo_ok(-5)
+except ValueError as e:
+    print("Rechazado:", e)
 ```
 
-Con la primera forma, si el usuario escribe `'; DROP TABLE productos; --` la base de datos **ejecuta ese comando** y se pierde la tabla. Es la **inyección SQL**, una de las vulnerabilidades más explotadas de la historia.
-
-!!! success "La regla, sin excepciones"
-    Los datos van **siempre** con `?` y una tupla. Nunca se concatenan ni se interpolan en la cadena SQL. En el examen esto se comprueba.
-
-> **Reto rápido 2.** Reescribe de forma segura: `cursor.execute(f"SELECT * FROM productos WHERE precio > {p}")`.
-> *(Solución: `cursor.execute("SELECT * FROM productos WHERE precio > ?", (p,))`.)*
-
-## 6. Filtrar y ordenar
-
-```python
-# filtrar
-cursor.execute("SELECT nombre FROM productos WHERE precio > ?", (20,))
-
-# ordenar
-cursor.execute("SELECT nombre, precio FROM productos ORDER BY precio DESC")
-
-# combinar y limitar
-cursor.execute("""
-    SELECT nombre, precio FROM productos
-    WHERE stock > ?
-    ORDER BY precio ASC
-    LIMIT 5
-""", (0,))
-```
-
-| Cláusula | Qué hace |
-|---|---|
-| `WHERE` | filtra las filas |
-| `ORDER BY campo ASC / DESC` | ordena ascendente / descendente |
-| `LIMIT n` | como mucho n resultados |
-| `LIKE '%algo%'` | búsqueda por texto parcial |
-
-Búsqueda parcial parametrizada:
-
-```python
-texto = "cam"
-cursor.execute("SELECT nombre FROM productos WHERE nombre LIKE ?", (f"%{texto}%",))
-```
-
-Funciones de agregado:
-
-```python
-cursor.execute("SELECT COUNT(*), AVG(precio), MAX(precio) FROM productos")
-total, media, maximo = cursor.fetchone()
+```text title="Salida"
+True
+False
+Rechazado: el plazo no puede ser negativo: -5
 ```
 
 ---
 
-> **Reto rápido 6.** Añade a un `SELECT` la cláusula que ordena de mayor a menor por precio. *(Solución: `ORDER BY precio DESC`.)*
+## 5. LSSI-CE, ENS y NIS2: el resto del mapa normativo
 
-## 7. Estructura de una aplicación con BD
+| Normativa | Ámbito |
+|---|---|
+| **RGPD** | Protección de datos personales (toda la UE) |
+| **LSSI-CE** | Comercio electrónico y comunicaciones comerciales por vía electrónica en España |
+| **ENS** (Esquema Nacional de Seguridad) | Seguridad de sistemas del sector público español |
+| **ISO/IEC 27000** | Familia de normas internacionales de gestión de la seguridad de la información |
+| **NIS2** | Ciberseguridad de infraestructuras y servicios esenciales/importantes en la UE |
 
-Conviene separar el acceso a datos de la interfaz:
+```mermaid
+flowchart LR
+    RGPD["RGPD<br/>datos personales"] --- LSSI["LSSI-CE<br/>comercio electrónico"]
+    ENS["ENS<br/>sector público ES"] --- ISO["ISO 27000<br/>gestión SI"]
+    NIS2["NIS2<br/>infraestructuras críticas"]
+```
+
+!!! reto "Reto rápido 3"
+    Una empresa española envía comunicaciones comerciales por email sin que el destinatario lo haya solicitado. ¿Qué normativa española, además del RGPD, entra en juego?
+
+---
+
+## 6. Errores frecuentes (ten esto a mano)
+
+| Error | Causa | Solución |
+|---|---|---|
+| Confundir seudonimización con anonimización | Pensar que el hash ya es "anónimo" y deja de ser dato personal | La seudonimización **sigue** bajo el RGPD; solo la anonimización real queda fuera |
+| Reutilizar la misma sal entre sistemas | Facilita la re-identificación cruzada | Sal distinta y secreta por sistema/propósito |
+| Regex de DNI que captura de más | Patrón demasiado laxo (`\d+` sin límites) | Ancla la longitud exacta y usa `\b` (límites de palabra) |
+| Guardar datos "por si acaso" sin plazo | Viola el principio de limitación del plazo | Define y valida un plazo de conservación |
+| Tratar datos sin base de licitud clara | Se asume que "si el usuario está registrado, vale para todo" | Cada finalidad distinta necesita su propia base |
+
+---
+
+## 7. Actividades: de lo más sencillo a preguntas tipo examen
+
+> Librerías reales: `hashlib`, `re`, `csv`, `json`.
+
+**1 · 🟢 ¿Base de licitud válida?** — `base_valida(base: str) -> bool`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-import sqlite3
+BASES = {"consentimiento", "contrato", "obligacion_legal", "interes_vital", "interes_publico", "interes_legitimo"}
+def base_valida(base: str) -> bool:
+    return base.strip().lower() in BASES
+```
+</details>
 
-BD = "inventario.db"
+**2 · 🟢 Seudonimizar un DNI** — `seudonimo(dni: str, sal: str = "cmo314") -> str`.
+<details class="sol"><summary>Solución</summary>
 
+```python
+import hashlib
+def seudonimo(dni: str, sal: str = "cmo314") -> str:
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
+```
+</details>
 
-def crear_tabla() -> None:
-    """Crea la tabla si no existe."""
-    with sqlite3.connect(BD) as con:
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS productos (
-                id     INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL,
-                precio REAL NOT NULL,
-                stock  INTEGER NOT NULL DEFAULT 0
-            )
-        """)
+**3 · 🟢 Enmascarar un email** — `enmascarar_email(email: str) -> str`.
+<details class="sol"><summary>Solución</summary>
 
+```python
+def enmascarar_email(email: str) -> str:
+    u, _, d = email.partition("@")
+    if len(u) <= 2:
+        return u[0] + "*@" + d
+    return u[0] + "*"*(len(u)-2) + u[-1] + "@" + d
+```
+</details>
 
-def insertar(nombre: str, precio: float, stock: int) -> None:
-    """Añade un producto."""
-    with sqlite3.connect(BD) as con:
-        con.execute(
-            "INSERT INTO productos (nombre, precio, stock) VALUES (?, ?, ?)",
-            (nombre, precio, stock),
-        )
+**4 · 🟢 ¿Plazo razonable?** — `plazo_ok(meses: int) -> bool`, lanza `ValueError` si es negativo.
+<details class="sol"><summary>Solución</summary>
 
+```python
+def plazo_ok(meses: int) -> bool:
+    if meses < 0:
+        raise ValueError("plazo negativo")
+    return 1 <= meses <= 60
+```
+</details>
 
-def listar() -> list[tuple]:
-    """Devuelve todos los productos."""
-    with sqlite3.connect(BD) as con:
-        return con.execute(
-            "SELECT id, nombre, precio, stock FROM productos"
-        ).fetchall()
+**5 · 🟡 Detectar un DNI en texto** — `contiene_dni(texto: str) -> bool` con `re`.
+<details class="sol"><summary>Solución</summary>
 
+```python
+import re
+def contiene_dni(texto: str) -> bool:
+    return bool(re.search(r"\b\d{8}[A-Za-z]\b", texto))
+```
+</details>
+
+**6 · 🟡 Anonimizar DNIs de un texto** — `anonimizar_dni(texto: str) -> str`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+def anonimizar_dni(texto: str) -> str:
+    return re.sub(r"\b\d{8}[A-Za-z]\b", "[DNI]", texto)
+```
+</details>
+
+**7 · 🟡 Anonimizar emails de un texto** — `anonimizar_email(texto: str) -> str`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+def anonimizar_email(texto: str) -> str:
+    return re.sub(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b", "[EMAIL]", texto)
+```
+</details>
+
+**8 · 🟡 Anonimización completa** — `anonimizar_texto(texto: str) -> str`, DNI y email a la vez.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+def anonimizar_texto(texto: str) -> str:
+    texto = re.sub(r"\b\d{8}[A-Za-z]\b", "[DNI]", texto)
+    texto = re.sub(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b", "[EMAIL]", texto)
+    return texto
+```
+</details>
+
+**9 · 🟠 Evaluar un tratamiento** — `evaluar_tratamiento(t: dict) -> list[str]`: lista de incumplimientos (base inválida, plazo fuera de rango, sin finalidad declarada).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def evaluar_tratamiento(t: dict) -> list[str]:
+    fallos = []
+    if not base_valida(t.get("base", "")):
+        fallos.append("base de licitud no válida")
+    if not t.get("finalidad", "").strip():
+        fallos.append("sin finalidad declarada")
+    plazo = t.get("plazo_meses", -1)
+    if plazo < 0 or plazo > 60:
+        fallos.append("plazo de conservación fuera de rango")
+    return fallos
+```
+</details>
+
+**10 · 🟠 ¿Cumple?** — `cumple(t: dict) -> bool` (usa el ejercicio 9).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def cumple(t: dict) -> bool:
+    return not evaluar_tratamiento(t)
+```
+</details>
+
+**11 · 🟠 Seudonimizar un lote** — `seudonimizar_lote(dnis: list[str], sal: str) -> dict[str,str]`: DNI original → seudónimo.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def seudonimizar_lote(dnis: list[str], sal: str) -> dict[str, str]:
+    return {dni: seudonimo(dni, sal) for dni in dnis}
+```
+</details>
+
+**12 · 🔴 Detectar re-identificación por sal repetida** — `sal_reutilizada(mapa1: dict[str,str], mapa2: dict[str,str]) -> list[str]`: seudónimos que coinciden entre dos sistemas (indicio de sal compartida).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def sal_reutilizada(mapa1: dict[str, str], mapa2: dict[str, str]) -> list[str]:
+    return sorted(set(mapa1.values()) & set(mapa2.values()))
+```
+</details>
+
+**13 · 🔴 Anonimizar un CSV completo** — `anonimizar_csv(texto_csv: str, columnas: list[str]) -> str`: sustituye el valor de esas columnas por `seudonimo(valor)`, conservando el resto (usa `csv.DictReader`/`DictWriter`).
+<details class="sol"><summary>Solución</summary>
+
+```python
+import csv, io
+def anonimizar_csv(texto_csv: str, columnas: list[str]) -> str:
+    lector = csv.DictReader(io.StringIO(texto_csv))
+    filas = []
+    for fila in lector:
+        for col in columnas:
+            if col in fila:
+                fila[col] = seudonimo(fila[col])
+        filas.append(fila)
+    salida = io.StringIO()
+    escritor = csv.DictWriter(salida, fieldnames=lector.fieldnames or [])
+    escritor.writeheader()
+    escritor.writerows(filas)
+    return salida.getvalue()
+```
+</details>
+
+**14 · 🔴 Auditoría de un lote de tratamientos** — `auditar_tratamientos(tratamientos: list[dict]) -> dict[str, list[str]]`: nombre del tratamiento → sus incumplimientos.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def auditar_tratamientos(tratamientos: list[dict]) -> dict[str, list[str]]:
+    return {t["nombre"]: evaluar_tratamiento(t) for t in tratamientos}
+```
+</details>
+
+**15 · 🔴 Informe final** — `informe_cumplimiento(tratamientos: list[dict]) -> list[str]`: una línea por tratamiento, `"OK"` o los fallos, ordenado con los incumplidos primero.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def informe_cumplimiento(tratamientos: list[dict]) -> list[str]:
+    aud = auditar_tratamientos(tratamientos)
+    lineas = [f"{n}: {'OK' if not f else ', '.join(f)}" for n, f in aud.items()]
+    return sorted(lineas, key=lambda l: ": OK" in l)
+```
+</details>
+
+---
+
+## 8. Reto resuelto, paso a paso — Verificador de cumplimiento y anonimizador
+
+Un cliente te pasa su inventario de tratamientos de datos y un lote de tickets de soporte con datos personales sin anonimizar. Te piden dos cosas: un informe de cumplimiento, y los tickets anonimizados listos para compartir con un equipo externo.
+
+```mermaid
+flowchart LR
+    T["tratamientos.json"] --> Ev["evaluar cada uno"]
+    Ev --> Inf["informe de<br/>cumplimiento"]
+    Tk["tickets.txt"] --> An["anonimizar"]
+    An --> Sal["tickets_anon.txt"]
+```
+
+**Paso 1 — Bases de licitud y validación de un tratamiento.**
+
+```python title="cumplimiento.py"
+BASES_VALIDAS = {
+    "consentimiento", "contrato", "obligacion_legal",
+    "interes_vital", "interes_publico", "interes_legitimo",
+}
+
+def base_valida(base: str) -> bool:
+    return base.strip().lower() in BASES_VALIDAS
+
+def evaluar_tratamiento(t: dict) -> list[str]:
+    fallos = []
+    if not base_valida(t.get("base", "")):
+        fallos.append("base de licitud no válida")
+    if not t.get("finalidad", "").strip():
+        fallos.append("sin finalidad declarada")
+    plazo = t.get("plazo_meses", -1)
+    if plazo < 0 or plazo > 60:
+        fallos.append("plazo de conservación fuera de rango")
+    return fallos
+```
+
+**Paso 2 — Informe de cumplimiento para todo el inventario.**
+
+```python title="cumplimiento.py (continúa)"
+def informe_cumplimiento(tratamientos: list[dict]) -> list[str]:
+    lineas = []
+    for t in tratamientos:
+        fallos = evaluar_tratamiento(t)
+        estado = "OK" if not fallos else "; ".join(fallos)
+        lineas.append(f"{t['nombre']}: {estado}")
+    return sorted(lineas, key=lambda l: ": OK" in l)
+```
+
+**Paso 3 — Seudonimización y anonimización de texto.**
+
+```python title="cumplimiento.py (continúa)"
+import hashlib, re
+
+def seudonimo(dni: str, sal: str = "cmo314") -> str:
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
+
+PATRON_DNI = re.compile(r"\b\d{8}[A-Za-z]\b")
+PATRON_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+
+def anonimizar_texto(texto: str) -> str:
+    texto = PATRON_DNI.sub("[DNI]", texto)
+    texto = PATRON_EMAIL.sub("[EMAIL]", texto)
+    return texto
+```
+
+**Paso 4 — Anonimizar un fichero de tickets, línea a línea.**
+
+```python title="cumplimiento.py (continúa)"
+def anonimizar_fichero(texto: str) -> str:
+    return "\n".join(anonimizar_texto(linea) for linea in texto.splitlines())
+```
+
+**Paso 5 — CLI con `argparse`.**
+
+```python title="cumplimiento.py (continúa)"
+import argparse, json
+from pathlib import Path
 
 def main() -> None:
-    crear_tabla()
-    insertar("Camisa", 19.99, 10)
-    for fila in listar():
-        print(fila)
+    ap = argparse.ArgumentParser(prog="cumplimiento", description="Verificador RGPD y anonimizador")
+    sub = ap.add_subparsers(dest="accion", required=True)
 
+    p1 = sub.add_parser("auditar", help="evalúa un inventario de tratamientos")
+    p1.add_argument("tratamientos", type=Path)
+
+    p2 = sub.add_parser("anonimizar", help="anonimiza un fichero de texto")
+    p2.add_argument("entrada", type=Path)
+    p2.add_argument("salida", type=Path)
+
+    args = ap.parse_args()
+    if args.accion == "auditar":
+        tratamientos = json.loads(args.tratamientos.read_text(encoding="utf-8"))
+        for linea in informe_cumplimiento(tratamientos):
+            print(linea)
+    else:
+        anonimizado = anonimizar_fichero(args.entrada.read_text(encoding="utf-8"))
+        args.salida.write_text(anonimizado, encoding="utf-8")
+        print(f"Anonimizado en {args.salida}")
 
 if __name__ == "__main__":
     main()
 ```
 
-Cada función hace **una** operación y **devuelve** datos; solo `main` imprime. Igual que en la UD2, esto es lo que permite probarlo automáticamente.
+**Paso 6 — Pruébalo con Docker, sin `sudo`.**
 
----
-
-> **Reto rápido 7.** ¿Por qué `listar(bd)` devuelve las filas en vez de imprimirlas? *(Solución: para poder probarla con un test y reutilizarla.)*
-
-## 8. Errores frecuentes
-
-| Síntoma | Causa | Solución |
-|---|---|---|
-| Los datos no se guardan | falta `commit()` | llámalo tras insertar/modificar/borrar |
-| `no such table` | no creaste la tabla | `CREATE TABLE IF NOT EXISTS` al arrancar |
-| `no such column` | nombre de columna mal escrito | revisa el `CREATE TABLE` |
-| `Incorrect number of bindings` | los `?` no coinciden con la tupla | cuenta ambos |
-| Se cambiaron todas las filas | `UPDATE`/`DELETE` sin `WHERE` | añade siempre el `WHERE` |
-| `(3)` no funciona como parámetro | no es una tupla | escribe `(3,)` |
-| `database is locked` | conexión sin cerrar | usa `with` |
-| Inyección SQL | concatenaste la entrada del usuario | usa `?` siempre |
-
----
-
----
-
-## 9. Ejercicios
-
-Aquí están **todos los ejercicios de la unidad**, agrupados por el
-tema al que corresponden y con la solución desplegable.
-
-**Haz los de un tema en cuanto termines de leerlo.** No esperes al final: son cortos y solo
-usan lo que acabas de ver, así que si algo no ha quedado claro lo descubres en el momento y
-no tres semanas después.
-
-!!! warning "Intenta antes de desplegar"
-    Abrir la solución sin haberlo intentado da sensación de aprender, y no enseña nada. Si
-    llevas quince minutos sin avanzar, mírala. Si llevas dos, no.
-
-
-### Tema 1 · Por qué una base de datos
-
-**1.1.** Tienes las notas de 60 alumnos guardadas en un CSV. Da **tres razones** por las que una base de datos lo haría mejor.
-<details><summary>Solución</summary>
-
-```text
-1. BUSCAR. En el CSV hay que leerlo entero y recorrerlo a mano.
-   En SQL:  SELECT * FROM alumnos WHERE nota >= 5   -> y ya esta.
-
-2. INTEGRIDAD. El CSV admite cualquier cosa: una nota "hola", un campo vacio,
-   dos alumnos con el mismo id. La tabla define tipos y restricciones
-   (NOT NULL, PRIMARY KEY) y rechaza lo que no cuadra.
-
-3. VARIOS A LA VEZ. Si dos programas escriben el CSV a la vez, se pisan y se
-   pierden datos. La base de datos gestiona los accesos simultaneos.
-
-Extra: relacionar tablas (alumnos + matriculas + modulos) es trivial en SQL
-y un infierno a mano.
+```yaml title="docker-compose.yml"
+services:
+  demo:
+    image: python:3.12-alpine
+    volumes: ["./cumplimiento.py:/cumplimiento.py"]
+    working_dir: /app
+    command: >
+      sh -c "mkdir -p /app; cd /app;
+      echo '[{\"nombre\":\"Newsletter\",\"base\":\"consentimiento\",\"finalidad\":\"marketing\",\"plazo_meses\":24},{\"nombre\":\"Logs acceso\",\"base\":\"porque_si\",\"finalidad\":\"\",\"plazo_meses\":-1}]' > tratamientos.json;
+      echo 'Usuario 12345678Z (ana.perez@iesx.es) reporta un fallo' > tickets.txt;
+      echo '--- auditoria ---'; python /cumplimiento.py auditar tratamientos.json;
+      echo '--- anonimizar ---'; python /cumplimiento.py anonimizar tickets.txt tickets_anon.txt;
+      cat tickets_anon.txt"
 ```
-</details>
 
-**1.2.** ¿Qué es una **tabla**, una **fila** y una **columna**? Ponlo en paralelo con algo que ya conoces.
-<details><summary>Solución</summary>
-
-```text
-Tabla   -> el conjunto de datos del mismo tipo. Como un fichero CSV entero,
-           o como una lista de objetos de una misma clase.
-Fila     -> un registro concreto: UN alumno, UN libro. Como un objeto.
-Columna  -> un campo con su tipo: nombre TEXT, nota REAL. Como un atributo.
-
-Alumno(nombre, nota)  <->  tabla alumnos (nombre TEXT, nota REAL)
-ada = Alumno(...)     <->  una fila
+```bash title="Ejecutar"
+docker compose run --rm demo
 ```
-</details>
 
-**1.3.** Traduce a SQL, sin ejecutar: «quiero el título y el año de los libros de Borges».
-<details><summary>Solución</summary>
-
-```text
-SELECT titulo, anio          <- que columnas quiero
-FROM   libros                <- de que tabla
-WHERE  autor = 'Borges';     <- que filas
-
-Las tres palabras clave, siempre en ese orden. Si te acostumbras a leerlas
-asi -"que columnas, de donde, con que condicion"- el SQL deja de dar miedo.
+```text title="Salida esperada"
+--- auditoria ---
+Logs acceso: base de licitud no válida; sin finalidad declarada; plazo de conservación fuera de rango
+Newsletter: OK
+--- anonimizar ---
+Anonimizado en tickets_anon.txt
+Usuario [DNI] ([EMAIL]) reporta un fallo
 ```
-</details>
 
-
-### Tema 2 · Conectarse desde Python
-
-**2.1.** Conéctate a una base de datos `prueba.db` y comprueba que el fichero se crea.
-<details><summary>Solución</summary>
+<details class="sol"><summary>📄 cumplimiento.py completo</summary>
 
 ```python
-import os
-import sqlite3
-
-with sqlite3.connect("prueba.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS t (id INTEGER)")
-
-print(os.path.exists("prueba.db"))   # -> True
-
-# SQLite no necesita servidor: la base de datos ES un fichero.
-```
-</details>
-
-**2.2.** ¿Qué hace `with sqlite3.connect(...)` que no hace `sqlite3.connect(...)` a secas?
-<details><summary>Solución</summary>
-
-```text
-El with hace COMMIT automatico al salir del bloque si todo ha ido bien
-(y ROLLBACK si salta una excepcion).
-
-Sin with, esto NO guarda nada:
-
-    con = sqlite3.connect("bd.db")
-    con.execute("INSERT INTO ...")
-    # falta con.commit()  ->  al cerrar el programa, los datos se pierden
-
-Es el error numero uno de la unidad: "el programa funciona pero la tabla
-esta vacia". Casi siempre es un commit() que falta.
-```
-</details>
-
-**2.3.** Crea una tabla, inserta una fila y comprueba con `fetchall()` que está.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("demo.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS alumnos (nombre TEXT, nota REAL)")
-    con.execute("INSERT INTO alumnos (nombre, nota) VALUES (?, ?)", ("Ada", 9.5))
-
-with sqlite3.connect("demo.db") as con:
-    print(con.execute("SELECT nombre, nota FROM alumnos").fetchall())
-    # -> [('Ada', 9.5)]
-```
-</details>
-
-
-### Tema 3 · Crear la tabla
-
-**3.1.** Crea la tabla `productos` con `id` autonumérico, `nombre` obligatorio y `precio`.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("tienda.db") as con:
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS productos (
-            id     INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            precio REAL NOT NULL
-        )
-    """)
-
-print("tabla creada")   # -> tabla creada
-```
-</details>
-
-**3.2.** ¿Por qué `IF NOT EXISTS`? Ejecuta la creación dos veces y compruébalo.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-
-def crear(bd: str) -> None:
-    """Crea la tabla si no está."""
-    with sqlite3.connect(bd) as con:
-        con.execute("CREATE TABLE IF NOT EXISTS t (id INTEGER)")
-
-
-crear("dos.db")
-crear("dos.db")   # sin IF NOT EXISTS, esta segunda llamada lanzaría
-                  # OperationalError: table t already exists
-
-print("dos veces sin error")   # -> dos veces sin error
-```
-</details>
-
-**3.3.** Elige el tipo adecuado para: nombre de un cliente, número de unidades, precio, si está activo.
-<details><summary>Solución</summary>
-
-```text
-nombre    -> TEXT
-unidades  -> INTEGER
-precio    -> REAL      (nunca TEXT: no se podria ordenar ni sumar)
-activo    -> INTEGER   (SQLite no tiene BOOLEAN: se usa 0 / 1)
-
-Y casi siempre:  id INTEGER PRIMARY KEY AUTOINCREMENT
-para tener una clave unica sin pensar en ella.
-```
-</details>
-
-
-### Tema 4 · CRUD
-
-**4.1.** Inserta tres productos y recupéralos todos (Create + Read).
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("crud.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS productos (nombre TEXT, precio REAL)")
-    for fila in [("Camisa", 19.9), ("Gorra", 7.25), ("Botas", 45.0)]:
-        con.execute("INSERT INTO productos (nombre, precio) VALUES (?, ?)", fila)
-
-with sqlite3.connect("crud.db") as con:
-    for nombre, precio in con.execute("SELECT nombre, precio FROM productos"):
-        print(f"{nombre:<10}{precio:>8.2f}")
-
-# -> Camisa       19.90
-# -> Gorra         7.25
-# -> Botas        45.00
-```
-</details>
-
-**4.2.** Sube un 10 % el precio de las gorras (Update) y comprueba el resultado.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("upd.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS productos (nombre TEXT, precio REAL)")
-    con.execute("INSERT INTO productos VALUES (?, ?)", ("Gorra", 10.0))
-    con.execute("UPDATE productos SET precio = precio * 1.10 WHERE nombre = ?", ("Gorra",))
-
-with sqlite3.connect("upd.db") as con:
-    print(con.execute("SELECT precio FROM productos").fetchone())   # -> (11.0,)
-```
-</details>
-
-**4.3.** Borra un producto por su nombre (Delete). ¿Qué pasa si te dejas el `WHERE`?
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("del.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS productos (nombre TEXT)")
-    con.executemany("INSERT INTO productos VALUES (?)", [("Camisa",), ("Gorra",)])
-    con.execute("DELETE FROM productos WHERE nombre = ?", ("Gorra",))
-
-with sqlite3.connect("del.db") as con:
-    print(con.execute("SELECT COUNT(*) FROM productos").fetchone()[0])   # -> 1
-
-# Sin WHERE, "DELETE FROM productos" borra la tabla ENTERA y no hay deshacer.
-# Antes de lanzar un DELETE, escribe primero el SELECT con ese mismo WHERE
-# y mira qué filas salen.
-```
-</details>
-
-
-### Tema 5 · Consultas parametrizadas
-
-**5.1.** Busca un producto por nombre usando una consulta **parametrizada**.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("param.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS productos (nombre TEXT, precio REAL)")
-    con.execute("INSERT INTO productos VALUES (?, ?)", ("Camisa", 19.9))
-
-buscado: str = "Camisa"
-
-with sqlite3.connect("param.db") as con:
-    filas = con.execute(
-        "SELECT nombre, precio FROM productos WHERE nombre = ?", (buscado,)).fetchall()
-
-print(filas)   # -> [('Camisa', 19.9)]
-
-# La coma de (buscado,) NO es opcional: sin ella no es una tupla.
-```
-</details>
-
-**5.2.** Comprueba que un nombre con apóstrofo rompe la consulta si la construyes concatenando texto, y que con `?` no pasa nada.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-buscado = "O" + chr(39) + "Keeffe"      # O'Keeffe
-
-with sqlite3.connect("comillas.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS autores (nombre TEXT)")
-    con.execute("INSERT INTO autores VALUES (?)", (buscado,))
-
-# MAL: el apóstrofo cierra la cadena SQL antes de tiempo
-comilla = chr(39)
-sql_malo = "SELECT * FROM autores WHERE nombre = " + comilla + buscado + comilla
-with sqlite3.connect("comillas.db") as con:
-    try:
-        con.execute(sql_malo).fetchall()
-    except sqlite3.OperationalError:
-        print("la concatenada revienta")   # -> la concatenada revienta
-
-# BIEN: el ? se encarga de escapar lo que haga falta
-with sqlite3.connect("comillas.db") as con:
-    filas = con.execute(
-        "SELECT nombre FROM autores WHERE nombre = ?", (buscado,)).fetchall()
-
-print(len(filas))   # -> 1
-
-# Y esto no va de comillas raras: es la MISMA puerta por la que entra una
-# inyección SQL. El ? la cierra.
-```
-</details>
-
-**5.3.** Explica por qué esto es peligroso: `f"SELECT * FROM u WHERE nombre = '{nombre}'"`.
-<details><summary>Solución</summary>
-
-```text
-Porque lo que escriba el usuario se convierte en SQL. Es inyeccion SQL.
-
-Si nombre vale:    ' OR '1'='1
-la consulta queda: SELECT * FROM u WHERE nombre = '' OR '1'='1'
-y devuelve TODAS las filas de la tabla.
-
-Peor aun, con  '; DROP TABLE u; --  se puede destruir la tabla.
-
-Con parametros nunca pasa: el ? no mezcla datos con instrucciones. Lo que
-llega por ? se trata SIEMPRE como un valor, aunque parezca codigo SQL.
-Por eso el criterio de esta unidad es todo-o-nada: una sola consulta
-concatenada y el punto se pierde.
-```
-</details>
-
-
-### Tema 6 · Filtrar y ordenar
-
-**6.1.** Muestra los productos de más de 10 € ordenados de más caro a más barato.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("filtro.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS productos (nombre TEXT, precio REAL)")
-    con.executemany("INSERT INTO productos VALUES (?, ?)",
-                    [("Camisa", 19.9), ("Gorra", 7.25), ("Botas", 45.0)])
-
-with sqlite3.connect("filtro.db") as con:
-    filas = con.execute(
-        "SELECT nombre, precio FROM productos WHERE precio > ? ORDER BY precio DESC",
-        (10,)).fetchall()
-
-print(filas)   # -> [('Botas', 45.0), ('Camisa', 19.9)]
-```
-</details>
-
-**6.2.** Cuenta cuántos productos hay y calcula el precio medio.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("agr.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS productos (precio REAL)")
-    con.executemany("INSERT INTO productos VALUES (?)", [(10.0,), (20.0,), (30.0,)])
-
-with sqlite3.connect("agr.db") as con:
-    cuantos = con.execute("SELECT COUNT(*) FROM productos").fetchone()[0]
-    media = con.execute("SELECT AVG(precio) FROM productos").fetchone()[0]
-
-print(cuantos, media)   # -> 3 20.0
-
-# fetchone() devuelve una TUPLA: por eso el [0] para sacar el valor.
-```
-</details>
-
-**6.3.** Busca los productos cuyo nombre empieza por «Ca», con `LIKE` y sin concatenar.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("like.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS productos (nombre TEXT)")
-    con.executemany("INSERT INTO productos VALUES (?)",
-                    [("Camisa",), ("Camiseta",), ("Gorra",)])
-
-with sqlite3.connect("like.db") as con:
-    filas = con.execute(
-        "SELECT nombre FROM productos WHERE nombre LIKE ?", ("Ca%",)).fetchall()
-
-print(filas)   # -> [('Camisa',), ('Camiseta',)]
-
-# El comodín % va DENTRO del parámetro, no pegado al SQL.
-```
-</details>
-
-
-### Tema 7 · Estructura de la aplicación
-
-**7.1.** Separa en dos funciones el acceso a datos y la presentación: `listar(bd)` devuelve, `mostrar(filas)` imprime.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-
-def listar(bd: str) -> list[tuple]:
-    """Solo consulta: devuelve las filas."""
-    with sqlite3.connect(bd) as con:
-        return con.execute("SELECT nombre, precio FROM productos").fetchall()
-
-
-def mostrar(filas: list[tuple]) -> None:
-    """Solo presenta: no sabe nada de la base de datos."""
-    for nombre, precio in filas:
-        print(f"{nombre:<10}{precio:>8.2f}")
-
-
-with sqlite3.connect("cap.db") as con:
-    con.execute("CREATE TABLE IF NOT EXISTS productos (nombre TEXT, precio REAL)")
-    con.execute("INSERT INTO productos VALUES (?, ?)", ("Camisa", 19.9))
-
-mostrar(listar("cap.db"))   # -> Camisa       19.90
-
-# listar() se puede probar con un test (devuelve datos comparables);
-# mostrar() se puede reutilizar aunque mañana los datos vengan de un CSV.
-```
-</details>
-
-**7.2.** ¿Por qué las funciones de acceso a datos reciben la ruta de la base de datos como parámetro en vez de tenerla escrita dentro?
-<details><summary>Solución</summary>
-
-```text
-Porque asi se pueden PROBAR. El test crea una base de datos temporal
-(tmp_path) y se la pasa a la funcion; al terminar, desaparece.
-
-Si la ruta esta escrita dentro de la funcion:
-  - los tests machacarian la base de datos de verdad
-  - no se podrian ejecutar dos a la vez
-  - no podrias tener una BD de pruebas y otra de produccion
-
-Es la misma idea de siempre: todo lo que la funcion necesita, entra por
-parametros.
-```
-</details>
-
-**7.3.** Monta el esqueleto completo de la aplicación: crear tabla, insertar, listar y un `main()` que lo use.
-<details><summary>Solución</summary>
-
-```python
-"""Mini aplicación con base de datos."""
-import sqlite3
-
-BD: str = "app.db"
-
-
-def crear_tabla(bd: str) -> None:
-    """Crea la tabla si no existe."""
-    with sqlite3.connect(bd) as con:
-        con.execute("CREATE TABLE IF NOT EXISTS notas (alumno TEXT, nota REAL)")
-
-
-def insertar(bd: str, alumno: str, nota: float) -> None:
-    """Añade una nota."""
-    with sqlite3.connect(bd) as con:
-        con.execute("INSERT INTO notas (alumno, nota) VALUES (?, ?)", (alumno, nota))
-
-
-def listar(bd: str) -> list[tuple]:
-    """Devuelve todas las notas."""
-    with sqlite3.connect(bd) as con:
-        return con.execute("SELECT alumno, nota FROM notas").fetchall()
-
+import argparse, hashlib, json, re
+from pathlib import Path
+
+BASES_VALIDAS = {
+    "consentimiento", "contrato", "obligacion_legal",
+    "interes_vital", "interes_publico", "interes_legitimo",
+}
+
+def base_valida(base: str) -> bool:
+    return base.strip().lower() in BASES_VALIDAS
+
+def evaluar_tratamiento(t: dict) -> list[str]:
+    fallos = []
+    if not base_valida(t.get("base", "")):
+        fallos.append("base de licitud no válida")
+    if not t.get("finalidad", "").strip():
+        fallos.append("sin finalidad declarada")
+    plazo = t.get("plazo_meses", -1)
+    if plazo < 0 or plazo > 60:
+        fallos.append("plazo de conservación fuera de rango")
+    return fallos
+
+def informe_cumplimiento(tratamientos: list[dict]) -> list[str]:
+    lineas = []
+    for t in tratamientos:
+        fallos = evaluar_tratamiento(t)
+        lineas.append(f"{t['nombre']}: {'OK' if not fallos else '; '.join(fallos)}")
+    return sorted(lineas, key=lambda l: ": OK" in l)
+
+def seudonimo(dni: str, sal: str = "cmo314") -> str:
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
+
+PATRON_DNI = re.compile(r"\b\d{8}[A-Za-z]\b")
+PATRON_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+
+def anonimizar_texto(texto: str) -> str:
+    texto = PATRON_DNI.sub("[DNI]", texto)
+    texto = PATRON_EMAIL.sub("[EMAIL]", texto)
+    return texto
+
+def anonimizar_fichero(texto: str) -> str:
+    return "\n".join(anonimizar_texto(linea) for linea in texto.splitlines())
 
 def main() -> None:
-    """Punto de entrada."""
-    crear_tabla(BD)
-    insertar(BD, "Ada", 9.5)
-    for alumno, nota in listar(BD):
-        print(f"{alumno}: {nota}")
-
+    ap = argparse.ArgumentParser(prog="cumplimiento", description="Verificador RGPD y anonimizador")
+    sub = ap.add_subparsers(dest="accion", required=True)
+    p1 = sub.add_parser("auditar")
+    p1.add_argument("tratamientos", type=Path)
+    p2 = sub.add_parser("anonimizar")
+    p2.add_argument("entrada", type=Path)
+    p2.add_argument("salida", type=Path)
+    args = ap.parse_args()
+    if args.accion == "auditar":
+        tratamientos = json.loads(args.tratamientos.read_text(encoding="utf-8"))
+        for linea in informe_cumplimiento(tratamientos):
+            print(linea)
+    else:
+        anonimizado = anonimizar_fichero(args.entrada.read_text(encoding="utf-8"))
+        args.salida.write_text(anonimizado, encoding="utf-8")
+        print(f"Anonimizado en {args.salida}")
 
 if __name__ == "__main__":
-    main()   # -> Ada: 9.5
-```
-</details>
-
-
-### Actividades guiadas
-
-#### Actividad 1 — Crear la base de datos
-Crea `prueba.db` con una tabla `alumnos` (id, nombre, nota).
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-with sqlite3.connect("prueba.db") as con:
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS alumnos (
-            id     INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            nota   REAL NOT NULL
-        )
-    """)
-```
-</details>
-
-#### Actividad 2 — Insertar y listar
-<details><summary>Solución</summary>
-
-```python
-with sqlite3.connect("prueba.db") as con:
-    con.execute("INSERT INTO alumnos (nombre, nota) VALUES (?, ?)", ("Ada", 9.5))
-
-with sqlite3.connect("prueba.db") as con:
-    for fila in con.execute("SELECT id, nombre, nota FROM alumnos"):
-        print(fila)
-```
-</details>
-
-#### Actividad 3 — Modificar y borrar
-<details><summary>Solución</summary>
-
-```python
-with sqlite3.connect("prueba.db") as con:
-    con.execute("UPDATE alumnos SET nota = ? WHERE nombre = ?", (10.0, "Ada"))
-    con.execute("DELETE FROM alumnos WHERE nota < ?", (5.0,))
-```
-</details>
-
-#### Actividad 4 — Buscar
-Muestra los alumnos aprobados ordenados por nota descendente.
-<details><summary>Solución</summary>
-
-```python
-with sqlite3.connect("prueba.db") as con:
-    filas = con.execute(
-        "SELECT nombre, nota FROM alumnos WHERE nota >= ? ORDER BY nota DESC",
-        (5.0,)
-    ).fetchall()
-print(filas)
-```
-</details>
-
-### Ejercicios propuestos
-
-**E1 ○ · Contar registros.** `cuantos(bd: str) -> int` con `COUNT(*)`.
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-def cuantos(bd: str) -> int:
-    with sqlite3.connect(bd) as con:
-        return int(con.execute("SELECT COUNT(*) FROM alumnos").fetchone()[0])
-```
-</details>
-
-**E2 ○ · Nota media.** `nota_media(bd: str) -> float` con `AVG`, devolviendo `0.0` si no hay filas.
-<details><summary>Pista</summary><code>AVG</code> devuelve <code>None</code> con la tabla vacía.</details>
-<details><summary>Solución</summary>
-
-```python
-def nota_media(bd: str) -> float:
-    with sqlite3.connect(bd) as con:
-        resultado = con.execute("SELECT AVG(nota) FROM alumnos").fetchone()[0]
-    return float(resultado) if resultado is not None else 0.0
-```
-</details>
-
-**E3 ◐ · Buscar por nombre.** Búsqueda parcial parametrizada con `LIKE`.
-<details><summary>Solución</summary>
-
-```python
-def buscar(bd: str, texto: str) -> list[tuple]:
-    with sqlite3.connect(bd) as con:
-        return con.execute(
-            "SELECT nombre, nota FROM alumnos WHERE nombre LIKE ?",
-            (f"%{texto}%",)
-        ).fetchall()
-```
-</details>
-
-**E4 ● · Menú CRUD.** Programa con menú (alta, listado, modificación, baja, salir) y entrada validada.
-<details><summary>Solución</summary>
-
-```python
-def menu() -> None:
-    crear_tabla()
-    opcion = ""
-    while opcion != "0":
-        print("1-Alta  2-Listar  3-Modificar  4-Baja  0-Salir")
-        opcion = input("Opción: ")
-        if opcion == "1":
-            insertar(input("Nombre: "), float(input("Precio: ")), 0)
-        elif opcion == "2":
-            for fila in listar():
-                print(fila)
-```
-*(Añade `try/except` en las conversiones, como en la UD3.)*
-</details>
-
-**E5 ○ · Crear la tabla de clientes.** `crear_tabla(bd: str) -> None` crea la tabla `clientes` si no existe, con `id` autonumérico, `nombre` obligatorio y `email`.
-<details><summary>Pista</summary><code>CREATE TABLE IF NOT EXISTS</code>, y el id como <code>INTEGER PRIMARY KEY AUTOINCREMENT</code>.</details>
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-
-def crear_tabla(bd: str) -> None:
-    """Crea la tabla clientes si no existe."""
-    with sqlite3.connect(bd) as con:
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS clientes (
-                id     INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL,
-                email  TEXT
-            )
-        """)
-```
-</details>
-
-**E6 ◐ · Insertar un cliente.** `insertar(bd: str, nombre: str, email: str) -> None` añade un cliente con una consulta **parametrizada**.
-<details><summary>Pista</summary>Los valores van como <code>?</code> y en una tupla aparte. Nunca concatenados.</details>
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-
-def insertar(bd: str, nombre: str, email: str) -> None:
-    """Añade un cliente."""
-    with sqlite3.connect(bd) as con:
-        con.execute("INSERT INTO clientes (nombre, email) VALUES (?, ?)",
-                    (nombre, email))
-```
-</details>
-
-**E7 ◐ · Buscar por email.** `buscar_por_email(bd: str, email: str) -> list[tuple]` devuelve `[(nombre, email), ...]` de los clientes con ese email exacto. Lista vacía si no hay ninguno.
-<details><summary>Pista</summary>Mismo patrón que el insertar, pero con <code>SELECT ... WHERE email = ?</code> y <code>.fetchall()</code>.</details>
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-
-def buscar_por_email(bd: str, email: str) -> list[tuple]:
-    """Clientes con ese email exacto."""
-    with sqlite3.connect(bd) as con:
-        return con.execute(
-            "SELECT nombre, email FROM clientes WHERE email = ?", (email,)).fetchall()
-```
-</details>
-
-**E8 ● · Actualizar y contar los cambios.** `actualizar_email(bd: str, nombre: str, email: str) -> int` cambia el email de ese cliente y devuelve **cuántas filas ha modificado**.
-<details><summary>Pista</summary>El cursor tiene un atributo <code>rowcount</code> con el número de filas afectadas por la última operación.</details>
-<details><summary>Solución</summary>
-
-```python
-import sqlite3
-
-
-def actualizar_email(bd: str, nombre: str, email: str) -> int:
-    """Cambia el email de un cliente; devuelve cuántas filas cambió."""
-    with sqlite3.connect(bd) as con:
-        cur = con.execute("UPDATE clientes SET email = ? WHERE nombre = ?",
-                          (email, nombre))
-        return cur.rowcount
+    main()
 ```
 </details>
 
 ---
 
----
+## 9. Reto para ti (propuesto, sin solución)
 
-## 10. Práctica tipo examen
+### 📋 Registro de actividades de tratamiento (RAT) exportable
 
-Los ejercicios de arriba tienen la solución a la vista. Lo que viene
-ahora **no**: aquí se comprueba si sabes hacerlo solo, que es lo que mide el examen.
+El RGPD exige que muchas organizaciones mantengan un **Registro de Actividades de Tratamiento** (RAT). Vas a construir la herramienta que lo genera y lo mantiene al día.
 
-Son dos escalones, y en este orden:
-
-| | Qué es | Cómo sabes si va bien |
-|---|---|---|
-| **Proyecto de la unidad** | Un proyecto Python completo, para trabajar con calma | Sus tests, que ejecutas tú |
-| **Simulacro** | Mismo formato, tamaño y rúbrica que el examen, contrarreloj | Sus tests, y la tabla de apartados |
-
----
-
-## 11. Proyecto de la unidad
-
-Toda la práctica de esta unidad se hace sobre un **proyecto base**: un inventario sobre una base de datos SQLite. Está montado
-con la estructura real de un proyecto Python y trae una **batería de tests** que puedes
-ejecutar en cualquier momento para ver si va todo bien.
-
-**[Proyecto Inventario →](../proyectos/ud6/README.md)**
-
-```
-proyecto-ud6/
-├── src/      ← tu código (funciones con TODO)
-└── tests/    ← 13 tests que comprueban tu trabajo
+```mermaid
+flowchart LR
+    N["nuevo tratamiento<br/>(CLI)"] --> R["añadir al<br/>registro (JSON)"]
+    R --> V["validar con<br/>evaluar_tratamiento"]
+    V -->|falla| Re["rechazar,<br/>no se añade"]
+    V -->|ok| G["guardar"]
+    G --> Ex["exportar informe<br/>(CSV o texto)"]
 ```
 
-### Cómo se trabaja
+**Objetivo.** Una CLI que permita **añadir** tratamientos a un registro persistente (un fichero JSON que actúa de base de datos), **rechazando** los que no cumplan (reutilizando `evaluar_tratamiento`), y **exportar** el registro completo a CSV para auditoría externa.
 
-```bash
-pip install -r requirements.txt
-pytest
-```
+**Requisitos**
 
-La primera vez falla casi todo: aún no has escrito nada. A partir de ahí, lee una función,
-escríbela, vuelve a lanzar `pytest` y comprueba si ese test ya pasa. Terminas cuando está
-**todo en verde** y `mypy src` dice *Success*.
+- `python rat.py anadir --nombre "..." --base consentimiento --finalidad "..." --plazo 12 registro.json`
+- `python rat.py exportar registro.json informe.csv`
+- Si el tratamiento no cumple, `anadir` debe **rechazarlo** (no se guarda) y mostrar por qué, con un código de salida distinto de 0 (`sys.exit(1)`).
+- El registro es una lista JSON que se lee, se modifica y se vuelve a guardar (como el manifiesto de la UT1, pero para tratamientos).
+- Código tipado, `mypy` limpio.
+- Demuéstralo con Docker.
 
-!!! tip "De uno en uno"
-    `pytest -x` se detiene en el primer fallo. Arreglas esa función y sigues. Mucho más
-    llevadero que enfrentarse a todos los errores a la vez.
+**Criterios de aceptación**
 
-!!! warning "Los tests son la especificación"
-    No los modifiques para que pasen: describen exactamente lo que tu código debe hacer, y
-    el examen usará una batería equivalente.
+1. Añadir un tratamiento válido lo persiste en el JSON y una segunda ejecución de `exportar` lo incluye.
+2. Añadir un tratamiento inválido **no** modifica el fichero de registro.
+3. `exportar` genera un CSV válido (compruébalo con `csv.DictReader` sobre tu propia salida).
 
-Detalles y comandos útiles en **[Proyectos](../proyectos/index.md)**.
+**Pistas** (no solución): reutiliza `evaluar_tratamiento` tal cual · para el registro persistente, el patrón es idéntico al manifiesto de la UT1: cargar JSON (o lista vacía si no existe el fichero), modificar en memoria, volver a guardar · `csv.DictWriter` para exportar.
 
----
+**Si te sobra tiempo:** añade `rat.py listar registro.json` que muestre solo los tratamientos que **no** cumplen · añade una fecha de alta a cada tratamiento (`datetime.now().isoformat()`) para poder auditar antigüedad.
 
----
-
-## 12. Simulacro de examen
-
-Cuando tengas el proyecto terminado, mídete: el **simulacro** es un examen de mentira con
-**el mismo formato, tamaño y rúbrica** que el de verdad — y con los tests publicados.
-
-**[Simulacro RA6 · Museo en SQLite →](../simulacros/ra6/README.md)** · 11 tests · 45–50 min
-
-Hazlo **contrarreloj y sin ayuda**, como si fuera el examen. Al terminar, aplica la rúbrica
-y tendrás una estimación bastante fiel de tu nota.
-
-!!! warning "El examen de verdad va sin tests"
-    Allí solo tendrás los **docstrings** y unos ejemplos. Por eso, en el simulacro, intenta
-    resolver cada función leyendo solo su docstring y mira el test únicamente cuando falle.
+> Esto es justo el tipo de reto que resolverás en el **test práctico**.
 
 ---
 
----
+## Autoevaluación rápida (conceptos)
 
-## 13. Retos opcionales
+<details><summary>1. ¿Qué exige el principio de minimización de datos?</summary>Recoger solo los datos estrictamente necesarios para la finalidad declarada.</details>
+<details><summary>2. ¿Cuántas bases de licitud reconoce el RGPD?</summary>Seis: consentimiento, contrato, obligación legal, interés vital, interés público, interés legítimo.</details>
+<details><summary>3. ¿Sigue bajo el RGPD un dato seudonimizado?</summary>Sí; solo la anonimización real queda fuera de su ámbito.</details>
+<details><summary>4. ¿Qué regula la LSSI-CE?</summary>El comercio electrónico y las comunicaciones comerciales por vía electrónica en España.</details>
+<details><summary>5. ¿Por qué la sal de la seudonimización debe protegerse?</summary>Porque reutilizarla o filtrarla facilita la re-identificación por cruce de datos.</details>
 
-- **R1.** Añade una segunda tabla `categorias` y relaciónala con `productos` mediante una clave ajena.
-- **R2.** Investiga `GROUP BY` y cuenta cuántos productos hay por categoría.
-- **R3.** Exporta el contenido de la tabla a un CSV, reutilizando lo de la UD5.
-
-- **R4.** Añade a tu aplicación un menú de consola con las cuatro operaciones del CRUD.
-- **R5.** Investiga `GROUP BY` y escribe una consulta que cuente cuántos productos hay de cada categoría.
-- **R6.** Haz que la aplicación funcione con una base de datos de prueba cuando se lanza con el argumento `--test`, para no tocar la de verdad.
----
-
----
-
-## 14. Autoevaluación rápida
-
-<details><summary>1. ¿Qué pasa si olvidas <code>commit()</code>?</summary>Los cambios no se guardan, aunque no dé ningún error.</details>
-<details><summary>2. ¿Por qué usar <code>?</code> en vez de concatenar?</summary>Para evitar la inyección SQL.</details>
-<details><summary>3. ¿Qué hace <code>UPDATE productos SET precio = 0</code> sin <code>WHERE</code>?</summary>Pone el precio a 0 en TODAS las filas.</details>
-<details><summary>4. Diferencia entre <code>fetchall()</code> y <code>fetchone()</code>.</summary>El primero devuelve todas las filas; el segundo, solo la siguiente.</details>
-<details><summary>5. ¿Para qué <code>IF NOT EXISTS</code>?</summary>Para que crear la tabla no falle si ya existe.</details>
-<details><summary>6. ¿Qué devuelve <code>AVG</code> con la tabla vacía?</summary><code>None</code>: hay que contemplarlo.</details>
-
----
-
----
-
-## 15. Glosario
+## Glosario
 
 | Término | Definición |
 |---|---|
-| **SGBD** | Sistema gestor de bases de datos. |
-| **Tabla / fila / columna** | Estructura, registro y campo. |
-| **Clave primaria** | Campo que identifica cada fila de forma única. |
-| **SQL** | Lenguaje para consultar y manipular la base de datos. |
-| **CRUD** | Crear, leer, actualizar y borrar. |
-| **Cursor** | Objeto que ejecuta sentencias y recorre resultados. |
-| **`commit`** | Confirma los cambios pendientes. |
-| **Consulta parametrizada** | La que pasa los datos con `?` en vez de concatenarlos. |
-| **Inyección SQL** | Ataque que aprovecha el SQL construido por concatenación. |
+| **RGPD** | Reglamento General de Protección de Datos (UE). |
+| **Base de licitud** | Fundamento legal que exige el RGPD para tratar datos personales. |
+| **Seudonimización** | Sustituir un identificador por otro; sigue bajo el RGPD. |
+| **Anonimización** | Eliminar toda posibilidad de identificación; queda fuera del RGPD. |
+| **LSSI-CE** | Ley española de comercio electrónico y comunicaciones comerciales. |
+| **ENS** | Esquema Nacional de Seguridad (sector público español). |
+| **NIS2** | Directiva UE de ciberseguridad para infraestructuras esenciales. |
+
+## Cómo se evalúa esta unidad (RA6)
+
+El instrumento principal es un **test práctico**: resuelves en Python un reto parecido al de esta unidad y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún ejercicio práctico).
+
+!!! reto "La nota, sin sorpresas"
+    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Esta unidad además incluye la nota de **FFE** (Formación y Fomento del Emprendimiento), que aporta un 10 % adicional al módulo completo — ver [Cómo se evalúa el módulo](../el-curso.md).
+
+El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `hashlib`/`re`), pasar `mypy` y documentar el código.
 
 ---
 
----
+## Simulacro de examen tipo test
 
-## 16. Cómo se evalúa esta unidad (RA6)
+> 15 preguntas de opción múltiple. Cada una trae su propio código.
 
-El examen es **100 % práctico**: se entrega un proyecto con las funciones vacías y una
-especificación, y hay que escribir el código.
+**1.** ¿Qué imprime este código?
 
-**La nota sale solo de los casos de prueba.** No hay puntos por presentación ni por
-esfuerzo: cada apartado del examen vale en proporción a los casos que tiene, de modo que
-**todos los casos valen lo mismo**.
+```python
+BASES = {"consentimiento", "contrato", "obligacion_legal",
+         "interes_vital", "interes_publico", "interes_legitimo"}
 
-`nota del apartado = (casos superados ÷ casos del apartado) × puntos del apartado`
+def base_valida(b: str) -> bool:
+    return b.strip().lower() in BASES
 
-`nota del examen = suma de los apartados`
+print(base_valida("  Contrato "))
+print(base_valida("interes_comercial"))
+```
 
-### Así es el examen
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
 
-**Biblioteca en SQLite** · entrega `src/biblioteca.py` · **50 min**
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>.strip().lower()</code> normaliza <code>"  Contrato "</code> a <code>"contrato"</code>, que sí está en el conjunto. <code>"interes_comercial"</code> no es ninguna de las seis bases válidas.</details>
 
-| # | Apartado | Casos | Puntos |
-|:---:|---|:---:|:---:|
-| **A** | Crear la tabla e insertar | 3 | **3,00** |
-| **B** | Consultas | 5 | **5,00** |
-| **C** | Borrado | 2 | **2,00** |
-| | **TOTAL** | **10** | **10,00** |
+**2.** ¿Qué imprime este código?
 
-Esta tabla viene en el enunciado, así que sabes desde el primer minuto **qué vale cada
-parte** y por dónde empezar si vas justo de tiempo.
+```python
+import hashlib
 
-!!! warning "El examen se reparte sin tests"
-    La carpeta `tests/` viene vacía. La especificación son los **docstrings** de cada
-    función y los ejemplos del enunciado. Por eso conviene que en el simulacro te
-    acostumbres a resolver leyendo el docstring y no el test.
+def seudonimo(dni: str, sal: str = "cmo314") -> str:
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
 
-### Así se corrige
+print(seudonimo("11111111h") == seudonimo("11111111H"))
+```
 
-Alguien que entrega el examen con **8 de los 10 casos** superados
-—se le ha escapado el apartado **C**, donde falla 2 de
-2 casos—:
+A) `True`
+B) `False`
+C) Lanza una excepción, los DNIs deben ir en mayúsculas
+D) Depende del sistema operativo
 
-| # | Apartado | Casos superados | Puntos |
-|:---:|---|:---:|---|
-| A | Crear la tabla e insertar | 3 / 3 | 3,00 / 3,00 |
-| B | Consultas | 5 / 5 | 5,00 / 5,00 |
-| C | Borrado | 0 / 2 | 0,00 / 2,00  ← |
-| | | | **NOTA: 8,00** |
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> La función aplica <code>.upper()</code> al DNI antes de hashear, así que <code>"11111111h"</code> y <code>"11111111H"</code> producen el mismo seudónimo.</details>
 
-La corrección es automática: se monta un proyecto con la batería completa más el fichero
-entregado, se ejecuta y se reparte la nota con esa cuenta. **Nadie interpreta nada.**
+**3.** ¿Qué imprime este código?
 
-Además recibes un informe con los casos concretos que han fallado, con el valor que
-esperaba y el que devolvió tu función.
+```python
+import hashlib
 
-!!! note "Los tres requisitos de la entrega"
-    No puntúan por separado, pero forman parte de la especificación:
+def seudonimo(dni: str, sal: str = "cmo314") -> str:
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
 
-    1. Entregar **el fichero de `src/`**, con ese nombre.
-    2. `mypy src` sin errores.
-    3. Cada función con su **docstring**.
+print(seudonimo("11111111H", "salA") == seudonimo("11111111H", "salB"))
+```
 
-    Un fichero que no compila o que no se puede importar da **0 casos superados**, así que
-    en la práctica valen mucho más que unos puntos.
+A) `True`, porque el DNI es el mismo
+B) `False`, porque la sal forma parte de lo que se hashea
+C) Lanza una excepción, la sal debe ser siempre la misma
+D) `True` solo si las dos sales tienen la misma longitud
 
----
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La sal se concatena con el DNI antes de hashear; sales distintas producen seudónimos distintos para el mismo DNI. Por eso reutilizar la misma sal entre sistemas es lo que permite cruzarlos.</details>
 
-### Material de apoyo de la unidad
+**4.** ¿Qué imprime este código?
 
-- **[Proyecto de la unidad](../proyectos/ud6/README.md)** — `inventario`, 13 tests.
-- **[Simulacro de examen](../simulacros/ra6/README.md)** — `museo`, 11 tests.
+```python
+def enmascarar_email(email: str) -> str:
+    u, _, d = email.partition("@")
+    if len(u) <= 2:
+        return u[0] + "*@" + d
+    return u[0] + "*" * (len(u) - 2) + u[-1] + "@" + d
+
+print(enmascarar_email("laura.gomez@iesx.es"))
+```
+
+A) `l**********z@iesx.es`
+B) `l*********z@iesx.es`
+C) `**@iesx.es`
+D) `laura.gomez@iesx.es` sin cambios
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El usuario <code>"laura.gomez"</code> tiene 11 caracteres; se conserva el primero y el último, y los 9 del medio se sustituyen por asteriscos.</details>
+
+**5.** ¿Qué imprime este código?
+
+```python
+import re
+
+PATRON_DNI = re.compile(r"\b\d{8}[A-Za-z]\b")
+PATRON_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+
+def anonimizar_texto(t: str) -> str:
+    t = PATRON_DNI.sub("[DNI]", t)
+    t = PATRON_EMAIL.sub("[EMAIL]", t)
+    return t
+
+print(anonimizar_texto("Cliente 87654321X, tel 699123456, email laura@x.com"))
+```
+
+A) `Cliente [DNI], tel [TEL], email [EMAIL]`
+B) `Cliente [DNI], tel 699123456, email [EMAIL]`
+C) `Cliente 87654321X, tel 699123456, email [EMAIL]`
+D) `[DNI], [DNI], [EMAIL]` — el teléfono también encaja con el patrón de DNI
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El DNI y el email encajan con sus patrones y se sustituyen. El teléfono (9 dígitos, sin letra final) no encaja con <code>PATRON_DNI</code> (que exige una letra al final) ni existe un patrón de teléfono en esta versión de la función, así que queda expuesto.</details>
+
+**6.** ¿Qué imprime este código?
+
+```python
+def plazo_ok(meses: int) -> bool:
+    if meses < 0:
+        raise ValueError(f"negativo: {meses}")
+    return 1 <= meses <= 60
+
+print(plazo_ok(0))
+print(plazo_ok(36))
+```
+
+A) `True True`
+B) `False True`
+C) `True False`
+D) `False False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>0</code> no cumple <code>1 &lt;= meses</code> (el rango empieza en 1) → <code>False</code>. <code>36</code> sí está dentro de <code>[1,60]</code> → <code>True</code>.</details>
+
+**7.** ¿Qué imprime este código?
+
+```python
+BASES = {"consentimiento", "contrato", "obligacion_legal", "interes_vital", "interes_publico", "interes_legitimo"}
+def base_valida(b): return b.strip().lower() in BASES
+
+def evaluar_tratamiento(t: dict) -> list[str]:
+    fallos = []
+    if not base_valida(t.get("base", "")):
+        fallos.append("base_invalida")
+    if not t.get("finalidad", "").strip():
+        fallos.append("sin_finalidad")
+    plazo = t.get("plazo_meses", -1)
+    if plazo < 0 or plazo > 60:
+        fallos.append("plazo_fuera_rango")
+    return fallos
+
+t = {"base": "consentimiento", "finalidad": "envío de newsletter", "plazo_meses": -3}
+print(evaluar_tratamiento(t))
+```
+
+A) `[]`
+B) `['plazo_fuera_rango']`
+C) Lanza `ValueError`, porque el plazo es negativo
+D) `['base_invalida', 'plazo_fuera_rango']`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La base es válida y la finalidad no está vacía, pero el plazo es negativo. A diferencia de <code>plazo_ok</code>, aquí la comparación es directa (<code>plazo &lt; 0</code>) para poder acumular el fallo en la lista sin interrumpir la función con una excepción.</details>
+
+**8.** ¿Qué imprime este código?
+
+```python
+def evaluar_tratamiento(t: dict) -> list[str]:
+    # (misma función de la pregunta anterior)
+    ...
+
+def cumple(t: dict) -> bool:
+    return not evaluar_tratamiento(t)
+
+t = {"base": "consentimiento", "finalidad": "newsletter", "plazo_meses": 12}
+print(cumple(t))
+```
+
+A) `True`
+B) `False`
+C) `[]`
+D) `None`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Con base válida, finalidad declarada y plazo dentro de rango, <code>evaluar_tratamiento</code> devuelve una lista vacía; <code>not []</code> es <code>True</code>.</details>
+
+**9.** ¿Qué imprime este código?
+
+```python
+import hashlib
+
+def seudonimo(dni, sal="cmo314"):
+    return hashlib.sha256((sal + dni.upper()).encode()).hexdigest()[:12]
+
+def seudonimizar_lote(dnis: list[str], sal: str) -> dict[str, str]:
+    return {d: seudonimo(d, sal) for d in dnis}
+
+lote = seudonimizar_lote(["11111111H", "22222222J"], "salX")
+print(len(lote), all(len(v) == 12 for v in lote.values()))
+```
+
+A) `2 True`
+B) `1 True`
+C) `2 False`
+D) `12 True`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El diccionario tiene una entrada por cada DNI (2), y cada seudónimo generado tiene exactamente 12 caracteres (por el <code>[:12]</code> del hexdigest).</details>
+
+**10.** Dos sistemas seudonimizan el mismo DNI con la **misma** sal, por error de configuración compartida:
+
+```python
+def sal_reutilizada(mapa1: dict, mapa2: dict) -> list[str]:
+    return sorted(set(mapa1.values()) & set(mapa2.values()))
+
+mapaA = {"11111111H": seudonimo("11111111H", "comun")}
+mapaB = {"11111111H": seudonimo("11111111H", "comun")}
+print(len(sal_reutilizada(mapaA, mapaB)) > 0)
+```
+
+A) `True`, se detecta la coincidencia
+B) `False`, los diccionarios son distintos así que nunca coinciden
+C) Lanza una excepción, no se pueden comparar sets de hashes
+D) Depende del orden de las claves en cada diccionario
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Como ambos sistemas usan la misma sal para el mismo DNI, generan el <b>mismo</b> seudónimo; la intersección de conjuntos lo detecta — es la señal de alarma de re-identificación cruzada.</details>
+
+**11.** ¿Qué le ocurre a la columna `"nombre"` al ejecutar esto?
+
+```python
+import csv, io
+
+def anonimizar_csv(texto_csv: str, columnas: list[str]) -> str:
+    lector = csv.DictReader(io.StringIO(texto_csv))
+    filas = []
+    for fila in lector:
+        for col in columnas:
+            if col in fila:
+                fila[col] = seudonimo(fila[col])
+        filas.append(fila)
+    salida = io.StringIO()
+    escritor = csv.DictWriter(salida, fieldnames=lector.fieldnames or [])
+    escritor.writeheader()
+    escritor.writerows(filas)
+    return salida.getvalue()
+
+resultado = anonimizar_csv("nombre,dni\nAna,11111111H\n", columnas=["dni"])
+print("11111111H" in resultado, "Ana" in resultado)
+```
+
+A) `False True`
+B) `True False`
+C) `False False`
+D) `True True`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Solo se seudonimizan las columnas indicadas en <code>columnas</code> (aquí, solo <code>"dni"</code>); <code>"nombre"</code> se copia tal cual, así que <code>"Ana"</code> sigue en el resultado y el DNI original ya no.</details>
+
+**12.** ¿Qué imprime este código?
+
+```python
+def informe_cumplimiento(tratamientos: list[dict]) -> list[str]:
+    lineas = []
+    for t in tratamientos:
+        f = evaluar_tratamiento(t)
+        lineas.append(f"{t['nombre']}: {'OK' if not f else ','.join(f)}")
+    return sorted(lineas, key=lambda l: ": OK" in l)
+
+tratamientos = [
+    {"nombre": "X", "base": "contrato", "finalidad": "a", "plazo_meses": 10},
+    {"nombre": "Y", "base": "mala", "finalidad": "", "plazo_meses": -1},
+]
+print(informe_cumplimiento(tratamientos))
+```
+
+A) `['X: OK', 'Y: base_invalida,sin_finalidad,plazo_fuera_rango']`
+B) `['Y: base_invalida,sin_finalidad,plazo_fuera_rango', 'X: OK']`
+C) Están en el mismo orden que la lista original
+D) Solo aparece `Y`, porque `X` se omite al cumplir
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El <code>sorted(..., key=lambda l: ": OK" in l)</code> pone <code>False</code> antes que <code>True</code>: las líneas que <b>no</b> terminan en <code>": OK"</code> (los incumplimientos) van primero.</details>
+
+**13.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+import re
+
+PATRON_DNI = re.compile(r"\b\d{8}[A-Za-z]\b")
+PATRON_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+
+def anonimizar_texto(t):
+    t = PATRON_DNI.sub("[DNI]", t)
+    t = PATRON_EMAIL.sub("[EMAIL]", t)
+    return t
+
+def anonimizar_fichero(texto: str) -> str:
+    return "\n".join(anonimizar_texto(l) for l in texto.splitlines())
+
+texto = "Cliente 12345678Z solicita baja\nContacto: ana@empresa.com"
+print(anonimizar_fichero(texto))
+```
+
+A) `Cliente [DNI] solicita baja` / `Contacto: [EMAIL]` (dos líneas)
+B) `Cliente 12345678Z solicita baja` / `Contacto: ana@empresa.com` (sin cambios)
+C) Todo el texto en una sola línea, sin el salto
+D) Lanza una excepción porque hay dos líneas
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>anonimizar_fichero</code> aplica <code>anonimizar_texto</code> línea a línea y las vuelve a unir con <code>"\n"</code>, conservando la estructura del fichero original.</details>
+
+**14.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+def evaluar_tratamiento(t: dict) -> list[str]:
+    # (misma función de las preguntas anteriores)
+    ...
+
+t = {"base": "obligacion_legal", "finalidad": "cumplimiento fiscal", "plazo_meses": 60}
+print(evaluar_tratamiento(t))
+```
+
+A) `[]`
+B) `['plazo_fuera_rango']`, porque 60 es el límite exacto
+C) `['base_invalida']`
+D) Lanza una excepción, 60 meses son demasiados años
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>"obligacion_legal"</code> es una base válida, la finalidad no está vacía, y <code>60</code> cumple <code>plazo &lt;= 60</code> (el límite es inclusive) — no hay ningún fallo.</details>
+
+**15.** *(Sobre el reto de la unidad)* Este tratamiento **no incluye la clave** `"plazo_meses"` en absoluto:
+
+```python
+def evaluar_tratamiento(t: dict) -> list[str]:
+    fallos = []
+    if not base_valida(t.get("base", "")):
+        fallos.append("base_invalida")
+    if not t.get("finalidad", "").strip():
+        fallos.append("sin_finalidad")
+    plazo = t.get("plazo_meses", -1)
+    if plazo < 0 or plazo > 60:
+        fallos.append("plazo_fuera_rango")
+    return fallos
+
+t = {"base": "contrato", "finalidad": "factura"}
+print(evaluar_tratamiento(t))
+```
+
+A) `[]`, porque no se puede validar lo que no existe
+B) `['plazo_fuera_rango']`
+C) Lanza `KeyError`, falta la clave `"plazo_meses"`
+D) `['sin_finalidad', 'plazo_fuera_rango']`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>t.get("plazo_meses", -1)</code> no lanza <code>KeyError</code>: como la clave no existe, devuelve el valor por defecto <code>-1</code>, que es negativo y por tanto incumple.</details>

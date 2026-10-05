@@ -1,1170 +1,1015 @@
-# Unidad 2 · Programas sencillos: funciones y librerías
+# Unidad 2 · Seguridad activa, malware y red
 
-> **Módulo:** CMO-313 · Fundamentos de programación
-> **Resultado de aprendizaje:** RA2 · **Duración:** 8 h · **Peso:** 15 %
-> **Lenguaje:** Python 3 (tipado) · **Requisito:** haber superado la UD1
+> **Módulo:** CMO-314 · Ciberseguridad · **RA2** · **Duración:** 16 h · **Peso:** 20 % · **Herramienta:** Python 3 (tipado) + `re`
 
-En la UD1 escribías programas «de un tirón»: leer, calcular, mostrar. Eso funciona con problemas pequeños, pero se vuelve inmanejable en cuanto crecen. Esta unidad enseña la herramienta que lo resuelve: **dividir el problema en funciones** y **reutilizar código ya hecho** mediante librerías.
+Si la UT1 iba de **proteger datos en reposo**, esta va de **vigilar lo que se mueve**: tráfico, sesiones, intentos de acceso. La herramienta que vas a dominar es `re` (expresiones regulares) — la navaja suiza para convertir un log en bruto, ilegible, en datos que puedes analizar. Al terminar habrás construido un **detector de fuerza bruta** capaz de leer un registro de autenticación y señalar, con criterio, qué IP está atacando.
 
----
+!!! reto "El reto de la unidad"
+    **Caza un ataque de fuerza bruta escondido en un registro de accesos.** Vas a construir un detector que lea un log y señale las IP sospechosas. Todo lo de abajo es tu entrenamiento para resolverlo tú solo.
 
-## Mapa de la unidad
+```mermaid
+flowchart TB
+    A["Amenazas y malware"] --> B["Tipos de ataque de red"]
+    B --> C["Expresiones regulares<br/>con re"]
+    C --> D["Parsear logs<br/>con grupos con nombre"]
+    D --> E["Contar y detectar<br/>patrones (Counter)"]
+    E --> F["Monitorización<br/>y SIEM"]
+    D --> P["RETO<br/>Detector de fuerza bruta"]
+    E --> P
+    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
+```
 
-<figure markdown>
-  ![Mapa de la unidad 2](../assets/diagramas/ud2-mapa.svg#only-light)
-  ![Mapa de la unidad 2](../assets/diagramas/ud2-mapa-dark.svg#only-dark)
-  <figcaption>Un problema grande se parte en funciones; las librerías aportan funciones ya hechas.</figcaption>
-</figure>
+**Qué sabrás hacer al terminar:** distinguir los tipos de malware y de ataque de red más comunes · escribir expresiones regulares con grupos con nombre · parsear un log línea a línea y extraer campos estructurados · contar y detectar patrones con `collections.Counter` · explicar qué hace un SIEM y por qué existe · construir una CLI de detección con `argparse`, tipada y probada.
 
-### Qué vas a saber hacer al terminar
+**Cómo se trabaja (aula invertida):** lees la sección y ejecutas los ejemplos antes de clase → en clase resuelves las actividades y avanzas el reto en parejas.
 
-- [ ] Descomponer un problema en **funciones** con una responsabilidad clara.
-- [ ] Definir funciones con **parámetros** y **valor de retorno**, anotando los tipos.
-- [ ] Distinguir `return` de `print` (el error más común de esta unidad).
-- [ ] Usar **parámetros por defecto** y llamadas por nombre.
-- [ ] Entender el **ámbito** de las variables (local y global).
-- [ ] Manejar **listas** para trabajar con conjuntos de datos.
-- [ ] Importar y usar la **librería estándar** (`math`, `random`, `statistics`).
-- [ ] Crear tu **propio módulo** e importarlo desde otro programa.
-
-### Cómo se trabaja esta unidad
-
-Igual que la UD1, y en este orden:
-
-**lees la sección** → **reto rápido** → **ejercicios de esa sección** (con solución
-desplegable, al final de cada una) → en clase, dudas y **actividades guiadas** (sección 10)
-→ **proyecto** con sus tests → **test de práctica** → examen (que en este trimestre es un **test de código**).
-
-!!! tip "Los ejercicios de sección son la clave"
-    Están justo después de cada explicación y solo usan lo que acabas de leer. Hazlos en
-    el momento: es lo que hace que el tiempo de clase se pueda dedicar a lo que cuesta.
+!!! danger "Recordatorio de uso ético"
+    Analizarás logs y patrones de ataque **con fines defensivos**, sobre datos de laboratorio o tuyos. Nunca contra sistemas ajenos. Ver [Uso ético y legal](../recursos/uso-etico.md).
 
 ---
 
-## 1. Por qué funciones
+## 1. Amenazas y malware
 
-Imagina que necesitas calcular la media de notas en cinco sitios distintos de un programa. Sin funciones, copias el cálculo cinco veces. Y cuando descubras un fallo, tendrás que corregirlo… cinco veces (y olvidarás alguna).
+**Malware** es cualquier software diseñado para dañar, robar o tomar el control sin permiso. No es un tipo, es una familia:
 
-Una **función** es un trozo de código con nombre que hace **una cosa concreta** y puede reutilizarse cuantas veces quieras.
+| Tipo | Cómo actúa | Ejemplo de objetivo |
+|---|---|---|
+| **Virus** | Necesita un fichero "hospedador" para propagarse | Infecta ejecutables |
+| **Gusano (worm)** | Se replica solo, sin hospedador, viaja por red | Satura redes enteras |
+| **Troyano** | Se disfraza de software legítimo | Abre una puerta trasera |
+| **Ransomware** | Cifra los datos y pide un rescate | Extorsión (§UT1 tenía el hash del lado defensivo) |
+| **Spyware** | Roba información en silencio | Contraseñas, pulsaciones de teclado |
 
-> **Analogía.** Una función es como una **receta con nombre**: «hacer masa». La escribes una vez y luego dices «hago masa» sin repetir los pasos. Le pasas ingredientes (parámetros) y te devuelve un resultado (return).
+```python title="clasificar_malware.py"
+COMPORTAMIENTO_A_TIPO = {
+    "autorreplica_por_red": "gusano",
+    "requiere_archivo_hospedador": "virus",
+    "cifra_y_pide_rescate": "ransomware",
+    "se_oculta_en_utilidad_legitima": "troyano",
+    "roba_datos_en_silencio": "spyware",
+}
 
-Las tres razones para usarlas:
+def clasifica(comportamiento: str) -> str:
+    return COMPORTAMIENTO_A_TIPO.get(comportamiento, "desconocido")
 
-| Razón | Qué significa |
+for c in ["cifra_y_pide_rescate", "autorreplica_por_red", "algo_nuevo"]:
+    print(f"{c:32} -> {clasifica(c)}")
+```
+
+```text title="Salida"
+cifra_y_pide_rescate            -> ransomware
+autorreplica_por_red            -> gusano
+algo_nuevo                      -> desconocido
+```
+
+!!! reto "Reto rápido 1"
+    Un ransomware moderno a menudo **también** exfiltra datos antes de cifrar (doble extorsión — lo viste en la UT1). ¿Debería `clasifica()` devolver dos etiquetas en ese caso? ¿Cómo cambiarías la función para permitirlo?
+
+---
+
+## 2. Ataques de red más comunes
+
+| Ataque | Qué hace | Pista típica en el log |
+|---|---|---|
+| **Fuerza bruta** | Prueba contraseñas hasta acertar | Muchos `FALLO` seguidos, misma IP |
+| **DoS / DDoS** | Satura un servicio hasta tumbarlo | Picos enormes de peticiones |
+| **Phishing** | Engaña para robar credenciales | (no deja huella en logs de servidor) |
+| **Escaneo de puertos** | Reconocimiento previo a un ataque | Muchas IP-destino distintas en poco tiempo desde una IP |
+| **Man-in-the-middle** | Se interpone en una comunicación | Certificados TLS inesperados |
+
+```mermaid
+flowchart LR
+    R["Reconocimiento<br/>(escaneo)"] --> A["Acceso<br/>(fuerza bruta, phishing)"]
+    A --> P["Persistencia<br/>(troyano, backdoor)"]
+    P --> Ob["Objetivo<br/>(robo, cifrado, sabotaje)"]
+```
+
+!!! analogia "Analogía"
+    Un atacante de fuerza bruta es como alguien probando llaves en una cerradura, una tras otra, toda la noche. No hace ruido de cristal roto — pero deja **huellas**: la misma persona, la misma puerta, muchas veces seguidas. Eso es justo lo que vas a detectar.
+
+---
+
+## 3. Expresiones regulares con `re`: la herramienta de esta unidad
+
+Una expresión regular describe un **patrón** de texto. `re` es el módulo de Python para buscarlo, extraerlo o sustituirlo.
+
+```python title="regex_basico.py"
+import re
+
+texto = "Conexión desde 10.0.20.5 al puerto 22"
+
+# search: busca el patrón en cualquier parte
+m = re.search(r"\d{1,3}(?:\.\d{1,3}){3}", texto)   # una IPv4
+print(m.group() if m else None)
+
+# findall: todas las coincidencias
+puertos = re.findall(r"puerto (\d+)", texto)
+print(puertos)
+
+# sub: sustituir
+anonimizado = re.sub(r"\d{1,3}(?:\.\d{1,3}){3}", "[IP]", texto)
+print(anonimizado)
+```
+
+```text title="Salida"
+10.0.20.5
+['22']
+Conexión desde [IP] al puerto 22
+```
+
+### 3.1 Grupos con nombre: la técnica que más vas a usar
+
+En vez de acordarte de que "la IP es el grupo 2", la pides **por su nombre**:
+
+```python title="grupos_con_nombre.py"
+import re
+
+patron = re.compile(
+    r"usuario=(?P<usuario>\S+)\s+ip=(?P<ip>\S+)\s+estado=(?P<estado>OK|FALLO)"
+)
+linea = "2026-05-01 10:00:01 sshd usuario=root ip=10.0.20.5 estado=FALLO"
+
+m = patron.search(linea)
+if m:
+    print(m["usuario"], m["ip"], m["estado"])
+    print(m.groupdict())    # los tres campos como diccionario, muy útil
+```
+
+```text title="Salida"
+root 10.0.20.5 FALLO
+{'usuario': 'root', 'ip': '10.0.20.5', 'estado': 'FALLO'}
+```
+
+| Símbolo | Significa |
 |---|---|
-| **No repetirse** | El código se escribe una vez y se usa muchas. |
-| **Dividir el problema** | Un problema grande se convierte en varios pequeños que sí sabes resolver. |
-| **Poder probarlo** | Una función se puede comprobar por separado (es lo que hacen tus tests). |
-
-> **Reto rápido 1.** Piensa en el programa de la UD1 (presupuesto). ¿Qué parte convertirías en función y cómo la llamarías?
-
-## 2. Definir y llamar funciones
-
-### 2.1 La estructura
-
-```python
-def area_rectangulo(base: float, altura: float) -> float:
-    """Devuelve el área de un rectángulo."""
-    return base * altura
-```
-
-Pieza a pieza:
-
-| Parte | Qué es |
-|---|---|
-| `def` | palabra reservada que inicia la definición |
-| `area_rectangulo` | **nombre** (en `snake_case`, describe lo que hace) |
-| `base: float, altura: float` | **parámetros** con su tipo: los datos que necesita |
-| `-> float` | el tipo que **devuelve** |
-| `"""..."""` | *docstring*: qué hace la función |
-| `return` | **devuelve** el resultado a quien la llamó |
-
-Para **usarla** (llamarla):
-
-```python
-resultado: float = area_rectangulo(3.0, 4.0)
-print(resultado)        # 12.0
-```
-
-!!! warning "El error nº 1 de esta unidad: `return` no es `print`"
-    ```python
-    def suma_mal(a: int, b: int) -> None:
-        print(a + b)          # ✗ muestra, pero no devuelve
-
-    def suma_bien(a: int, b: int) -> int:
-        return a + b          # ✓ devuelve: puedes usar el resultado
-    ```
-    Con `suma_mal` no puedes hacer `total = suma_mal(2, 3) * 10`, porque `total` valdría `None`. **La función calcula y devuelve; quien la llama decide si lo muestra.**
-
-### 2.2 Funciones que no devuelven nada
-
-Algunas funciones solo *hacen* algo (mostrar por pantalla, por ejemplo). Se anotan con `-> None`:
-
-```python
-def saludar(nombre: str) -> None:
-    print(f"Hola, {nombre}")
-
-saludar("Ada")          # Hola, Ada
-```
-
-### 2.3 Devolver varios valores
-
-Con una tupla, separando por comas:
-
-```python
-def area_y_perimetro(base: float, altura: float) -> tuple[float, float]:
-    return base * altura, 2 * (base + altura)
-
-area, perimetro = area_y_perimetro(4, 3)    # 12.0  y  14.0
-```
-
-> **Reto rápido 2.** Escribe `cuadrado(n: int) -> int` que devuelva el cuadrado de un número. Llámala con 7 y muestra el resultado.
-
-## 3. Parámetros
-
-### 3.1 Posicionales y por nombre
-
-```python
-def presentar(nombre: str, edad: int) -> str:
-    return f"{nombre} tiene {edad} años"
-
-print(presentar("Ada", 36))              # por posición
-print(presentar(edad=36, nombre="Ada"))  # por nombre: el orden da igual
-```
-
-### 3.2 Parámetros por defecto
-
-Un parámetro puede tener valor por defecto; entonces es opcional al llamar:
-
-```python
-def precio_con_iva(precio: float, iva: int = 21) -> float:
-    return precio * (1 + iva / 100)
-
-print(precio_con_iva(100))        # 121.0  (usa 21)
-print(precio_con_iva(100, 10))    # 110.0  (usa 10)
-```
-
-!!! tip "Los parámetros con valor por defecto van al final"
-    `def f(a, b=2, c)` es un error de sintaxis. Primero los obligatorios, después los opcionales.
-
-> **Reto rápido 3.** Añade a `presentar` un parámetro `saludo: str = "Hola"` y haz que el texto empiece por él.
-
-## 4. Ámbito de las variables
-
-Una variable creada **dentro** de una función solo existe ahí: es **local**. Cuando la función termina, desaparece.
-
-```python
-def calcular() -> int:
-    total = 10        # variable LOCAL
-    return total
-
-calcular()
-print(total)          # ✗ NameError: 'total' no existe fuera
-```
-
-Las variables de fuera son **globales** y sí se pueden *leer* desde dentro:
-
-```python
-IVA = 21                       # global (constante)
-
-def con_iva(precio: float) -> float:
-    return precio * (1 + IVA / 100)   # puede leer IVA
-```
-
-!!! warning "No modifiques variables globales desde una función"
-    Existe la palabra `global`, pero usarla convierte el programa en algo imposible de seguir. **Lo correcto es pasar los datos por parámetro y devolver el resultado.** Una función que solo depende de sus parámetros se llama *función pura* y es la más fácil de probar.
-
-> **Reto rápido 4.** ¿Qué imprime este código? *(Piensa antes de ejecutarlo.)*
-> ```python
-> x = 5
-> def cambiar() -> None:
->     x = 99
-> cambiar()
-> print(x)
-> ```
-> *(Respuesta: `5`. La `x` de dentro es otra variable distinta.)*
-
-## 5. Listas: trabajar con varios datos
-
-Hasta ahora cada variable guardaba **un** valor. Una **lista** guarda **muchos** bajo un solo nombre:
-
-```python
-notas: list[float] = [5.0, 7.5, 9.0, 4.5]
-
-print(notas[0])        # 5.0    primer elemento (se empieza en 0)
-print(notas[-1])       # 4.5    último
-print(len(notas))      # 4      cuántos hay
-```
-
-Operaciones básicas:
-
-```python
-notas.append(6.0)      # añadir al final
-print(sum(notas))      # 32.0   suma de todos
-print(max(notas))      # 9.0    el mayor
-print(min(notas))      # 4.5    el menor
-```
-
-Con esto ya puedes escribir funciones que reciben listas:
-
-```python
-def media(numeros: list[float]) -> float:
-    return sum(numeros) / len(numeros)
-
-print(media([5.0, 7.5, 9.0]))      # 7.166666666666667
-```
-
-!!! warning "Cuidado con la lista vacía"
-    `media([])` provoca `ZeroDivisionError`, porque `len([])` es 0. En la UD3 aprenderás a controlarlo; de momento, tenlo presente.
-
-> **Reto rápido 5.** Escribe `cuantos(numeros: list[int]) -> int` que devuelva cuántos elementos tiene la lista.
-
-## 6. Librerías: código ya escrito
-
-Una **librería** (o módulo) es un conjunto de funciones ya hechas que puedes usar. Python trae muchas incluidas: es la **librería estándar**.
-
-### 6.1 Importar
-
-```python
-import math
-
-print(math.sqrt(16))      # 4.0     raíz cuadrada
-print(math.pi)            # 3.141592653589793
-print(math.floor(3.7))    # 3       redondea hacia abajo
-print(math.ceil(3.2))     # 4       redondea hacia arriba
-```
-
-También puedes importar solo lo que necesitas:
-
-```python
-from math import sqrt, pi
-
-print(sqrt(25))     # 5.0    ya no hace falta escribir math.
-```
-
-### 6.2 Tres librerías útiles ya
-
-```python
-import random
-print(random.randint(1, 6))        # número al azar entre 1 y 6
-print(random.choice(["a", "b"]))   # elemento al azar de una lista
-
-import statistics
-print(statistics.mean([2, 4, 6]))     # 4      media
-print(statistics.median([1, 5, 9]))   # 5      mediana
-```
-
-!!! tip "Antes de programar algo, mira si ya existe"
-    `statistics.mean()` ya calcula medias. Escribir tu propia versión está bien **para aprender**, pero en un proyecto real se usa la librería: está probada por miles de personas.
-
-### 6.3 Tu propio módulo
-
-Cualquier fichero `.py` es un módulo importable. Si creas `utilidades.py`:
-
-```python
-# utilidades.py
-def doble(n: int) -> int:
-    return n * 2
-
-def triple(n: int) -> int:
-    return n * 3
-```
-
-lo usas desde otro fichero de la misma carpeta:
-
-```python
-# principal.py
-import utilidades
-
-print(utilidades.doble(5))     # 10
-```
-
-o importando funciones sueltas:
-
-```python
-from utilidades import doble, triple
-print(doble(5), triple(5))     # 10 15
-```
-
-> **Reto rápido 6.** Crea `mis_utiles.py` con una función `mitad(n: float) -> float` e impórtala desde otro fichero.
-
-## 7. `if __name__ == "__main__":`
-
-Cuando importas un módulo, Python **ejecuta todo su código suelto**. Si tu fichero tiene pruebas o `input()` fuera de las funciones, se dispararán al importarlo, que no es lo que quieres.
-
-La solución es este guardián:
-
-```python
-def doble(n: int) -> int:
-    return n * 2
-
-if __name__ == "__main__":
-    # esto SOLO se ejecuta si lanzas este fichero directamente
-    print(doble(21))
-```
-
-- Si ejecutas `python utilidades.py` → se ejecuta el bloque.
-- Si haces `import utilidades` desde otro sitio → **no** se ejecuta.
-
-!!! tip "Regla práctica de esta unidad"
-    En un módulo de funciones, **todo el código suelto va dentro de ese `if`**. Tus tests importan el fichero, así que si dejas un `input()` fuera, se quedarán colgados.
+| `\d` | Un dígito | `\S` | Un carácter que no es espacio |
+| `+` | Uno o más | `*` | Cero o más |
+| `(?P<nombre>...)` | Grupo con nombre | `\s+` | Uno o más espacios |
+| `search()` | Busca en cualquier parte | `fullmatch()` | Debe encajar la cadena entera |
+
+!!! warning "Atención"
+    `re.search` devuelve `None` si no encuentra nada — **siempre** comprueba con `if m:` antes de usar `m["campo"]`, o tendrás un `TypeError: NoneType is not subscriptable`.
+
+!!! reto "Reto rápido 2"
+    Cambia el patrón para que también capture la **fecha** al principio de la línea (`2026-05-01`) en un grupo `fecha`. Pista: `\d{4}-\d{2}-\d{2}`.
 
 ---
 
-> **Reto rápido 7.** Coge un fichero con una función `saluda()` y añádele `if __name__ == "__main__":` con una llamada de prueba. Impórtalo desde otro fichero y comprueba que no se ejecuta nada.
+## 4. Parsear un log completo
 
-## 8. Cómo descomponer un problema
+Un log real son muchas líneas. La estrategia: parsear cada línea, descartar las que no encajan, y quedarte con una lista de eventos estructurados.
 
-El método, paso a paso:
+```python title="parsear_log.py"
+import re
 
-1. **Escribe qué hay que hacer** en frases cortas.
-2. Cada frase con un verbo claro → **una función**.
-3. Decide qué **necesita** cada una (parámetros) y qué **da** (return).
-4. Escríbelas y **pruébalas por separado**.
-5. Monta el programa principal llamándolas.
+PATRON = re.compile(r"usuario=(?P<usuario>\S+)\s+ip=(?P<ip>\S+)\s+estado=(?P<estado>OK|FALLO)")
 
-**Ejemplo.** «Calcular la nota final de un alumno a partir de sus notas, y decir si aprueba.»
+def parsear_evento(linea: str) -> dict[str, str] | None:
+    m = PATRON.search(linea)
+    return m.groupdict() if m else None
+
+def parsear_log(texto: str) -> list[dict[str, str]]:
+    eventos = []
+    for linea in texto.splitlines():
+        evento = parsear_evento(linea)
+        if evento is not None:
+            eventos.append(evento)
+    return eventos
+
+LOG = """\
+2026-05-01 10:00:01 sshd usuario=root ip=10.0.20.5 estado=FALLO
+2026-05-01 10:00:02 sshd usuario=root ip=10.0.20.5 estado=FALLO
+linea corrupta sin formato
+2026-05-01 10:00:03 sshd usuario=ana ip=10.0.20.9 estado=OK
+"""
+
+eventos = parsear_log(LOG)
+print(f"{len(eventos)} eventos válidos de {len(LOG.splitlines())} líneas")
+for e in eventos:
+    print(e)
+```
+
+```text title="Salida"
+3 eventos válidos de 4 líneas
+{'usuario': 'root', 'ip': '10.0.20.5', 'estado': 'FALLO'}
+{'usuario': 'root', 'ip': '10.0.20.5', 'estado': 'FALLO'}
+{'usuario': 'ana', 'ip': '10.0.20.9', 'estado': 'OK'}
+```
+
+> La línea corrupta se descarta sola, sin que el programa se caiga. Esto es clave: **un log real siempre tiene basura**, y tu parser tiene que sobrevivir a ella.
+
+---
+
+## 5. Contar y detectar: `collections.Counter`
+
+Con los eventos parseados, contar fallos por IP es una línea:
+
+```python title="detectar_umbral.py"
+from collections import Counter
+
+def contar_fallos_por_ip(eventos: list[dict[str, str]]) -> dict[str, int]:
+    contador: Counter[str] = Counter()
+    for e in eventos:
+        if e["estado"] == "FALLO":
+            contador[e["ip"]] += 1
+    return dict(contador)
+
+def ips_sospechosas(eventos: list[dict[str, str]], umbral: int = 5) -> list[str]:
+    fallos = contar_fallos_por_ip(eventos)
+    return sorted([ip for ip, n in fallos.items() if n >= umbral],
+                  key=lambda ip: -fallos[ip])
+
+eventos = [{"usuario": "root", "ip": "10.0.20.5", "estado": "FALLO"}] * 5
+eventos += [{"usuario": "ana", "ip": "10.0.20.9", "estado": "OK"}]
+print(contar_fallos_por_ip(eventos))
+print(ips_sospechosas(eventos, umbral=5))
+```
+
+```text title="Salida"
+{'10.0.20.5': 5}
+['10.0.20.5']
+```
+
+### 5.1 ¿Y si además tuvo éxito? Ahí está el peligro real
+
+```python title="acceso_tras_fuerza_bruta.py"
+def hubo_acceso_correcto(eventos: list[dict[str, str]], ip: str) -> bool:
+    return any(e["ip"] == ip and e["estado"] == "OK" for e in eventos)
+
+eventos = [
+    {"ip": "10.0.20.5", "estado": "FALLO"}, {"ip": "10.0.20.5", "estado": "FALLO"},
+    {"ip": "10.0.20.5", "estado": "OK"},     # ¡al final entró!
+]
+print(hubo_acceso_correcto(eventos, "10.0.20.5"))
+```
+
+```text title="Salida"
+True
+```
+
+!!! analogia "Analogía"
+    Una IP con 50 fallos y **sin ningún éxito** es ruidosa pero no crítica: el atacante no ha entrado (todavía). Una IP con 5 fallos **seguidos de un OK** es la alarma roja: probablemente acertó la contraseña. Ese matiz es lo que separa una alerta informativa de una crítica.
+
+!!! reto "Reto rápido 3"
+    Con los eventos de arriba, ¿cuántos fallos tuvo `10.0.20.5` antes del `OK`? Escribe una función `fallos_antes_de_ok(eventos, ip) -> int`.
+
+---
+
+## 6. Monitorización y SIEM
+
+Un **SIEM** (*Security Information and Event Management*) centraliza los logs de toda una organización, los correla en tiempo real y dispara alertas — es, a escala industrial, exactamente lo que acabas de programar a mano: parsear, contar, detectar umbral.
+
+```mermaid
+flowchart LR
+    S1["Servidor web"] --> C["Recolector<br/>de logs"]
+    S2["Firewall"] --> C
+    S3["Servidor SSH"] --> C
+    C --> Co["Correlación<br/>de eventos"]
+    Co --> Al["Alerta"]
+```
+
+| Herramienta real | Qué hace |
+|---|---|
+| Wazuh, Splunk, ELK | SIEM: centraliza, correla, alerta |
+| `fail2ban` | Bloquea IPs tras N fallos (la misma lógica que tu detector) |
+| Suricata | Detección de intrusiones por firma de tráfico |
+
+---
+
+## 7. Errores frecuentes (ten esto a mano)
+
+| Error | Causa | Solución |
+|---|---|---|
+| `TypeError: 'NoneType' object is not subscriptable` | Usar `m["campo"]` sin comprobar `if m:` | Comprueba siempre antes |
+| El patrón no encaja nunca | Espacios reales vs `\s`, o mayúsculas | Prueba con `re.search` en un REPL antes de automatizar |
+| `re.match` no encuentra algo que sí está en la línea | `match` solo mira el **principio** de la cadena | Usa `search` salvo que quieras anclar al inicio |
+| El contador da de más | Contar también los `OK` | Filtra por `estado == "FALLO"` antes de contar |
+| Falsos positivos con IPs internas | No distinguir tráfico interno de externo | Usa `ipaddress.ip_address(ip).is_private` |
+
+---
+
+## 8. Actividades: de lo más sencillo a preguntas tipo examen
+
+> Una única escalera. Intenta cada uno antes de mirar la solución. Librerías reales: `re`, `collections.Counter`, `ipaddress`.
+
+**1 · 🟢 Extraer IPs de un texto** — `ips(texto: str) -> list[str]`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-def media(notas: list[float]) -> float:
-    """Devuelve la media de una lista de notas."""
-    return sum(notas) / len(notas)
+import re
+def ips(texto: str) -> list[str]:
+    return re.findall(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", texto)
+```
+</details>
 
+**2 · 🟢 ¿Es una IP privada?** — `es_privada(ip: str) -> bool` con `ipaddress`.
+<details class="sol"><summary>Solución</summary>
 
-def aprueba(nota: float) -> bool:
-    """Indica si una nota es de aprobado."""
-    return nota >= 5
+```python
+import ipaddress
+def es_privada(ip: str) -> bool:
+    return ipaddress.ip_address(ip).is_private
+```
+</details>
 
+**3 · 🟢 Parsear un evento** — `parsear_evento(linea) -> dict[str,str] | None` (usa el patrón de §3.1).
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+_P = re.compile(r"usuario=(?P<usuario>\S+)\s+ip=(?P<ip>\S+)\s+estado=(?P<estado>OK|FALLO)")
+def parsear_evento(linea: str) -> dict[str, str] | None:
+    m = _P.search(linea)
+    return m.groupdict() if m else None
+```
+</details>
+
+**4 · 🟢 Clasificar malware** — `clasifica(comportamiento: str) -> str` (usa el diccionario de §1).
+<details class="sol"><summary>Solución</summary>
+
+```python
+MAPA = {"autorreplica_por_red": "gusano", "cifra_y_pide_rescate": "ransomware"}
+def clasifica(c: str) -> str:
+    return MAPA.get(c, "desconocido")
+```
+</details>
+
+**5 · 🟡 Contar códigos de estado HTTP** — `codigos(lineas: list[str]) -> Counter`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+from collections import Counter
+def codigos(lineas: list[str]) -> "Counter[str]":
+    c: Counter[str] = Counter()
+    for ln in lineas:
+        m = re.search(r'"\s+(\d{3})\b', ln)
+        if m:
+            c[m.group(1)] += 1
+    return c
+```
+</details>
+
+**6 · 🟡 Parsear el log completo** — `parsear_log(texto: str) -> list[dict[str,str]]`, descartando líneas corruptas.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def parsear_log(texto: str) -> list[dict[str, str]]:
+    eventos = []
+    for ln in texto.splitlines():
+        e = parsear_evento(ln)
+        if e is not None:
+            eventos.append(e)
+    return eventos
+```
+</details>
+
+**7 · 🟡 Fallos por IP** — `contar_fallos_por_ip(eventos) -> dict[str,int]`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+from collections import Counter
+def contar_fallos_por_ip(eventos: list[dict[str, str]]) -> dict[str, int]:
+    c: Counter[str] = Counter()
+    for e in eventos:
+        if e["estado"] == "FALLO":
+            c[e["ip"]] += 1
+    return dict(c)
+```
+</details>
+
+**8 · 🟡 Top de IPs más ruidosas** — `top_ips(eventos, n=3) -> list[tuple[str,int]]`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+from collections import Counter
+def top_ips(eventos: list[dict[str, str]], n: int = 3) -> list[tuple[str, int]]:
+    c: Counter[str] = Counter(e["ip"] for e in eventos if e["estado"] == "FALLO")
+    return c.most_common(n)
+```
+</details>
+
+**9 · 🟠 IPs sospechosas por umbral** — `ips_sospechosas(eventos, umbral=5) -> list[str]`, ordenadas de más a menos fallos.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def ips_sospechosas(eventos: list[dict[str, str]], umbral: int = 5) -> list[str]:
+    fallos = contar_fallos_por_ip(eventos)
+    return sorted([ip for ip, n in fallos.items() if n >= umbral], key=lambda ip: -fallos[ip])
+```
+</details>
+
+**10 · 🟠 ¿Hubo acceso tras los fallos?** — `hubo_acceso_correcto(eventos, ip) -> bool`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def hubo_acceso_correcto(eventos: list[dict[str, str]], ip: str) -> bool:
+    return any(e["ip"] == ip and e["estado"] == "OK" for e in eventos)
+```
+</details>
+
+**11 · 🟠 Usuarios objetivo de una IP** — `usuarios_objetivo(eventos, ip) -> set[str]`: qué usuarios ha probado esa IP.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def usuarios_objetivo(eventos: list[dict[str, str]], ip: str) -> set[str]:
+    return {e["usuario"] for e in eventos if e["ip"] == ip}
+```
+</details>
+
+**12 · 🔴 Password spraying** — `spraying(eventos, min_usuarios=5) -> list[str]`: IPs que prueban **pocas** contraseñas contra **muchos** usuarios distintos (al revés que la fuerza bruta clásica).
+<details class="sol"><summary>Solución</summary>
+
+```python
+from collections import defaultdict
+def spraying(eventos: list[dict[str, str]], min_usuarios: int = 5) -> list[str]:
+    usuarios_por_ip: dict[str, set[str]] = defaultdict(set)
+    for e in eventos:
+        if e["estado"] == "FALLO":
+            usuarios_por_ip[e["ip"]].add(e["usuario"])
+    return sorted(ip for ip, us in usuarios_por_ip.items() if len(us) >= min_usuarios)
+```
+</details>
+
+**13 · 🔴 Ventana temporal** — `en_ventana(marcas: list[int], segundos: int) -> int`: el máximo de eventos que caen en cualquier ventana deslizante de `segundos` (marcas ordenadas, en segundos desde el inicio).
+<details class="sol"><summary>Solución</summary>
+
+```python
+def en_ventana(marcas: list[int], segundos: int) -> int:
+    mejor = i = 0
+    for j in range(len(marcas)):
+        while marcas[j] - marcas[i] > segundos:
+            i += 1
+        mejor = max(mejor, j - i + 1)
+    return mejor
+```
+</details>
+
+**14 · 🔴 Escaneo de rutas 404** — `escaneo_web(lineas, umbral=10) -> list[str]`: IP que pide muchas rutas **distintas** con 404 (fuzzing de directorios).
+<details class="sol"><summary>Solución</summary>
+
+```python
+import re
+from collections import defaultdict
+def escaneo_web(lineas: list[str], umbral: int = 10) -> list[str]:
+    rutas: dict[str, set[str]] = defaultdict(set)
+    for ln in lineas:
+        m = re.search(r'(\d{1,3}(?:\.\d{1,3}){3}).*"(?:GET|POST)\s+(\S+)[^"]*"\s+404', ln)
+        if m:
+            rutas[m.group(1)].add(m.group(2))
+    return sorted(ip for ip, r in rutas.items() if len(r) >= umbral)
+```
+</details>
+
+**15 · 🔴 Informe final** — `informe(eventos, umbral=5) -> list[str]`: una línea por IP sospechosa con fallos y si hubo acceso, ordenado por gravedad.
+<details class="sol"><summary>Solución</summary>
+
+```python
+def informe(eventos: list[dict[str, str]], umbral: int = 5) -> list[str]:
+    salida = []
+    for ip in ips_sospechosas(eventos, umbral):
+        fallos = contar_fallos_por_ip(eventos)[ip]
+        critico = hubo_acceso_correcto(eventos, ip)
+        etiqueta = "CRÍTICO" if critico else "alerta"
+        salida.append(f"[{etiqueta}] {ip}: {fallos} fallos" + (" + ACCESO" if critico else ""))
+    return sorted(salida, key=lambda s: "CRÍTICO" not in s)
+```
+</details>
+
+---
+
+## 9. Reto resuelto, paso a paso — Detector de fuerza bruta profesional
+
+Sigues en la consultora. Esta vez te llega un log de SSH de un cliente con la sospecha de que alguien está intentando entrar por fuerza bruta. Construyes la herramienta que lo confirma.
+
+```mermaid
+flowchart LR
+    L["log.txt"] --> P["parsear_log"]
+    P --> Ev["lista de eventos"]
+    Ev --> D["detectar"]
+    D --> Inf["informe:<br/>IP · fallos · ¿acceso?"]
+```
+
+**Paso 1 — El patrón y el parseo de una línea.**
+
+```python title="detector.py"
+import re
+
+PATRON = re.compile(
+    r"usuario=(?P<usuario>\S+)\s+ip=(?P<ip>\S+)\s+estado=(?P<estado>OK|FALLO)"
+)
+
+def parsear_evento(linea: str) -> dict[str, str] | None:
+    m = PATRON.search(linea)
+    return m.groupdict() if m else None
+```
+
+**Paso 2 — Parsear el fichero completo, sobreviviendo a la basura.**
+
+```python title="detector.py (continúa)"
+def parsear_log(texto: str) -> list[dict[str, str]]:
+    return [e for ln in texto.splitlines() if (e := parsear_evento(ln)) is not None]
+```
+
+**Paso 3 — Contar y detectar el umbral.**
+
+```python title="detector.py (continúa)"
+from collections import Counter
+
+def contar_fallos_por_ip(eventos: list[dict[str, str]]) -> dict[str, int]:
+    c: Counter[str] = Counter(e["ip"] for e in eventos if e["estado"] == "FALLO")
+    return dict(c)
+
+def ips_sospechosas(eventos: list[dict[str, str]], umbral: int) -> list[str]:
+    fallos = contar_fallos_por_ip(eventos)
+    return sorted([ip for ip, n in fallos.items() if n >= umbral], key=lambda ip: -fallos[ip])
+
+def hubo_acceso_correcto(eventos: list[dict[str, str]], ip: str) -> bool:
+    return any(e["ip"] == ip and e["estado"] == "OK" for e in eventos)
+```
+
+**Paso 4 — El informe, con severidad.**
+
+```python title="detector.py (continúa)"
+def generar_informe(eventos: list[dict[str, str]], umbral: int) -> list[str]:
+    lineas = []
+    fallos = contar_fallos_por_ip(eventos)
+    for ip in ips_sospechosas(eventos, umbral):
+        critico = hubo_acceso_correcto(eventos, ip)
+        etiqueta = "CRÍTICO (acceso logrado)" if critico else "alerta"
+        lineas.append(f"[{etiqueta:24}] {ip}  ({fallos[ip]} fallos)")
+    return lineas
+```
+
+**Paso 5 — CLI con `argparse`.**
+
+```python title="detector.py (continúa)"
+import argparse
+from pathlib import Path
 
 def main() -> None:
-    notas: list[float] = [6.0, 7.0, 4.0]
-    nota_final: float = media(notas)
-    print(f"Media: {nota_final:.2f}")
-    print("Aprobado" if aprueba(nota_final) else "Suspenso")
+    ap = argparse.ArgumentParser(prog="detector", description="Detector de fuerza bruta en logs SSH")
+    ap.add_argument("log", type=Path, help="fichero de log a analizar")
+    ap.add_argument("--umbral", type=int, default=5, help="fallos mínimos para alertar")
+    args = ap.parse_args()
 
+    eventos = parsear_log(args.log.read_text(encoding="utf-8"))
+    print(f"{len(eventos)} eventos analizados")
+    for linea in generar_informe(eventos, args.umbral):
+        print(linea)
 
 if __name__ == "__main__":
     main()
 ```
 
-Fíjate: `media` y `aprueba` **no muestran nada**; devuelven datos. Solo `main` imprime. Esa separación es la clave y es lo que permite probarlas automáticamente.
+**Paso 6 — Pruébalo con Docker: genera el log y analízalo, sin `sudo`.**
 
----
+```yaml title="docker-compose.yml"
+services:
+  demo:
+    image: python:3.12-alpine
+    volumes: ["./datos:/datos", "./detector.py:/detector.py"]
+    working_dir: /datos
+    command: >
+      sh -c "python3 -c \"
+      lineas = ['2026-05-01 sshd usuario=root ip=10.0.20.5 estado=FALLO'] * 6
+      lineas += ['2026-05-01 sshd usuario=root ip=10.0.20.5 estado=OK']
+      lineas += ['2026-05-01 sshd usuario=ana ip=10.0.20.9 estado=OK']
+      open('log.txt','w').write(chr(10).join(lineas))
+      \";
+      python /detector.py log.txt --umbral 5"
+```
 
-> **Reto rápido 8.** Enumera (sin código) las funciones en que partirías «calcular la factura de la luz» a partir de la lectura anterior, la actual y el precio del kWh. *(Solución: una para el consumo, otra para el importe y otra para mostrarlo.)*
+```bash title="Ejecutar"
+mkdir -p datos && docker compose run --rm demo
+```
 
-## 9. Errores frecuentes
+```text title="Salida esperada"
+8 eventos analizados
+[CRÍTICO (acceso logrado)] 10.0.20.5  (6 fallos)
+```
 
-| Síntoma | Causa | Solución |
-|---|---|---|
-| La función devuelve `None` | usaste `print` en vez de `return` | devuelve el valor con `return` |
-| `TypeError: takes 2 positional arguments but 3 were given` | llamas con más argumentos de los definidos | revisa los parámetros |
-| `NameError` al usar una variable de la función | es **local**, no existe fuera | devuélvela con `return` |
-| `ModuleNotFoundError` | el módulo no existe o está en otra carpeta | mismo directorio y nombre exacto |
-| El test se queda colgado | hay un `input()` suelto en el módulo | mételo en `if __name__ == "__main__":` |
-| `ZeroDivisionError` en `media` | lista vacía | contémplalo (UD3) |
-
----
-
----
-
-## 10. Ejercicios
-
-Aquí están **todos los ejercicios de la unidad**, agrupados por el
-tema al que corresponden y con la solución desplegable.
-
-**Haz los de un tema en cuanto termines de leerlo.** No esperes al final: son cortos y solo
-usan lo que acabas de ver, así que si algo no ha quedado claro lo descubres en el momento y
-no tres semanas después.
-
-!!! warning "Intenta antes de desplegar"
-    Abrir la solución sin haberlo intentado da sensación de aprender, y no enseña nada. Si
-    llevas quince minutos sin avanzar, mírala. Si llevas dos, no.
-
-
-### Tema 1 · Por qué funciones
-
-**1.1.** Este código repite lo mismo tres veces. Reescríbelo con **una sola función**:
+<details class="sol"><summary>📄 detector.py completo</summary>
 
 ```python
-print(f"Hola, Ada")
-print(f"Hola, Alan")
-print(f"Hola, Grace")
-```
-<details><summary>Solución</summary>
-
-```python
-def saludar(nombre: str) -> None:
-    """Saluda a la persona indicada."""
-    print(f"Hola, {nombre}")
-
-saludar("Ada")     # -> Hola, Ada
-saludar("Alan")    # -> Hola, Alan
-saludar("Grace")   # -> Hola, Grace
-
-# Si mañana cambia el saludo, se toca en UN sitio, no en tres.
-```
-</details>
-
-**1.2.** Nombra bien estas funciones. ¿Qué problema tiene cada nombre? `f1`, `hacer_cosas`, `calcular`.
-<details><summary>Solución</summary>
-
-```text
-f1           -> no dice nada; en dos semanas no recordaras que hacia
-hacer_cosas  -> demasiado vago: si hace 'cosas' en plural, probablemente
-                deberian ser varias funciones
-calcular     -> calcular, si, pero ¿que? Falta el complemento
-
-Buenos nombres: verbo + complemento, en minusculas y con guion bajo:
-    calcular_iva, media_notas, es_par, formatear_precio
-```
-</details>
-
-**1.3.** Escribe la función más pequeña posible que evite repetir el cálculo del IVA en un programa que factura tres artículos.
-<details><summary>Solución</summary>
-
-```python
-IVA: int = 21
-
-
-def con_iva(precio: float) -> float:
-    """Devuelve el precio con el IVA aplicado."""
-    return precio * (1 + IVA / 100)
-
-print(f"{con_iva(10):.2f}")   # -> 12.10
-print(f"{con_iva(25):.2f}")   # -> 30.25
-print(f"{con_iva(99):.2f}")   # -> 119.79
-```
-</details>
-
-
-### Tema 2 · Definir y llamar funciones
-
-**2.1.** Escribe `es_par(n)` que devuelva `True` o `False`, con sus tipos y su docstring.
-<details><summary>Solución</summary>
-
-```python
-def es_par(n: int) -> bool:
-    """Indica si un número es par."""
-    return n % 2 == 0
-
-print(es_par(4))   # -> True
-print(es_par(7))   # -> False
-```
-</details>
-
-**2.2.** ¿Qué diferencia hay entre estas dos funciones? Ejecútalas y mira lo que devuelven.
-
-```python
-def a(x): print(x * 2)
-def b(x): return x * 2
-```
-<details><summary>Solución</summary>
-
-```python
-def a(x: int) -> None:
-    """Muestra el doble por pantalla."""
-    print(x * 2)
-
-
-def b(x: int) -> int:
-    """Devuelve el doble."""
-    return x * 2
-
-resultado_a = a(5)   # -> 10   (lo imprime la propia funcion)
-resultado_b = b(5)
-
-print(resultado_a)   # -> None   a() no devuelve nada
-print(resultado_b)   # -> 10     b() SI devuelve, y por eso se puede reutilizar
-print(b(5) + b(3))   # -> 16     esto con a() seria imposible
-```
-</details>
-
-**2.3.** Escribe `mayor(a, b)` que devuelva el mayor de dos números, sin usar `max()`.
-<details><summary>Solución</summary>
-
-```python
-def mayor(a: float, b: float) -> float:
-    """Devuelve el mayor de los dos números."""
-    if a > b:
-        return a
-    return b
-
-print(mayor(3, 9))     # -> 9
-print(mayor(-2, -7))   # -> -2
-print(mayor(4, 4))     # -> 4
-```
-</details>
-
-
-### Tema 3 · Parámetros
-
-**3.1.** Escribe `presentar(nombre, ciudad)` y llámala **por posición** y **por nombre**.
-<details><summary>Solución</summary>
-
-```python
-def presentar(nombre: str, ciudad: str) -> str:
-    """Frase de presentación."""
-    return f"{nombre} vive en {ciudad}"
-
-print(presentar("Ada", "Londres"))                     # -> Ada vive en Londres
-print(presentar(ciudad="Madrid", nombre="Alan"))       # -> Alan vive en Madrid
-
-# Por nombre el orden da igual, y se lee mucho mejor cuando hay varios parametros.
-```
-</details>
-
-**3.2.** Añade a `saludar(nombre, saludo)` un **valor por defecto** para que `saludo` sea `"Hola"` si no se indica.
-<details><summary>Solución</summary>
-
-```python
-def saludar(nombre: str, saludo: str = "Hola") -> str:
-    """Saluda con el saludo indicado (Hola por defecto)."""
-    return f"{saludo}, {nombre}"
-
-print(saludar("Ada"))                 # -> Hola, Ada
-print(saludar("Ada", "Buenas"))       # -> Buenas, Ada
-```
-</details>
-
-**3.3.** Escribe `potencia(base, exponente)` con `exponente` a 2 por defecto, y comprueba que los parámetros con valor por defecto van **al final**.
-<details><summary>Solución</summary>
-
-```python
-def potencia(base: float, exponente: int = 2) -> float:
-    """Eleva la base al exponente indicado (al cuadrado por defecto)."""
-    return base ** exponente
-
-print(potencia(5))      # -> 25
-print(potencia(2, 10))  # -> 1024
-
-# def potencia(exponente=2, base): ...  -> SyntaxError
-# Los parametros con valor por defecto tienen que ir SIEMPRE al final.
-```
-</details>
-
-
-### Tema 4 · Ámbito de las variables
-
-**4.1.** ¿Qué imprime este programa? Piénsalo antes de ejecutarlo.
-
-```python
-x = 10
-def f():
-    x = 99
-f()
-print(x)
-```
-<details><summary>Solución</summary>
-
-```python
-x = 10
-
-
-def f() -> None:
-    x = 99          # esta x es NUEVA y solo vive dentro de f()
-    print("dentro:", x)   # -> dentro: 99
-
-f()
-print("fuera:", x)   # -> fuera: 10
-
-# Asignar dentro de una funcion crea una variable local: la de fuera no se toca.
-```
-</details>
-
-**4.2.** Esta función no funciona porque usa una variable que no existe fuera. Arréglala pasándola como parámetro:
-
-```python
-def mostrar_total():
-    print(total)
-```
-<details><summary>Solución</summary>
-
-```python
-def mostrar_total(total: float) -> None:
-    """Muestra el total recibido."""
-    print(f"Total: {total:.2f}")
-
-mostrar_total(42.5)   # -> Total: 42.50
-
-# Todo lo que la funcion necesita entra por parametros: asi es independiente
-# y se puede probar sola.
-```
-</details>
-
-**4.3.** Escribe `acumular(lista, valor)` que devuelva una **lista nueva** con el valor añadido, sin modificar la original.
-<details><summary>Solución</summary>
-
-```python
-def acumular(lista: list[int], valor: int) -> list[int]:
-    """Devuelve una lista nueva con el valor añadido al final."""
-    return lista + [valor]
-
-original = [1, 2]
-nueva = acumular(original, 3)
-
-print(original)   # -> [1, 2]
-print(nueva)      # -> [1, 2, 3]
-```
-</details>
-
-
-### Tema 5 · Listas
-
-**5.1.** Crea una lista con cinco notas, muestra la primera, la última y cuántas hay.
-<details><summary>Solución</summary>
-
-```python
-notas: list[float] = [5.0, 7.5, 9.0, 4.25, 6.0]
-
-print(notas[0])     # -> 5.0
-print(notas[-1])    # -> 6.0     el -1 es el ultimo, sin contar
-print(len(notas))   # -> 5
-```
-</details>
-
-**5.2.** Escribe `suma_lista(numeros)` que sume una lista **sin usar `sum()`**.
-<details><summary>Solución</summary>
-
-```python
-def suma_lista(numeros: list[float]) -> float:
-    """Suma todos los elementos de la lista."""
-    total: float = 0.0
-    for n in numeros:
-        total = total + n
-    return total
-
-print(suma_lista([1, 2, 3, 4]))   # -> 10.0
-print(suma_lista([]))             # -> 0.0
-```
-</details>
-
-**5.3.** Escribe `media(numeros)` que devuelva `0.0` si la lista está vacía.
-<details><summary>Solución</summary>
-
-```python
-def media(numeros: list[float]) -> float:
-    """Media aritmética; 0.0 si la lista está vacía."""
-    if len(numeros) == 0:
-        return 0.0
-    return sum(numeros) / len(numeros)
-
-print(media([5.0, 7.0, 9.0]))   # -> 7.0
-print(media([]))                # -> 0.0
-
-# Sin el if, la lista vacia provoca ZeroDivisionError. Es el caso limite
-# que mas se olvida y el que casi siempre esta en los tests.
-```
-</details>
-
-
-### Tema 6 · Librería estándar
-
-**6.1.** Calcula la raíz cuadrada de 144 y el área de un círculo de radio 3 usando `math`.
-<details><summary>Solución</summary>
-
-```python
-import math
-
-print(math.sqrt(144))            # -> 12.0
-print(f"{math.pi * 3 ** 2:.2f}")  # -> 28.27
-```
-</details>
-
-**6.2.** Necesitas redondear **siempre hacia arriba** el número de cajas para 47 unidades que van de 10 en 10. Búscalo en `math`.
-<details><summary>Solución</summary>
-
-```python
-import math
-
-unidades: int = 47
-por_caja: int = 10
-
-cajas: int = math.ceil(unidades / por_caja)
-
-print(cajas)   # -> 5
-
-# 47 / 10 = 4.7  ->  con round() saldrian 5, pero con 44 unidades round() daria 4
-# y se quedarian 4 unidades fuera. ceil() nunca deja a nadie fuera.
-```
-</details>
-
-**6.3.** Muestra la fecha de hoy en formato `dd/mm/aaaa` con el módulo `datetime`.
-<details><summary>Solución</summary>
-
-```python
-from datetime import date
-
-hoy = date.today()
-print(hoy.strftime("%d/%m/%Y"))
-
-# Antes de escribir tu propia funcion, mira si ya existe en la libreria estandar:
-# viene instalada, esta probada por medio mundo y no hay que mantenerla.
-```
-</details>
-
-
-### Tema 7 · Módulos y `__main__`
-
-**7.1.** Añade a un módulo con la función `doble()` el bloque `if __name__ == "__main__":` para poder probarlo directamente.
-<details><summary>Solución</summary>
-
-```python
-"""Módulo de ejemplo."""
-
-
-def doble(n: int) -> int:
-    """Devuelve el doble."""
-    return n * 2
-
+import argparse, re
+from collections import Counter
+from pathlib import Path
+
+PATRON = re.compile(r"usuario=(?P<usuario>\S+)\s+ip=(?P<ip>\S+)\s+estado=(?P<estado>OK|FALLO)")
+
+def parsear_evento(linea: str) -> dict[str, str] | None:
+    m = PATRON.search(linea)
+    return m.groupdict() if m else None
+
+def parsear_log(texto: str) -> list[dict[str, str]]:
+    return [e for ln in texto.splitlines() if (e := parsear_evento(ln)) is not None]
+
+def contar_fallos_por_ip(eventos: list[dict[str, str]]) -> dict[str, int]:
+    return dict(Counter(e["ip"] for e in eventos if e["estado"] == "FALLO"))
+
+def ips_sospechosas(eventos: list[dict[str, str]], umbral: int) -> list[str]:
+    fallos = contar_fallos_por_ip(eventos)
+    return sorted([ip for ip, n in fallos.items() if n >= umbral], key=lambda ip: -fallos[ip])
+
+def hubo_acceso_correcto(eventos: list[dict[str, str]], ip: str) -> bool:
+    return any(e["ip"] == ip and e["estado"] == "OK" for e in eventos)
+
+def generar_informe(eventos: list[dict[str, str]], umbral: int) -> list[str]:
+    fallos = contar_fallos_por_ip(eventos)
+    out = []
+    for ip in ips_sospechosas(eventos, umbral):
+        etiqueta = "CRÍTICO (acceso logrado)" if hubo_acceso_correcto(eventos, ip) else "alerta"
+        out.append(f"[{etiqueta:24}] {ip}  ({fallos[ip]} fallos)")
+    return out
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="detector", description="Detector de fuerza bruta en logs SSH")
+    ap.add_argument("log", type=Path)
+    ap.add_argument("--umbral", type=int, default=5)
+    args = ap.parse_args()
+    eventos = parsear_log(args.log.read_text(encoding="utf-8"))
+    print(f"{len(eventos)} eventos analizados")
+    for linea in generar_informe(eventos, args.umbral):
+        print(linea)
 
 if __name__ == "__main__":
-    # Esto solo se ejecuta si lanzas ESTE fichero, no al importarlo
-    print(doble(21))   # -> 42
-```
-</details>
-
-**7.2.** ¿Qué pasa si otro fichero hace `import mimodulo` y el módulo tiene un `print()` suelto al final?
-<details><summary>Solución</summary>
-
-```text
-Que ese print() se ejecuta al importar, aunque el otro fichero solo queria
-usar una funcion. Efectos raros al importar = programa dificil de reutilizar.
-
-Por eso las pruebas y los ejemplos van dentro de:
-
-    if __name__ == "__main__":
-        ...
-
-Al importar, __name__ vale "mimodulo" y el bloque no se ejecuta.
-Al lanzarlo directamente, __name__ vale "__main__" y si se ejecuta.
-```
-</details>
-
-**7.3.** Comprueba qué vale `__name__` cuando ejecutas el fichero directamente.
-<details><summary>Solución</summary>
-
-```python
-print(__name__)   # -> __main__
-
-if __name__ == "__main__":
-    print("Me han lanzado directamente")   # -> Me han lanzado directamente
-```
-</details>
-
-
-### Tema 8 · Descomponer un problema
-
-**8.1.** Descompón en funciones el problema «calcular la nota final de un alumno a partir de sus notas y decir si aprueba». No escribas el cuerpo todavía: solo las firmas.
-<details><summary>Solución</summary>
-
-```python
-def media(notas: list[float]) -> float:
-    """Media de las notas."""
-    ...
-
-
-def redondear_nota(nota: float) -> float:
-    """Nota redondeada a dos decimales."""
-    ...
-
-
-def aprueba(nota: float) -> bool:
-    """Indica si la nota llega a 5."""
-    ...
-
-# Tres funciones pequenas, cada una con UNA responsabilidad y cada una probable
-# por separado. Eso es descomponer.
-```
-</details>
-
-**8.2.** Ahora escribe el cuerpo de esas tres funciones y encadénalas.
-<details><summary>Solución</summary>
-
-```python
-def media(notas: list[float]) -> float:
-    """Media de las notas; 0.0 si no hay."""
-    if len(notas) == 0:
-        return 0.0
-    return sum(notas) / len(notas)
-
-
-def redondear_nota(nota: float) -> float:
-    """Nota redondeada a dos decimales."""
-    return round(nota, 2)
-
-
-def aprueba(nota: float) -> bool:
-    """Indica si la nota llega a 5."""
-    return nota >= 5
-
-notas = [7.0, 4.5, 6.25]
-final = redondear_nota(media(notas))
-
-print(final)           # -> 5.92
-print(aprueba(final))  # -> True
-```
-</details>
-
-**8.3.** Esta función hace demasiadas cosas. Pártela en dos:
-
-```python
-def procesar(notas):
-    m = sum(notas) / len(notas)
-    print(f"Media: {m:.2f}")
-```
-<details><summary>Solución</summary>
-
-```python
-def media(notas: list[float]) -> float:
-    """Solo calcula."""
-    if len(notas) == 0:
-        return 0.0
-    return sum(notas) / len(notas)
-
-
-def mostrar_media(notas: list[float]) -> None:
-    """Solo muestra."""
-    print(f"Media: {media(notas):.2f}")
-
-mostrar_media([5.0, 8.0])   # -> Media: 6.50
-
-# Calcular y mostrar son dos responsabilidades. Separadas, media() se puede
-# probar con un test y reutilizar en cualquier otro sitio.
-```
-</details>
-
-
-### Actividades guiadas
-
-#### Actividad 1 — Tu primera función
-Escribe `saludo(nombre: str) -> str` que **devuelva** (no imprima) `"Hola, Ada"`.
-<details><summary>Solución</summary>
-
-```python
-def saludo(nombre: str) -> str:
-    return f"Hola, {nombre}"
-
-print(saludo("Ada"))     # Hola, Ada
-```
-</details>
-
-#### Actividad 2 — Varias operaciones
-Escribe `operaciones(a: int, b: int) -> tuple[int, int, int]` que devuelva suma, resta y producto.
-<details><summary>Solución</summary>
-
-```python
-def operaciones(a: int, b: int) -> tuple[int, int, int]:
-    return a + b, a - b, a * b
-
-s, r, p = operaciones(7, 3)
-print(s, r, p)      # 10 4 21
-```
-</details>
-
-#### Actividad 3 — Usar una librería
-Con `math`, escribe `hipotenusa(a: float, b: float) -> float`.
-<details><summary>Solución</summary>
-
-```python
-import math
-
-def hipotenusa(a: float, b: float) -> float:
-    return math.sqrt(a ** 2 + b ** 2)
-
-print(hipotenusa(3, 4))     # 5.0
-```
-</details>
-
-#### Actividad 4 — Trabajar con listas
-Escribe `resumen(numeros: list[float]) -> tuple[float, float, float]` que devuelva media, mínimo y máximo.
-<details><summary>Solución</summary>
-
-```python
-def resumen(numeros: list[float]) -> tuple[float, float, float]:
-    return sum(numeros) / len(numeros), min(numeros), max(numeros)
-
-print(resumen([4.0, 8.0, 6.0]))     # (6.0, 4.0, 8.0)
-```
-</details>
-
-### Ejercicios propuestos
-
-**E1 ○ · Área del círculo.** `area_circulo(radio: float) -> float` usando `math.pi`.
-<details><summary>Solución</summary>
-
-```python
-import math
-
-def area_circulo(radio: float) -> float:
-    return math.pi * radio ** 2
-```
-</details>
-
-**E2 ○ · Conversión.** `a_fahrenheit(celsius: float) -> float`.
-<details><summary>Solución</summary>
-
-```python
-def a_fahrenheit(celsius: float) -> float:
-    return celsius * 9 / 5 + 32
-```
-</details>
-
-**E3 ◐ · Precio final.** `precio_final(precio: float, iva: int = 21, descuento: int = 0) -> float`: aplica primero el descuento y después el IVA.
-<details><summary>Pista</summary>Calcula el precio con descuento y sobre ese resultado aplica el IVA.</details>
-<details><summary>Solución</summary>
-
-```python
-def precio_final(precio: float, iva: int = 21, descuento: int = 0) -> float:
-    con_descuento = precio * (1 - descuento / 100)
-    return con_descuento * (1 + iva / 100)
-
-print(precio_final(100))            # 121.0
-print(precio_final(100, 21, 10))    # 108.9
-```
-</details>
-
-**E4 ◐ · Contar pares.** `cuenta_pares(numeros: list[int]) -> int`.
-<details><summary>Pista</summary>Recorre con un bucle y usa <code>% 2 == 0</code>. También vale <code>sum(1 for n in numeros if n % 2 == 0)</code>.</details>
-<details><summary>Solución</summary>
-
-```python
-def cuenta_pares(numeros: list[int]) -> int:
-    total = 0
-    for n in numeros:
-        if n % 2 == 0:
-            total += 1
-    return total
-```
-</details>
-
-**E5 ◐ · Módulo propio.** Crea `estadistica.py` con `media`, `maximo` y `minimo`, e impórtalo desde `principal.py`.
-<details><summary>Solución</summary>
-
-```python
-# estadistica.py
-def media(numeros: list[float]) -> float:
-    return sum(numeros) / len(numeros)
-
-def maximo(numeros: list[float]) -> float:
-    return max(numeros)
-
-def minimo(numeros: list[float]) -> float:
-    return min(numeros)
-```
-```python
-# principal.py
-import estadistica
-
-datos = [4.0, 8.0, 6.0]
-print(estadistica.media(datos))     # 6.0
-```
-</details>
-
-**E6 ● · Redondeo a múltiplo.** `redondear_a(valor: float, multiplo: int = 5) -> int`: redondea al múltiplo más cercano.
-<details><summary>Pista</summary><code>round(valor / multiplo) * multiplo</code></details>
-<details><summary>Solución</summary>
-
-```python
-def redondear_a(valor: float, multiplo: int = 5) -> int:
-    return round(valor / multiplo) * multiplo
-
-print(redondear_a(23))       # 25
-print(redondear_a(23, 10))   # 20
-```
-</details>
-
-**E7 ◐ · Contar pares.** `contar_pares(numeros: list[int]) -> int` devuelve cuántos números pares hay en la lista.
-<details><summary>Pista</summary>Un acumulador a 0 y un <code>for</code>; el resto de dividir entre 2 te dice si es par.</details>
-<details><summary>Solución</summary>
-
-```python
-def contar_pares(numeros: list[int]) -> int:
-    """Cuántos números pares hay en la lista."""
-    total: int = 0
-    for n in numeros:
-        if n % 2 == 0:
-            total += 1
-    return total
-```
-</details>
-
-**E8 ● · Resumen estadístico.** `resumen(numeros: list[float]) -> tuple[float, float, float]` devuelve mínimo, máximo y media. Con la lista vacía devuelve `(0.0, 0.0, 0.0)`.
-<details><summary>Pista</summary>Resuelve primero el caso de la lista vacía y sal con <code>return</code>; así el resto del código ya puede dar por hecho que hay datos.</details>
-<details><summary>Solución</summary>
-
-```python
-def resumen(numeros: list[float]) -> tuple[float, float, float]:
-    """Mínimo, máximo y media; (0.0, 0.0, 0.0) si la lista está vacía."""
-    if len(numeros) == 0:
-        return 0.0, 0.0, 0.0
-    return min(numeros), max(numeros), sum(numeros) / len(numeros)
+    main()
 ```
 </details>
 
 ---
 
----
+## 10. Reto para ti (propuesto, sin solución)
 
-## 11. Simulacro tipo test
+### 📡 Mini-SIEM en dos contenedores
 
-El examen de esta unidad es un **test de código**. Tienes uno de
-práctica con **8 preguntas por cada tema** de la unidad y la respuesta explicada:
+Un SIEM de verdad no analiza un fichero estático: vigila **en vivo**. Vas a montar una versión mínima.
 
-**[Simulacro tipo test RA2](../simulacros/ra2/README.md)**
-
-Hazlo cuando termines los ejercicios, contrarreloj y sin ordenador. Después comprueba en
-Python las que hayas fallado: ahí es donde de verdad se aprende.
-
----
-
-## 12. Proyecto de la unidad
-
-Toda la práctica de esta unidad se hace sobre un **proyecto base**: un paquete de funciones reutilizables en tres módulos. Está montado
-con la estructura real de un proyecto Python y trae una **batería de tests** que puedes
-ejecutar en cualquier momento para ver si va todo bien.
-
-**[Proyecto Biblioteca de utilidades →](../proyectos/ud2/README.md)**
-
-```
-proyecto-ud2/
-├── src/      ← tu código (funciones con TODO)
-└── tests/    ← 31 tests que comprueban tu trabajo
+```mermaid
+flowchart LR
+    subgraph "Contenedor: generador"
+    G["escribe una línea<br/>de log cada segundo"]
+    end
+    subgraph "Contenedor: monitor (tu código)"
+    T["sigue el fichero<br/>en vivo (tail)"] --> An["analiza la<br/>ventana de 60s"]
+    An -->|umbral superado| Al["alerta"]
+    end
+    G -.->|volumen compartido| T
 ```
 
-### Cómo se trabaja
+**Objetivo.** Un contenedor **genera** un log de accesos web en streaming (una línea nueva cada segundo, con IPs variadas y códigos 200/404). **Otro contenedor** con tu Python **sigue el fichero en vivo** y alerta cuando una IP supera **10 respuestas 404 en una ventana de 60 segundos**.
 
-```bash
-pip install -r requirements.txt
-pytest
-```
+**Requisitos**
 
-La primera vez falla casi todo: aún no has escrito nada. A partir de ahí, lee una función,
-escríbela, vuelve a lanzar `pytest` y comprueba si ese test ya pasa. Terminas cuando está
-**todo en verde** y `mypy src` dice *Success*.
+- CLI con `argparse`: `python monitor.py <fichero> --ventana 60 --umbral 10`.
+- "Seguir en vivo" un fichero que crece: abre el fichero, ve a leer lo que se añada (patrón `tail -f`: recuerda la posición leída y relee desde ahí).
+- Reutiliza tus funciones de parseo y de ventana temporal (ejercicio 13) del apartado anterior.
+- Código tipado, `mypy` limpio.
+- Nada de `sudo`: todo en `docker compose up`.
 
-!!! tip "De uno en uno"
-    `pytest -x` se detiene en el primer fallo. Arreglas esa función y sigues. Mucho más
-    llevadero que enfrentarse a todos los errores a la vez.
+**Criterios de aceptación**
 
-!!! warning "Los tests son la especificación"
-    No los modifiques para que pasen: describen exactamente lo que tu código debe hacer, y
-    el examen usará una batería equivalente.
+1. El monitor no se bloquea esperando: lee lo nuevo y vuelve a dormir un poco si no hay líneas.
+2. Alerta como máximo **una vez** por IP mientras siga en la ventana (no una alerta por cada línea nueva).
+3. Si paras el generador, el monitor no falla: simplemente no hay líneas nuevas.
 
-Detalles y comandos útiles en **[Proyectos](../proyectos/index.md)**.
+**Pistas** (no solución): para leer solo lo nuevo, guarda la posición con `f.tell()` tras cada lectura y reabre con `f.seek(posicion)` · para la ventana de 60 s reutiliza la idea de "ventana deslizante" del ejercicio 13, pero con marcas de tiempo reales (`time.time()`) en vez de índices.
 
----
+**Si te sobra tiempo:** añade detección de **password spraying** (ejercicio 12) en el mismo monitor · exporta las alertas a un CSV con `csv.writer` · añade un modo `--formato json` que saque cada alerta como una línea JSON (`import json`).
 
----
-
-## 13. Retos opcionales
-
-- **R1.** Añade a P1 una función `mediana(numeros: list[float]) -> float` sin usar `statistics`.
-- **R2.** Investiga `*args` y escribe `suma_todos(*numeros)` que sume cuantos números le pases.
-- **R3.** Compara tu `media` con `statistics.mean` sobre la misma lista: ¿dan exactamente lo mismo?
-
-- **R4.** Escribe `es_primo(n)` sin usar librerías y pruébala con los números del 1 al 20.
-- **R5.** Crea tu propio módulo `texto.py` con tres funciones de utilidad (contar vocales, invertir, quitar espacios) e impórtalo desde otro programa.
-- **R6.** Investiga `random.sample()` y escribe una función que devuelva 6 números distintos del 1 al 49.
----
+> Esto es justo el tipo de reto que resolverás en el **test práctico**.
 
 ---
 
-## 14. Autoevaluación rápida
+## Autoevaluación rápida (conceptos)
 
-<details><summary>1. ¿Qué diferencia hay entre <code>return</code> y <code>print</code>?</summary><code>return</code> devuelve el valor a quien llamó (se puede seguir usando); <code>print</code> solo lo muestra.</details>
-<details><summary>2. ¿Qué devuelve una función sin <code>return</code>?</summary><code>None</code>.</details>
-<details><summary>3. ¿Se puede leer una variable global desde una función?</summary>Sí, leerla sí. Modificarla es mala práctica: mejor pasarla por parámetro.</details>
-<details><summary>4. ¿Para qué sirve <code>if __name__ == "__main__":</code>?</summary>Para que el código suelto solo se ejecute al lanzar el fichero directamente, no al importarlo.</details>
-<details><summary>5. ¿Cómo se importa solo <code>sqrt</code> de <code>math</code>?</summary><code>from math import sqrt</code></details>
-<details><summary>6. ¿Qué vale <code>len([3, 5, 7])</code>?</summary><code>3</code>.</details>
+<details><summary>1. ¿Qué diferencia a un virus de un gusano?</summary>El virus necesita un fichero hospedador; el gusano se replica solo por la red.</details>
+<details><summary>2. ¿Qué devuelve <code>re.search</code> si no encuentra el patrón?</summary><code>None</code>.</details>
+<details><summary>3. ¿Cómo se accede a un grupo con nombre en un match?</summary>Con <code>m["nombre"]</code> o <code>m.group("nombre")</code>.</details>
+<details><summary>4. ¿Qué hace un SIEM?</summary>Centraliza logs de muchas fuentes, los correla y dispara alertas.</details>
+<details><summary>5. ¿Por qué es peligrosa una IP con fallos seguidos de un <code>OK</code>?</summary>Porque probablemente acertó la contraseña tras varios intentos.</details>
 
----
-
----
-
-## 15. Glosario
+## Glosario
 
 | Término | Definición |
 |---|---|
-| **Función** | Bloque de código con nombre que hace una tarea y puede devolver un resultado. |
-| **Parámetro / argumento** | Dato que la función declara / valor concreto que se le pasa. |
-| **`return`** | Devuelve un valor y termina la función. |
-| **Función pura** | Solo depende de sus parámetros y no toca nada de fuera. |
-| **Ámbito** | Zona donde existe una variable (local o global). |
-| **Lista** | Colección ordenada de valores: `[1, 2, 3]`. |
-| **Módulo / librería** | Fichero (o conjunto) con funciones reutilizables. |
-| **`import`** | Trae a tu programa el contenido de un módulo. |
+| **Malware** | Software diseñado para dañar, robar o tomar el control sin permiso. |
+| **Fuerza bruta** | Ataque que prueba credenciales de forma sistemática hasta acertar. |
+| **Password spraying** | Variante: pocas contraseñas contra muchos usuarios, para evitar bloqueos. |
+| **Grupo con nombre** | `(?P<nombre>...)` en una regex; se accede como diccionario. |
+| **SIEM** | Sistema que centraliza y correla eventos de seguridad de toda una organización. |
+| **`fail2ban`** | Herramienta real que bloquea IPs tras N fallos — la misma lógica que este reto. |
+
+## Cómo se evalúa esta unidad (RA2)
+
+El instrumento principal es un **test práctico**: resuelves en Python un reto parecido al de esta unidad y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún ejercicio práctico).
+
+!!! reto "La nota, sin sorpresas"
+    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5.
+
+El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `re`), pasar `mypy` y documentar el código.
 
 ---
 
----
+## Simulacro de examen tipo test
 
-## 16. Cómo se evalúa esta unidad (RA2)
+> 15 preguntas de opción múltiple. Cada una trae su propio código.
 
-El RA2 es del **primer trimestre**, y ahí el examen es un **test de 12 preguntas de
-opción múltiple**. Pero no de definiciones: **todas las preguntas son de código**.
+**1.** ¿Qué imprime este código?
 
-### Cómo son las preguntas
+```python
+MAPA = {
+    "cifra_y_pide_rescate": "ransomware",
+    "autorreplica_por_red": "gusano",
+    "roba_datos_en_silencio": "spyware",
+}
 
-Se te da un fragmento y tienes que decir qué hace. Hay cuatro formas:
+def clasifica(c: str) -> str:
+    return MAPA.get(c, "desconocido")
 
-| Tipo | Qué te piden |
-|---|---|
-| **Qué imprime** | Seguir un programa de 5–12 líneas y dar la salida exacta, carácter a carácter. |
-| **Qué error da** | Identificar la excepción: `TypeError`, `ValueError`, `UnboundLocalError`… |
-| **Cuál es correcta** | Cuatro versiones de una función; solo una pasa todos los casos. |
-| **Cuál es falsa** | Una función y cuatro pares «llamada → resultado»; uno de ellos miente. |
+print(clasifica("roba_datos_en_silencio"))
+print(clasifica("ataque_nuevo"))
+```
 
-No son preguntas de una línea. Son fragmentos del mismo tipo que los ejercicios que haces:
-presupuestos con IVA y descuento, tickets con formato, conversión de lo que escribe el
-usuario, medias con la lista vacía. Y las cuatro opciones son **resultados reales de errores
-concretos**, así que por descarte no se acierta: hay que seguir el cálculo.
+A) `spyware` y `desconocido`
+B) `desconocido` y `spyware`
+C) `spyware` y `None`
+D) Lanza `KeyError` en la segunda llamada
 
-Es exactamente lo que haces en clase cuando lees un error o predices un resultado antes de
-ejecutar. Temas del RA2: `return` frente a `print` · parámetros y valores por defecto · ámbito · listas · librería estándar · módulos y `__main__`.
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>dict.get(clave, valor_por_defecto)</code> devuelve el valor si la clave existe, y el valor por defecto (<code>"desconocido"</code>) si no — sin lanzar excepción.</details>
 
-### Cómo se puntúa
+**2.** ¿Qué imprime este código?
 
-| | |
-|---|---|
-| Acierto | **+0.83** puntos |
-| Error | **−0.28** puntos |
-| En blanco | 0 |
+```python
+import re
 
-`nota = (aciertos − errores ÷ 3) × 0.83`, con un mínimo de 0.
+texto = "El servidor 10.0.5.9 recibió tráfico en el puerto 443 y en el puerto 8080"
+print(re.findall(r"puerto (\d+)", texto))
+```
 
-Se resta un tercio por error porque hay cuatro opciones: así **contestar al azar no
-compensa**. La regla práctica es sencilla:
+A) `['puerto 443', 'puerto 8080']`
+B) `['443', '8080']`
+C) `['443']`
+D) `[]`
 
-- Si lo sabes, marca.
-- Si dudas **entre dos**, marca: sigue saliéndote a cuenta.
-- Si no tienes ni idea, **déjalo en blanco**.
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>findall</code> devuelve una lista con el contenido de los grupos capturados (lo que hay dentro del paréntesis), no del texto completo que coincide.</details>
 
-### Un ejemplo de corrección
+**3.** ¿Qué imprime este código?
 
-| Alumno | Aciertos | Errores | En blanco | Cuenta | Nota |
-|---|:---:|:---:|:---:|---|:---:|
-| Lo lleva bien | 10 | 2 | 0 | (10 − 0,67) × 0.83 | **7,78** |
-| Va justo | 8 | 4 | 0 | (8 − 1,33) × 0.83 | **5,56** |
-| Prudente | 6 | 0 | 6 | (6 − 0) × 0.83 | **5,00** |
-| A ciegas | 3 | 9 | 0 | (3 − 3) × 0.83 | **0,00** |
+```python
+import re
 
-Fíjate en las dos últimas filas: quien contesta solo lo que sabe aprueba, y quien marca a
-voleo se queda a cero. **No es lo mismo dudar que adivinar.**
+patron = re.compile(r"usuario=(?P<usuario>\S+)\s+intentos=(?P<intentos>\d+)")
+m = patron.search("log: usuario=marta intentos=7 hora=10:00")
+print(m["usuario"], m["intentos"])
+```
 
-### Cómo prepararte
+A) `marta 7`
+B) `usuario intentos`
+C) `None None`
+D) Lanza un error porque hay dos grupos con nombre
 
-1. Los **ejercicios de sección** y los **ejercicios largos**: el test pregunta justo eso.
-2. El **proyecto de la unidad**: escribir el código es lo que te enseña a leerlo.
-3. El **[test de práctica](../simulacros/ra2/README.md)**, con las mismas 12 preguntas
-   de formato y las respuestas al final.
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Cada grupo con nombre se accede como una clave de diccionario sobre el objeto <code>match</code>.</details>
 
-!!! tip "Lee el código antes de ejecutarlo"
-   Durante el curso, cada vez que vayas a ejecutar algo, predice primero qué va a salir.
-   Ese hábito es literalmente el examen.
+**4.** ¿Qué ocurre al ejecutar este código?
 
-!!! note "En el segundo y tercer trimestre cambia"
-    A partir del RA3 los exámenes son **retos de programación**: se escribe código y se
-    corrige con una batería de casos de prueba. El test es solo para arrancar.
+```python
+import re
+
+m = re.search(r"error=(\d+)", "todo correcto, sin fallos")
+print(m["error"])
+```
+
+A) Imprime una cadena vacía
+B) Imprime `None`
+C) Lanza `TypeError`, porque `m` es `None` y no se puede indexar
+D) Imprime `0`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Como el patrón no encaja, <code>re.search</code> devuelve <code>None</code>; intentar hacer <code>None["error"]</code> lanza <code>TypeError</code>. Por eso siempre hay que comprobar <code>if m:</code> antes de usar el resultado.</details>
+
+**5.** ¿Qué imprime este código?
+
+```python
+import re
+
+PATRON = re.compile(r"usuario=(?P<usuario>\S+)\s+ip=(?P<ip>\S+)\s+estado=(?P<estado>OK|FALLO)")
+
+def parsear_evento(linea: str) -> dict | None:
+    m = PATRON.search(linea)
+    return m.groupdict() if m else None
+
+def parsear_log(texto: str) -> list[dict]:
+    return [e for l in texto.splitlines() if (e := parsear_evento(l)) is not None]
+
+log = "usuario=x ip=1.1.1.1 estado=OK\n####corrupta####\nusuario=y ip=2.2.2.2 estado=FALLO\n"
+print(len(parsear_log(log)))
+```
+
+A) `3`
+B) `2`
+C) `1`
+D) Lanza una excepción al llegar a la línea corrupta
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La línea corrupta no encaja con el patrón, así que <code>parsear_evento</code> devuelve <code>None</code> y esa línea se descarta silenciosamente — el parser sobrevive.</details>
+
+**6.** ¿Qué imprime este código?
+
+```python
+from collections import Counter
+
+eventos = [{"ip": "3.3.3.3", "estado": "FALLO"}] * 4 + [{"ip": "3.3.3.3", "estado": "OK"}] * 10
+c = Counter(e["ip"] for e in eventos if e["estado"] == "FALLO")
+print(dict(c))
+```
+
+A) `{'3.3.3.3': 14}`
+B) `{'3.3.3.3': 4}`
+C) `{'3.3.3.3': 10}`
+D) `{}`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El generador solo produce las IPs cuyo evento tiene <code>estado == "FALLO"</code>; los 10 eventos <code>"OK"</code> ni se cuentan.</details>
+
+**7.** ¿Qué imprime este código?
+
+```python
+def hubo_acceso_correcto(eventos: list[dict], ip: str) -> bool:
+    return any(e["ip"] == ip and e["estado"] == "OK" for e in eventos)
+
+eventos = [{"ip": "5.5.5.5", "estado": "FALLO"}] * 20
+print(hubo_acceso_correcto(eventos, "5.5.5.5"))
+```
+
+A) `True`, porque hay 20 intentos
+B) `False`, porque ningún evento tiene `estado == "OK"`
+C) Lanza `IndexError`
+D) `True`, porque la IP coincide 20 veces
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Por muchos fallos que haya, <code>any(...)</code> solo es <code>True</code> si <b>alguno</b> de los eventos tiene <code>estado == "OK"</code> — y aquí no hay ninguno.</details>
+
+**8.** ¿Qué imprime este código?
+
+```python
+import ipaddress
+
+print(ipaddress.ip_address("192.168.50.2").is_private)
+print(ipaddress.ip_address("93.184.216.34").is_private)
+```
+
+A) `True` y `True`
+B) `False` y `False`
+C) `True` y `False`
+D) `False` y `True`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> <code>192.168.x.x</code> es un rango privado (RFC 1918); <code>93.184.216.34</code> es una IP pública real de Internet.</details>
+
+**9.** Tienes esta función de detección de *password spraying* (pocas contraseñas contra muchos usuarios):
+
+```python
+from collections import defaultdict
+
+def spraying(eventos: list[dict], min_usuarios: int = 3) -> list[str]:
+    usuarios_por_ip = defaultdict(set)
+    for e in eventos:
+        if e["estado"] == "FALLO":
+            usuarios_por_ip[e["ip"]].add(e["usuario"])
+    return sorted(ip for ip, us in usuarios_por_ip.items() if len(us) >= min_usuarios)
+
+eventos = [{"ip": "7.7.7.7", "usuario": f"u{i}", "estado": "FALLO"} for i in range(2)]
+print(spraying(eventos, min_usuarios=3))
+```
+
+A) `['7.7.7.7']`
+B) `[]`
+C) `['u0', 'u1']`
+D) Lanza `KeyError`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Solo hay 2 usuarios distintos probados desde <code>7.7.7.7</code>, y el umbral pide al menos 3 — no se marca como spraying.</details>
+
+**10.** ¿Qué imprime este código?
+
+```python
+def en_ventana(marcas: list[int], segundos: int) -> int:
+    mejor = i = 0
+    for j in range(len(marcas)):
+        while marcas[j] - marcas[i] > segundos:
+            i += 1
+        mejor = max(mejor, j - i + 1)
+    return mejor
+
+print(en_ventana([1, 2, 3, 20, 21], segundos=5))
+```
+
+A) `2`
+B) `3`
+C) `5`
+D) `1`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Las marcas 1, 2 y 3 caben todas en una ventana de 5 segundos (<code>3-1=2 ≤ 5</code>); al llegar a 20, las anteriores quedan fuera de rango. El máximo es 3.</details>
+
+**11.** ¿Qué imprime este código?
+
+```python
+import re
+from collections import Counter
+
+def codigos(lineas: list[str]) -> Counter:
+    c = Counter()
+    for l in lineas:
+        m = re.search(r'"\s+(\d{3})\b', l)
+        if m:
+            c[m.group(1)] += 1
+    return c
+
+lineas = ['1.1.1.1 "GET / HTTP/1.1" 200'] * 3 + ['1.1.1.1 "GET /a HTTP/1.1" 500']
+print(dict(codigos(lineas)))
+```
+
+A) `{'200': 3, '500': 1}`
+B) `{'200': 1, '500': 1}`
+C) `{'200': 4}`
+D) `{}`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> El patrón extrae el código de 3 dígitos al final de cada línea; se cuentan las 3 apariciones de <code>200</code> y la 1 de <code>500</code> por separado.</details>
+
+**12.** ¿Qué diferencia hay en el comportamiento de estas dos líneas con `linea = "sshd usuario=root ip=1.2.3.4"` (que **no** empieza por la fecha, como en un log real)?
+
+```python
+resultado_match = re.match(r"ip=", linea)
+resultado_search = re.search(r"ip=", linea)
+```
+
+A) Ambas dan el mismo resultado, porque el patrón es idéntico
+B) `resultado_match` es `None` (el patrón no está al principio); `resultado_search` sí encuentra la coincidencia en cualquier parte
+C) `resultado_match` encuentra la coincidencia; `resultado_search` no
+D) Las dos lanzan una excepción porque falta `^` en el patrón
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>match</code> solo comprueba si el patrón encaja justo al principio de la cadena; como la línea empieza por <code>"sshd..."</code>, no por <code>"ip="</code>, <code>match</code> falla. <code>search</code> sí lo encuentra, esté donde esté.</details>
+
+**13.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+from collections import Counter
+
+def contar_fallos_por_ip(eventos: list[dict]) -> dict:
+    return dict(Counter(e["ip"] for e in eventos if e["estado"] == "FALLO"))
+
+def ips_sospechosas(eventos: list[dict], umbral: int) -> list[str]:
+    fallos = contar_fallos_por_ip(eventos)
+    return sorted([ip for ip, n in fallos.items() if n >= umbral], key=lambda ip: -fallos[ip])
+
+eventos = [{"ip": "9.9.9.9", "estado": "FALLO"}] * 3 + [{"ip": "8.8.8.8", "estado": "FALLO"}] * 7
+print(ips_sospechosas(eventos, umbral=5))
+```
+
+A) `['9.9.9.9', '8.8.8.8']`
+B) `['8.8.8.8']`
+C) `['8.8.8.8', '9.9.9.9']`
+D) `[]`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>9.9.9.9</code> solo tiene 3 fallos, por debajo del umbral de 5; <code>8.8.8.8</code> tiene 7, así que supera el umbral y es la única IP sospechosa.</details>
+
+**14.** *(Sobre el reto de la unidad)* Con las funciones `contar_fallos_por_ip`, `ips_sospechosas` y `hubo_acceso_correcto` ya definidas, ¿qué imprime esto?
+
+```python
+def generar_informe(eventos: list[dict], umbral: int) -> list[str]:
+    fallos = contar_fallos_por_ip(eventos)
+    out = []
+    for ip in ips_sospechosas(eventos, umbral):
+        etiqueta = "CRÍTICO" if hubo_acceso_correcto(eventos, ip) else "alerta"
+        out.append(f"[{etiqueta}] {ip} ({fallos[ip]} fallos)")
+    return out
+
+eventos = [{"ip": "9.9.9.9", "estado": "FALLO"}] * 6 + [{"ip": "9.9.9.9", "estado": "OK"}]
+print(generar_informe(eventos, umbral=5))
+```
+
+A) `['[alerta] 9.9.9.9 (6 fallos)']`
+B) `['[CRÍTICO] 9.9.9.9 (6 fallos)']`
+C) `['[CRÍTICO] 9.9.9.9 (7 fallos)']`
+D) `[]`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>9.9.9.9</code> tiene 6 fallos (supera el umbral de 5) <b>y además</b> un <code>OK</code> posterior — <code>hubo_acceso_correcto</code> da <code>True</code>, así que se etiqueta como <code>CRÍTICO</code>, no como una simple alerta.</details>
+
+**15.** *(Sobre el reto de la unidad)* Tienes esta configuración de línea de comandos:
+
+```python
+import argparse
+
+ap = argparse.ArgumentParser()
+ap.add_argument("log")
+ap.add_argument("--umbral", type=int, default=5)
+args = ap.parse_args(["log.txt"])   # sin pasar --umbral
+
+print(args.umbral)
+```
+
+¿Qué imprime?
+
+A) `None`
+B) `5`
+C) Lanza un error porque `--umbral` es obligatorio
+D) `0`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Como <code>--umbral</code> no se indicó al llamar al programa, <code>argparse</code> usa el valor <code>default=5</code> definido en el propio <code>add_argument</code>.</details>

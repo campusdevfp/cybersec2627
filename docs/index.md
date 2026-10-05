@@ -1,64 +1,34 @@
-# CMO-313 · Fundamentos de programación
+# CMO-314 · Ciberseguridad
 
-Materiales del módulo: **6 unidades**, una por cada Resultado de Aprendizaje. Puedes consultarlos online u offline.
+Bienvenida y bienvenido al material del módulo de **Ciberseguridad** (CMO-314, 90 horas). Todo lo que necesitas para estudiar está aquí, y aprenderás usando **Python 3** como herramienta principal.
 
-## Unidades
+## Cómo está organizado
 
-| | Unidad | Qué aprendes | Horas |
-|:---:|---|---|:---:|
-| **1** | [Estructura del programa](ud1/index.md) | Variables, tipos, operadores, conversión, Python tipado | 8 h |
-| **2** | [Funciones y librerías](ud2/index.md) | Dividir el problema en funciones y reutilizar código | 8 h |
-| **3** | [Control y excepciones](ud3/index.md) | Decidir, repetir y no romperse con datos raros | 12 h |
-| **4** | [Orientación a objetos](ud4/index.md) | Clases, objetos, encapsulación y herencia | 8 h |
-| **5** | [Entrada/salida y ficheros](ud5/index.md) | Que los datos sobrevivan al cerrar el programa | 6 h |
-| **6** | [Bases de datos](ud6/index.md) | SQLite y las cuatro operaciones CRUD | 8 h |
+El módulo tiene **6 unidades**, una por cada **Resultado de Aprendizaje (RA)**. Cada unidad combina teoría con **muchas actividades** y termina en un **proyecto en Python** que se comprueba solo con tests: tú escribes el código y `pytest` te dice si está bien, igual que en el examen.
 
-Las unidades van en orden: cada una se apoya en la anterior.
+| Unidad | Tema | Horas | Peso | Proyecto |
+|:---:|---|:---:|:---:|---|
+| **1** | Fundamentos, criptografía y forense | 20 h | 15 % | Verificador de integridad |
+| **2** | Seguridad activa, malware y red | 16 h | 20 % | Detector de fuerza bruta |
+| **3** | Seguridad perimetral y acceso remoto | 14 h | 15 % | Motor de cortafuegos |
+| **4** | Riesgos, bastionado y autenticación | 12 h | 15 % | Riesgo + contraseñas |
+| **5** | Hacking ético en laboratorio | 20 h | 25 % | Escáner de puertos |
+| **6** | Normativa y protección de datos | 8 h | 10 % | Cumplimiento + anonimizador |
+| | **TOTAL** | **90 h** | **100 %** | |
 
-## Empieza por aquí
+## Antes de empezar
 
-- **[El módulo](el-modulo.md)** — qué se aprende en cada unidad, los pesos y cómo se trabaja.
-- **[Evaluación](evaluacion.md)** — exámenes, recuperaciones, el candado de los seis RA y la asistencia.
-
-## Recursos
-
-- **[Puesta en marcha](recursos/puesta-en-marcha.md)** — instalar Python, VS Code, el entorno virtual y `mypy`. Se hace en la sesión 2.
-- **[Entorno de trabajo](recursos/entorno.md)** — chuleta de entornos virtuales, `pip` y `mypy`.
-- **[Proyectos](proyectos/index.md)** — los **6 proyectos base** con sus tests, uno por unidad.
-- **[Simulacros de examen](simulacros/index.md)** — un examen de mentira por RA, con los tests publicados, para medirte antes de la prueba real.
-- **[Todo el material en una página](completo.md)** — para leer del tirón o exportar a PDF.
-
-## Cómo se trabaja cada unidad
-
-Todas las unidades tienen **la misma estructura**, y siempre en este orden:
-
-| | Qué es |
-|---|---|
-| **Conceptos** | La teoría, con ejemplos resueltos y comentados que puedes copiar y ejecutar. |
-| **Ejercicios** | Todos juntos al final, agrupados por tema y con la solución desplegable. |
-| **Práctica final** | En la UD1 y la UD2, un **simulacro tipo test**. En las demás, el **proyecto** de la unidad y un **simulacro** en formato de examen. |
-
-Así puedes leer un concepto, hacer sus ejercicios y saber si lo has entendido **sin esperar
-a nadie**.
-
-El módulo va en **aula invertida**: la teoría y los ejercicios los haces tú, y **la clase se
-dedica a programar** —dudas, actividades guiadas y proyecto, con el profesor por las mesas—.
-Está explicado con detalle en **[El módulo](el-modulo.md)**.
-
-!!! warning "La solución no es el objetivo"
-    Leer una solución da sensación de haber aprendido, pero no enseña. Si la abres sin haberlo intentado, el ejercicio no ha servido de nada. Atáscate primero: ahí está el aprendizaje.
+1. Prepara tu **entorno de trabajo** y el **laboratorio**: [Entorno y laboratorio](recursos/entorno.md).
+2. Lee las normas de **uso ético y legal**: [Uso ético y legal](recursos/uso-etico.md). Es obligatorio.
+3. Repasa cómo se usa **Python en ciberseguridad**: [Python para ciberseguridad](recursos/python-ciberseguridad.md).
 
 ## Cómo se evalúa
 
-Un examen por RA, dos por trimestre, y ninguno de teoría. En el **primer trimestre** es un **test de código**: 12 preguntas sobre fragmentos, para comprobar que sabes leerlos. En el **segundo y el tercero** son **retos de programación**: escribes código y se ejecuta contra una batería de casos.
+Cada RA se evalúa con un **reto en formato examen** que se corrige **solo con sus tests**:
 
-**Los seis RA tienen que estar en 5 o más** para superar el módulo. Lo que suspendas queda pendiente para la ordinaria y, después, la extraordinaria.
+> **Nota = (tests superados ÷ total) × 10** · se aprueba con 5.
 
-Todo el detalle —incluidas las recuperaciones, la FFE y el 15 % de faltas— en **[Evaluación](evaluacion.md)**. La rúbrica exacta de cada unidad está en su última sección.
+**Se supera con 5, y hay que aprobar los seis RAs**: no hay compensación entre ellos.
 
-## Uso offline
-
-Descarga la carpeta `site/` (o genérala con `mkdocs build`) y abre `site/index.html`. Todo funciona sin conexión, incluidos los diagramas y la búsqueda.
-
-!!! tip "Herramientas que usarás"
-    Python 3 · Visual Studio Code · `pytest` (pruebas) · `mypy` (tipos) · SQLite (UD6)
+!!! danger "Uso responsable"
+    Las herramientas y técnicas de este módulo se usan **solo** sobre tus sistemas o el laboratorio autorizado. Acceder a sistemas ajenos sin permiso es delito.

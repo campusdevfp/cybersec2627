@@ -1,1131 +1,1044 @@
-# Unidad 3 · Estructuras de control, excepciones y depuración
+# Unidad 3 · Seguridad perimetral y acceso remoto
 
-> **Módulo:** CMO-313 · Fundamentos de programación
-> **Resultado de aprendizaje:** RA3 · **Duración:** 12 h · **Peso:** 25 %
-> **Lenguaje:** Python 3 (tipado) · **La unidad más importante del módulo**
+> **Módulo:** CMO-314 · Ciberseguridad · **RA3** · **Duración:** 14 h · **Peso:** 15 % · **Herramienta:** Python 3 (tipado) + POO
 
-Hasta ahora tus programas iban en línea recta: siempre las mismas instrucciones, en el mismo orden. Aquí aprenden a **decidir** (hacer una cosa u otra según los datos) y a **repetir** (hacer algo muchas veces sin escribirlo muchas veces). Con esto ya puedes escribir prácticamente cualquier programa.
+Hasta ahora has protegido datos (UT1) y detectado ataques leyendo logs (UT2). Esta unidad va de **decidir qué tráfico entra y cuál no** — el trabajo de un cortafuegos. Y aquí cambia la herramienta principal: en vez de funciones sueltas, vas a modelar el problema con **clases** (programación orientada a objetos). Un cortafuegos real *es* un objeto con estado (sus reglas) y comportamiento (evaluar tráfico) — es el caso de uso perfecto para aprender POO con sentido, no de memoria.
 
-Es la unidad de **mayor peso** del módulo (25 %), y con razón: todo lo que venga después la usa.
+!!! reto "El reto de la unidad"
+    **Construye un motor de cortafuegos.** Reglas, prioridad y una política por defecto que decide cuando nada coincide. Todo lo de abajo es tu entrenamiento.
+
+```mermaid
+flowchart TB
+    A["Cortafuegos y ACL"] --> B["Tipos de cortafuegos<br/>y DMZ"]
+    B --> C["POO en Python<br/>clases y dataclasses"]
+    C --> D["Reglas como objetos"]
+    D --> E["VPN y acceso remoto"]
+    D --> P["RETO<br/>Motor de cortafuegos"]
+    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
+```
+
+**Qué sabrás hacer al terminar:** explicar qué es una ACL y la política "deny by default" · diseñar una DMZ · escribir clases en Python con `@dataclass`, métodos y herencia · modelar reglas de cortafuegos como objetos que se evalúan a sí mismos · explicar VPN y AAA (autenticación, autorización, auditoría) · construir un cortafuegos evaluable por CLI, tipado y probado.
+
+**Cómo se trabaja (aula invertida):** lees la sección y ejecutas los ejemplos antes de clase → en clase resuelves las actividades y avanzas el reto en parejas.
 
 ---
 
-## Mapa de la unidad
+## 1. Cortafuegos y listas de control de acceso (ACL)
 
-<figure markdown>
-  ![Mapa de la unidad 3](../assets/diagramas/ud3-mapa.svg#only-light)
-  ![Mapa de la unidad 3](../assets/diagramas/ud3-mapa-dark.svg#only-dark)
-  <figcaption>Decidir, repetir y no romperse cuando llegan datos inesperados.</figcaption>
-</figure>
+Un **cortafuegos** filtra tráfico según reglas. Cada regla dice: si el tráfico coincide con esto, haz aquello (permitir o denegar). Las reglas se evalúan **en orden**, y la **primera que coincide gana**.
 
-### Qué vas a saber hacer al terminar
-
-- [ ] Tomar decisiones con `if` / `elif` / `else`.
-- [ ] Repetir con `while` (mientras se cumpla algo) y con `for` (para cada elemento).
-- [ ] Usar `break` y `continue` con criterio.
-- [ ] Recorrer listas y diccionarios.
-- [ ] **Controlar errores** con `try` / `except` para que el programa no se caiga.
-- [ ] **Validar** la entrada del usuario.
-- [ ] Depurar: encontrar por qué un programa no hace lo que crees.
-
----
-
-!!! tip "Cómo se trabaja esta unidad"
-    Cada sección de teoría termina con **Practica lo de esta sección**: tres o cuatro
-    ejercicios cortos con la solución desplegable, que solo usan lo que acabas de leer.
-
-    **Hazlos en el momento, antes de seguir.** Ese es el trato: la teoría la lees tú
-    —en casa o en clase— y el tiempo de aula se dedica a resolver dudas y a lo que de
-    verdad cuesta. Si llegas a la siguiente sección sin haber tocado el teclado, la
-    unidad se te va a hacer cuesta arriba.
-
-    Después vienen las **actividades guiadas**, el **proyecto** de la unidad y el
-    **simulacro** de examen. En ese orden.
-
----
-
-## 1. Decidir: `if`, `elif`, `else`
-
-### 1.1 La forma básica
-
-```python
-nota: float = 7.0
-
-if nota >= 5:
-    print("Aprobado")
-else:
-    print("Suspenso")
+```mermaid
+flowchart LR
+    T["Tráfico entrante"] --> R1{"¿Coincide<br/>regla 1?"}
+    R1 -->|sí| A1["Aplica acción 1"]
+    R1 -->|no| R2{"¿Coincide<br/>regla 2?"}
+    R2 -->|sí| A2["Aplica acción 2"]
+    R2 -->|no| Def["Política por defecto<br/>(normalmente DENEGAR)"]
 ```
 
-Lo importante de la sintaxis de Python:
+!!! warning "La regla que nunca debes olvidar: deny by default"
+    Si el tráfico no coincide con **ninguna** regla, la política por defecto debe ser **denegar**. Un cortafuegos que "permite si no sabe qué hacer" es un cortafuegos roto — y es el error de configuración más común en el mundo real.
 
-- La condición termina en **dos puntos** `:`.
-- El bloque que depende de ella va **indentado** (4 espacios). La indentación **no es decorativa**: es lo que marca qué pertenece al `if`.
-
-```python
-if nota >= 5:
-    print("Aprobado")        # dentro del if
-print("Fin")                 # fuera: se ejecuta siempre
-```
-
-### 1.2 Varias opciones con `elif`
-
-```python
-nota: float = 7.0
-
-if nota >= 9:
-    calificacion = "Sobresaliente"
-elif nota >= 7:
-    calificacion = "Notable"
-elif nota >= 6:
-    calificacion = "Bien"
-elif nota >= 5:
-    calificacion = "Suficiente"
-else:
-    calificacion = "Insuficiente"
-
-print(calificacion)          # Notable
-```
-
-!!! tip "El orden importa"
-    Python comprueba de arriba abajo y se queda en **la primera** condición verdadera. Por eso se ponen de mayor a menor: si empezaras por `nota >= 5`, un 9 entraría ahí y nunca llegaría a «Sobresaliente».
-
-### 1.3 Condiciones compuestas
-
-```python
-edad: int = 20
-tiene_carnet: bool = True
-
-if edad >= 18 and tiene_carnet:
-    print("Puede conducir")
-
-if not tiene_carnet or edad < 18:
-    print("No puede conducir")
-```
-
-> **Error clásico:** `if edad >= 18 and <= 65` no es válido. Hay que repetir la variable: `if edad >= 18 and edad <= 65`. *(En Python también vale `if 18 <= edad <= 65`.)*
-
-> **Reto rápido 1.** Escribe un `if` que muestre `"Par"` o `"Impar"` según un número.
-
-## 2. Repetir con `while`
-
-`while` repite **mientras** una condición sea verdadera:
-
-```python
-contador: int = 1
-while contador <= 3:
-    print(contador)
-    contador = contador + 1     # ¡imprescindible!
-```
-
-Salida: `1`, `2`, `3`.
-
-!!! danger "El bucle infinito"
-    Si olvidas modificar la variable de la condición, el bucle **no termina nunca**:
-    ```python
-    contador = 1
-    while contador <= 3:
-        print(contador)       # ✗ contador nunca cambia
-    ```
-    Se corta con `Ctrl+C`. Siempre que escribas un `while`, pregúntate: *¿qué hace que esta condición acabe siendo falsa?*
-
-### 2.1 El patrón «menú»
-
-Es el uso más habitual y el que aparece en el examen:
-
-```python
-opcion: str = ""
-while opcion != "0":
-    print("1 - Saludar")
-    print("0 - Salir")
-    opcion = input("Opción: ")
-    if opcion == "1":
-        print("¡Hola!")
-print("Adiós")
-```
-
-> **Reto rápido 2.** Escribe un `while` que muestre los números del 10 al 1 (cuenta atrás).
-
-## 3. Repetir con `for`
-
-`for` recorre **cada elemento** de una colección. Es el bucle preferido cuando sabes sobre qué iteras.
-
-```python
-notas: list[float] = [5.0, 7.5, 9.0]
-
-for nota in notas:
-    print(nota)
-```
-
-### 3.1 `range()`: repetir un número de veces
-
-```python
-for i in range(5):          # 0, 1, 2, 3, 4
-    print(i)
-
-for i in range(1, 6):       # 1, 2, 3, 4, 5
-    print(i)
-
-for i in range(0, 10, 2):   # 0, 2, 4, 6, 8  (de dos en dos)
-    print(i)
-```
-
-!!! tip "`range(n)` llega hasta n-1"
-    `range(5)` da cinco valores: del 0 al 4. Es el mismo criterio que los índices de las listas.
-
-### 3.2 Acumular
-
-Patrón fundamental: una variable que va creciendo dentro del bucle.
-
-```python
-notas: list[float] = [5.0, 7.5, 9.0]
-
-total: float = 0.0
-for nota in notas:
-    total = total + nota        # también: total += nota
-
-print(f"Suma: {total}")         # 21.5
-print(f"Media: {total / len(notas):.2f}")
-```
-
-### 3.3 Contar con condición
-
-```python
-aprobados: int = 0
-for nota in notas:
-    if nota >= 5:
-        aprobados += 1
-print(aprobados)      # 3
-```
-
-### 3.4 `while` o `for`, ¿cuál?
-
-| Usa… | Cuando… |
+| Campo típico de una regla | Ejemplo |
 |---|---|
-| `for` | recorres una lista o repites un nº **conocido** de veces |
-| `while` | repites **hasta que pase algo** (menús, validaciones) |
+| Acción | `PERMITIR` / `DENEGAR` |
+| Origen | una IP, una red (`10.0.20.0/24`) o `*` (cualquiera) |
+| Destino | igual que origen |
+| Puerto | un número, o `0`/`*` (cualquiera) |
 
-> **Reto rápido 3.** Con un `for` y `range`, suma los números del 1 al 100. *(Resultado: 5050.)*
-
-## 4. Diccionarios
-
-Una lista guarda valores por posición; un **diccionario** los guarda por **clave**:
-
-```python
-alumno: dict[str, str] = {
-    "nombre": "Ada",
-    "grupo": "1DAW",
-}
-
-print(alumno["nombre"])         # Ada
-alumno["edad"] = "20"           # añadir
-```
-
-Recorrerlo:
-
-```python
-for clave, valor in alumno.items():
-    print(f"{clave}: {valor}")
-```
-
-> Acceder a una clave que no existe da `KeyError`. Para evitarlo: `alumno.get("edad", "desconocida")`.
+!!! reto "Reto rápido 1"
+    Tienes dos reglas: 1) `PERMITIR` cualquier origen al puerto 443. 2) `DENEGAR` todo. Si llega tráfico al puerto 22, ¿qué pasa? ¿Y si llegara la regla del puerto 22 **antes** que la de "denegar todo"?
 
 ---
 
-> **Reto rápido 4.** Crea un diccionario con tres provincias y su prefijo telefónico, y muestra el de una de ellas.
+## 2. Tipos de cortafuegos y la DMZ
 
-## 5. `break` y `continue`
-
-- **`break`** sale del bucle inmediatamente.
-- **`continue`** salta a la siguiente vuelta.
-
-```python
-for n in [1, 2, 3, 4, 5]:
-    if n == 4:
-        break              # al llegar al 4, corta
-    print(n)               # 1 2 3
-
-for n in [1, 2, 3, 4, 5]:
-    if n % 2 == 0:
-        continue           # se salta los pares
-    print(n)               # 1 3 5
-```
-
-!!! warning "Úsalos con moderación"
-    Un `break` bien puesto aclara el código; cinco `break` repartidos lo vuelven imposible de seguir. Si puedes expresarlo en la condición del bucle, mejor.
-
-> **Reto rápido 4.** Recorre `[3, 8, 2, 9, 4]` y para en cuanto encuentres un número mayor que 5, mostrándolo.
-
-## 6. Excepciones: que el programa no se caiga
-
-Ya conoces esto: si el usuario escribe `"hola"` cuando pides un número, el programa **se rompe**.
-
-```python
-edad = int(input("Edad: "))     # el usuario escribe "hola" → ValueError, programa muerto
-```
-
-### 6.1 `try` / `except`
-
-```python
-try:
-    edad = int(input("Edad: "))
-    print(f"Tienes {edad} años")
-except ValueError:
-    print("Eso no es un número")
-```
-
-- En `try` va el código que **puede fallar**.
-- En `except` va **qué hacer si falla**. El programa continúa.
-
-### 6.2 Capturar el error correcto
-
-```python
-try:
-    resultado = 10 / int(input("Divisor: "))
-except ValueError:
-    print("No has escrito un número")
-except ZeroDivisionError:
-    print("No se puede dividir entre cero")
-```
-
-!!! danger "No captures `Exception` a secas"
-    ```python
-    try:
-        ...
-    except:            # ✗ atrapa TODO, incluso errores tuyos de programación
-        pass           # ✗ y encima los oculta
-    ```
-    Así, un fallo real (una variable mal escrita) se traga en silencio y no te enteras. **Captura la excepción concreta que esperas.**
-
-### 6.3 `else` y `finally`
-
-```python
-try:
-    numero = int(input("Número: "))
-except ValueError:
-    print("Entrada no válida")
-else:
-    print(f"El doble es {numero * 2}")   # solo si NO hubo error
-finally:
-    print("Fin")                          # siempre, haya error o no
-```
-
-### 6.4 El patrón «validar entrada»
-
-La combinación de `while` + `try` que usarás una y otra vez:
-
-```python
-def pedir_entero(mensaje: str) -> int:
-    """Pide un entero hasta que el usuario escriba uno válido."""
-    while True:
-        try:
-            return int(input(mensaje))
-        except ValueError:
-            print("Entrada no válida, inténtalo otra vez")
-```
-
-> **Reto rápido 5.** ¿Qué excepción lanza `int("3.5")`? *(Respuesta: `ValueError`; `int()` no acepta decimales en texto.)*
-
-## 7. Depurar: encontrar el fallo
-
-Depurar es averiguar **por qué** el programa no hace lo que crees. Tres herramientas, de menos a más:
-
-### 7.1 `print` de diagnóstico
-
-La más simple y muchas veces suficiente. Muestra el valor de las variables en puntos clave:
-
-```python
-for i, nota in enumerate(notas):
-    print(f"[debug] i={i} nota={nota} total={total}")
-```
-
-Bórralos cuando termines.
-
-### 7.2 El depurador del IDE
-
-En VS Code: haz clic a la izquierda del número de línea para poner un **punto de ruptura** (breakpoint) y pulsa **F5**. El programa se detiene ahí y puedes:
-
-| Tecla | Qué hace |
-|---|---|
-| **F10** | ejecuta la línea y pasa a la siguiente |
-| **F11** | entra dentro de la función |
-| **F5** | continúa hasta el siguiente punto de ruptura |
-
-Mientras está parado, el panel **Variables** te enseña cuánto vale cada cosa **en ese instante**. Es incomparablemente mejor que llenar el código de `print`.
-
-### 7.3 Leer el error de verdad
-
-Cuando Python falla, te dice **el fichero, la línea y el tipo de error**. Lee siempre la **última** línea del mensaje: ahí está la causa.
-
-```text
-Traceback (most recent call last):
-  File "programa.py", line 7, in <module>
-    media = total / len(notas)
-ZeroDivisionError: division by zero
-```
-
-Eso dice: línea 7, división entre cero → `len(notas)` vale 0 → la lista está vacía.
-
----
-
-> **Reto rápido 7.** Provoca un `IndexError` a propósito (pide la posición 5 de una lista de 2), lee el *traceback* y di en qué línea está el fallo.
-
-## 8. Errores frecuentes
-
-| Síntoma | Causa | Solución |
+| Tipo | Dónde mira | Ejemplo |
 |---|---|---|
-| `IndentationError` | indentación inconsistente | 4 espacios, siempre igual |
-| El bucle no termina | no cambias la variable de la condición | modifícala dentro del `while` |
-| `if x = 5` da error | `=` asigna, `==` compara | usa `==` |
-| El `else` se ejecuta cuando no debe | condiciones en mal orden | ordena de más restrictiva a menos |
-| `ZeroDivisionError` en medias | lista vacía | comprueba `len(lista) > 0` antes |
-| `KeyError` | clave inexistente en el diccionario | usa `.get(clave, valor_por_defecto)` |
-| El error se «traga» | `except:` genérico con `pass` | captura la excepción concreta |
-| `range(1,5)` no llega al 5 | el final es exclusivo | usa `range(1, 6)` |
+| **Filtrado de paquetes** | Cabeceras IP/puerto | `iptables`, ACL de router |
+| **Stateful** | Recuerda el estado de la conexión | La mayoría de cortafuegos actuales |
+| **Proxy / aplicación** | El contenido, no solo la cabecera | WAF, proxy inverso |
+
+Una **DMZ** (zona desmilitarizada) es una red intermedia para los servicios que deben ser accesibles desde Internet (un servidor web), **sin** exponer la red interna donde están los datos sensibles:
+
+```mermaid
+flowchart LR
+    I["Internet"] -->|:443| DMZ["DMZ<br/>servidor web"]
+    DMZ -->|:5432 solo si es el web| LAN["LAN interna<br/>base de datos"]
+    I -.->|DENEGADO| LAN
+```
+
+> Fíjate: Internet **nunca** llega directamente a la LAN. Y dentro de la DMZ solo el servidor web (no cualquier cosa) puede hablar con la base de datos.
 
 ---
 
+## 3. POO en Python: modelar el problema con clases
+
+Hasta ahora escribías funciones sueltas que reciben datos. Una **clase** agrupa **datos** (atributos) y **comportamiento** (métodos) en un mismo objeto. Para una regla de cortafuegos, esto encaja perfecto: la regla *tiene* unos campos y *sabe* decidir si se aplica.
+
+```python title="clase_basica.py"
+class Regla:
+    def __init__(self, accion: str, puerto: int) -> None:   # (1)!
+        self.accion = accion                                  # (2)!
+        self.puerto = puerto
+
+    def permite(self, puerto: int) -> bool:                   # (3)!
+        return self.puerto == puerto and self.accion.upper() == "PERMITIR"
+
+r = Regla("permitir", 443)
+print(r.permite(443))   # (4)!
+print(r.permite(22))
+```
+
+1.  `__init__` es el **constructor**: se ejecuta al crear el objeto y recibe los datos iniciales.
+2.  `self` es el propio objeto: `self.accion` guarda el dato **en** ese objeto concreto.
+3.  Un **método**: una función que vive dentro de la clase y actúa sobre `self`.
+4.  `r.permite(443)` — le preguntas al objeto, no calculas tú por fuera.
+
+```text title="Salida"
+True
+False
+```
+
+### 3.1 `@dataclass`: la misma clase, con menos código repetitivo
+
+Escribir `__init__` a mano para cada atributo es tedioso. `@dataclass` lo genera automáticamente:
+
+```python title="dataclass_regla.py"
+from dataclasses import dataclass
+
+@dataclass
+class Regla:
+    accion: str
+    puerto: int = 0             # valor por defecto: 0 = "cualquier puerto"
+
+    def permite(self, puerto: int) -> bool:
+        return (self.puerto == 0 or self.puerto == puerto) and self.accion.upper() == "PERMITIR"
+
+r1 = Regla("PERMITIR", 443)
+r2 = Regla("DENEGAR")           # puerto usa el valor por defecto (0)
+print(r1)          # dataclass genera un __repr__ legible solo
+print(r1.permite(443), r2.permite(443))
+```
+
+```text title="Salida"
+Regla(accion='PERMITIR', puerto=443)
+True False
+```
+
+> `@dataclass` genera gratis `__init__`, `__repr__` (para que `print()` sea legible) y `__eq__` (para comparar dos reglas con `==`). Es el estándar profesional para clases que son, sobre todo, contenedores de datos.
+
+!!! reto "Reto rápido 2"
+    Añade un campo `origen: str = "*"` a `Regla` y amplía `permite` para que también lo compruebe (comodín `"*"` = cualquiera).
+
 ---
 
-## 9. Ejercicios
+## 4. Reglas con comodín y coincidencia por prioridad
 
-Aquí están **todos los ejercicios de la unidad**, agrupados por el
-tema al que corresponden y con la solución desplegable.
+```python title="regla_comodin.py"
+from dataclasses import dataclass
 
-**Haz los de un tema en cuanto termines de leerlo.** No esperes al final: son cortos y solo
-usan lo que acabas de ver, así que si algo no ha quedado claro lo descubres en el momento y
-no tres semanas después.
+@dataclass
+class Regla:
+    accion: str
+    origen: str = "*"
+    destino: str = "*"
+    puerto: int = 0
 
-!!! warning "Intenta antes de desplegar"
-    Abrir la solución sin haberlo intentado da sensación de aprender, y no enseña nada. Si
-    llevas quince minutos sin avanzar, mírala. Si llevas dos, no.
+    def coincide(self, origen: str, destino: str, puerto: int) -> bool:
+        def encaja(valor: str, patron: str) -> bool:
+            return patron == "*" or patron == valor
+        return (encaja(origen, self.origen) and encaja(destino, self.destino)
+                and (self.puerto == 0 or self.puerto == puerto))
 
+r = Regla("PERMITIR", origen="lan", destino="web", puerto=80)
+print(r.coincide("lan", "web", 80))    # todo coincide
+print(r.coincide("wan", "web", 80))    # origen no coincide
+```
 
-### Tema 1 · Decidir con `if`
+```text title="Salida"
+True
+False
+```
 
-**1.1.** Escribe `clasificar_nota(nota)` que devuelva `"Suspenso"`, `"Aprobado"`, `"Notable"` o `"Sobresaliente"`.
-<details><summary>Solución</summary>
+### 4.1 El cortafuegos: una clase que contiene reglas
+
+Una segunda clase que **usa** la primera — así se componen sistemas más grandes en POO:
+
+```python title="clase_cortafuegos.py"
+from dataclasses import dataclass, field
+
+@dataclass
+class Cortafuegos:
+    reglas: list[Regla] = field(default_factory=list)   # (1)!
+
+    def anadir(self, regla: Regla) -> None:
+        self.reglas.append(regla)
+
+    def evaluar(self, origen: str, destino: str, puerto: int) -> str:
+        for regla in self.reglas:                          # (2)!
+            if regla.coincide(origen, destino, puerto):
+                return regla.accion.upper()
+        return "DENEGAR"                                    # (3)!
+
+fw = Cortafuegos()
+fw.anadir(Regla("PERMITIR", origen="lan", destino="web", puerto=80))
+fw.anadir(Regla("DENEGAR"))                                 # regla "atrapa-todo"
+print(fw.evaluar("lan", "web", 80))
+print(fw.evaluar("wan", "web", 80))
+```
+
+1.  `field(default_factory=list)` es la forma correcta de dar una **lista vacía** por defecto en un dataclass — usar `reglas: list = []` directamente es un error clásico (todas las instancias compartirían la misma lista).
+2.  Recorre las reglas **en orden**: la primera que coincide decide.
+3.  Si ninguna coincide, `DENEGAR` — la política por defecto de la sección 1.
+
+```text title="Salida"
+PERMITIR
+DENEGAR
+```
+
+!!! analogia "Analogía"
+    Un objeto `Cortafuegos` es como un guardia con una lista de instrucciones en la mano: las lee de arriba abajo y, en cuanto una encaja, actúa — no sigue mirando el resto. Si llega al final de la lista sin que nada encaje, aplica la instrucción por defecto: "si no está permitido explícitamente, no pasa".
+
+!!! reto "Reto rápido 3"
+    Si añades la regla `DENEGAR` (atrapa-todo) **antes** que la de `PERMITIR`, ¿qué evalúa `fw.evaluar("lan","web",80)`? ¿Por qué importa tanto el orden?
+
+---
+
+## 5. Herencia: especializar una regla
+
+La herencia te permite partir de una clase y **añadir** comportamiento sin reescribir lo que ya funciona:
+
+```python title="herencia.py"
+from dataclasses import dataclass
+
+@dataclass
+class ReglaHoraria(Regla):                     # hereda accion, origen, destino, puerto
+    hora_inicio: int = 0
+    hora_fin: int = 23
+
+    def activa_a_las(self, hora: int) -> bool:
+        return self.hora_inicio <= hora <= self.hora_fin
+
+r = ReglaHoraria("PERMITIR", puerto=22, hora_inicio=8, hora_fin=18)
+print(r.activa_a_las(10))   # dentro del horario laboral
+print(r.activa_a_las(22))   # fuera
+print(r.coincide("*", "*", 22))   # el método heredado sigue funcionando
+```
+
+```text title="Salida"
+True
+False
+True
+```
+
+> `ReglaHoraria` **es** una `Regla` (hereda `coincide`) y además sabe algo nuevo (`activa_a_las`). Es el principio de sustitución: en cualquier sitio donde esperes una `Regla`, una `ReglaHoraria` también vale.
+
+---
+
+## 6. VPN y acceso remoto
+
+Una **VPN** (red privada virtual) cifra el tráfico entre tu equipo y una red remota, como si estuvieras físicamente dentro de ella.
+
+```mermaid
+flowchart LR
+    U["Tu equipo"] -->|"túnel cifrado<br/>(VPN)"| Gw["Gateway VPN"]
+    Gw --> LAN["Red interna<br/>de la empresa"]
+```
+
+| Concepto AAA | Responde a |
+|---|---|
+| **Authentication** (autenticación) | ¿Quién eres? |
+| **Authorization** (autorización) | ¿Qué puedes hacer? |
+| **Accounting** (auditoría) | ¿Qué hiciste, y cuándo? |
+
+!!! reto "Reto rápido 4"
+    Un empleado autentica correctamente (sabe su contraseña) pero intenta acceder a un recurso que no le corresponde. ¿Qué parte de AAA lo detiene: autenticación o autorización?
+
+---
+
+## 7. Errores frecuentes (ten esto a mano)
+
+| Error | Causa | Solución |
+|---|---|---|
+| `reglas: list = []` en un dataclass | Lista compartida entre instancias | `field(default_factory=list)` |
+| El cortafuegos "permite todo" | Falta la regla `DENEGAR` final | Añade siempre una regla atrapa-todo al final |
+| Una regla nunca se aplica | Está **después** de otra más genérica que ya coincide | El orden importa: reglas específicas primero |
+| `AttributeError` al usar un método heredado | Olvidar `@dataclass` en la clase hija también | Decora también la subclase |
+| Comparar objetos con `==` y falla | La clase no genera `__eq__` | `@dataclass` lo da gratis; con `class` normal, defínelo tú |
+
+---
+
+## 8. Actividades: de lo más sencillo a preguntas tipo examen
+
+> Librerías/técnicas reales: `dataclasses`, `ipaddress`, herencia, `field(default_factory=...)`.
+
+**1 · 🟢 Un servicio como objeto** — `@dataclass class Servicio` con `nombre: str` y `puerto: int`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-def clasificar_nota(nota: float) -> str:
-    """Clasifica una nota de 0 a 10."""
-    if nota < 5:
-        return "Suspenso"
-    if nota < 7:
-        return "Aprobado"
-    if nota < 9:
-        return "Notable"
-    return "Sobresaliente"
-
-print(clasificar_nota(4.9))   # -> Suspenso
-print(clasificar_nota(5))     # -> Aprobado
-print(clasificar_nota(9))     # -> Sobresaliente
+from dataclasses import dataclass
+@dataclass
+class Servicio:
+    nombre: str
+    puerto: int
 ```
 </details>
 
-**1.2.** Este código siempre dice «Menor». ¿Por qué? Arréglalo.
+**2 · 🟢 Regla mínima** — `@dataclass class Regla` con `accion` y `puerto`, y `permite(puerto) -> bool`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-edad = 20
-if edad > 18:
-    print("Mayor")
-if edad < 18:
-    print("Menor")
-else:
-    print("Menor")
-```
-<details><summary>Solución</summary>
-
-```python
-edad: int = 20
-
-# El fallo: el else colgaba del SEGUNDO if, no del primero.
-if edad >= 18:
-    print("Mayor")   # -> Mayor
-else:
-    print("Menor")
-
-# Una sola decision = un solo if/else. Encadenar ifs sueltos multiplica los casos
-# y hace que se solapen sin darte cuenta.
+from dataclasses import dataclass
+@dataclass
+class Regla:
+    accion: str
+    puerto: int
+    def permite(self, puerto: int) -> bool:
+        return self.puerto == puerto and self.accion.upper() == "PERMITIR"
 ```
 </details>
 
-**1.3.** Escribe `puede_votar(edad, nacionalidad)`: hace falta tener 18 o más **y** ser `"ES"`.
-<details><summary>Solución</summary>
+**3 · 🟢 ¿La IP está en la red?** — `en_red(ip: str, cidr: str) -> bool` con `ipaddress`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-def puede_votar(edad: int, nacionalidad: str) -> bool:
-    """Indica si la persona puede votar."""
-    return edad >= 18 and nacionalidad == "ES"
-
-print(puede_votar(20, "ES"))   # -> True
-print(puede_votar(17, "ES"))   # -> False
-print(puede_votar(30, "FR"))   # -> False
+import ipaddress
+def en_red(ip: str, cidr: str) -> bool:
+    return ipaddress.ip_address(ip) in ipaddress.ip_network(cidr)
 ```
 </details>
 
-
-### Tema 2 · Repetir con `while`
-
-**2.1.** Muestra los números del 1 al 5 con un `while`.
-<details><summary>Solución</summary>
+**4 · 🟢 Contar reglas por acción** — `contar_acciones(reglas: list[Regla]) -> dict[str,int]`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-i: int = 1
-while i <= 5:
-    print(i, end=" ")
-    i = i + 1     # SIN esta linea el bucle no termina nunca
-print()   # -> 1 2 3 4 5
+from collections import Counter
+def contar_acciones(reglas: list) -> dict[str, int]:
+    return dict(Counter(r.accion.upper() for r in reglas))
 ```
 </details>
 
-**2.2.** Escribe un `while` que sume números hasta que el usuario escriba `0`.
-<details><summary>Solución</summary>
+**5 · 🟡 Regla con origen, destino y puerto** — `Regla` con `origen`, `destino` (ambos `"*"` por defecto) y `coincide(origen, destino, puerto) -> bool`. Esta es la versión que usarás en el resto de actividades.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-total: int = 0
-numero: int = int(input("Número (0 para acabar): "))
-
-while numero != 0:
-    total = total + numero
-    numero = int(input("Número (0 para acabar): "))
-
-print(f"Total: {total}")   # -> Total: 12
+from dataclasses import dataclass
+@dataclass
+class Regla:
+    accion: str
+    origen: str = "*"
+    destino: str = "*"
+    puerto: int = 0
+    def coincide(self, origen: str, destino: str, puerto: int) -> bool:
+        def encaja(v: str, p: str) -> bool:
+            return p == "*" or p == v
+        return (encaja(origen, self.origen) and encaja(destino, self.destino)
+                and (self.puerto == 0 or self.puerto == puerto))
 ```
 </details>
 
-**2.3.** Este bucle es infinito. Encuentra el fallo:
+**6 · 🟡 Deny by default** — `Cortafuegos` con `anadir(regla)` y `evaluar(origen, destino, puerto)` que deniega si nada coincide.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-i = 0
-while i < 3:
-    print(i)
-```
-<details><summary>Solución</summary>
-
-```python
-i: int = 0
-while i < 3:
-    print(i)
-    i = i + 1   # <- lo que faltaba: sin avanzar, la condicion nunca deja de cumplirse
-
-# -> 0
-# -> 1
-# -> 2
-
-# Regla: en todo while, pregúntate "¿qué línea hace que la condición acabe
-# siendo falsa?". Si no la encuentras, es infinito.
+from dataclasses import dataclass, field
+@dataclass
+class Cortafuegos:
+    reglas: list = field(default_factory=list)
+    def anadir(self, regla) -> None:
+        self.reglas.append(regla)
+    def evaluar(self, origen: str, destino: str, puerto: int) -> str:
+        for r in self.reglas:
+            if r.coincide(origen, destino, puerto):
+                return r.accion.upper()
+        return "DENEGAR"
 ```
 </details>
 
-
-### Tema 3 · Repetir con `for`
-
-**3.1.** Recorre la lista `["Ada", "Alan", "Grace"]` y muestra cada nombre con su posición empezando en 1.
-<details><summary>Solución</summary>
+**7 · 🟡 Regla inalcanzable** — `tapada(reglas: list[tuple[str,int]], nueva: tuple[str,int]) -> bool`: ¿queda la nueva regla tapada por una anterior más genérica?
+<details class="sol"><summary>Solución</summary>
 
 ```python
-nombres = ["Ada", "Alan", "Grace"]
-
-for posicion, nombre in enumerate(nombres, start=1):
-    print(f"{posicion}. {nombre}")
-
-# -> 1. Ada
-# -> 2. Alan
-# -> 3. Grace
+def tapada(reglas: list[tuple[str, int]], nueva: tuple[str, int]) -> bool:
+    _, p = nueva
+    return any(rp in (0, p) for _, rp in reglas)
 ```
 </details>
 
-**3.2.** Suma los números del 1 al 100 con un `for` y `range()`.
-<details><summary>Solución</summary>
+**8 · 🟡 Reglas ordenadas por especificidad** — `ordenar_por_especificidad(reglas)`: las que no usan `"*"` van primero.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-total: int = 0
-for n in range(1, 101):   # 101 NO entra: range llega hasta el anterior
-    total = total + n
-
-print(total)   # -> 5050
+def ordenar_por_especificidad(reglas: list) -> list:
+    def puntuacion(r) -> int:
+        return (r.origen != "*") + (r.puerto != 0)
+    return sorted(reglas, key=puntuacion, reverse=True)
 ```
 </details>
 
-**3.3.** Cuenta cuántas notas de la lista `[3.0, 6.5, 9.0, 4.0]` están aprobadas.
-<details><summary>Solución</summary>
+**9 · 🟠 Herencia: regla con motivo** — `ReglaAuditada(Regla)` que añade `motivo: str = ""` y un método `describe() -> str`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-notas = [3.0, 6.5, 9.0, 4.0]
-
-aprobadas: int = 0
-for nota in notas:
-    if nota >= 5:
-        aprobadas = aprobadas + 1
-
-print(aprobadas)   # -> 2
+from dataclasses import dataclass
+@dataclass
+class ReglaAuditada(Regla):
+    motivo: str = ""
+    def describe(self) -> str:
+        return f"{self.accion} puerto={self.puerto} ({self.motivo or 'sin motivo'})"
 ```
 </details>
 
-
-### Tema 4 · Diccionarios
-
-**4.1.** Crea un diccionario con el stock de tres productos y muestra el stock de uno de ellos.
-<details><summary>Solución</summary>
+**10 · 🟠 Cargar reglas desde texto** — `cargar_reglas(texto: str) -> Cortafuegos`, líneas `"PERMITIR lan web 80"`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-stock: dict[str, int] = {"camisa": 10, "gorra": 4, "pantalón": 7}
-
-print(stock["gorra"])   # -> 4
-print(len(stock))       # -> 3
+def cargar_reglas(texto: str) -> Cortafuegos:
+    fw = Cortafuegos()
+    for ln in texto.strip().splitlines():
+        partes = ln.split()
+        accion, origen, destino = partes[0], partes[1], partes[2]
+        puerto = int(partes[3]) if len(partes) > 3 else 0
+        fw.anadir(Regla(accion, origen, destino, puerto))
+    return fw
 ```
 </details>
 
-**4.2.** Recorre el diccionario mostrando `producto: unidades`, y añade un producto nuevo.
-<details><summary>Solución</summary>
+**11 · 🟠 Métricas de uso** — `impactos(fw: Cortafuegos, trafico: list[tuple]) -> dict`: cuántas veces se aplicó cada regla.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-stock: dict[str, int] = {"camisa": 10, "gorra": 4}
-
-stock["botas"] = 2   # añadir es asignar una clave que no existía
-
-for producto, unidades in stock.items():
-    print(f"{producto}: {unidades}")
-
-# -> camisa: 10
-# -> gorra: 4
-# -> botas: 2
+from collections import Counter
+def impactos(fw: Cortafuegos, trafico: list[tuple]) -> dict[int, int]:
+    c: Counter[int] = Counter()
+    for o, d, p in trafico:
+        for i, r in enumerate(fw.reglas):
+            if r.coincide(o, d, p):
+                c[i] += 1
+                break
+    return dict(c)
 ```
 </details>
 
-**4.3.** Consulta un producto que puede no existir sin que el programa reviente.
-<details><summary>Solución</summary>
+**12 · 🔴 Detectar reglas duplicadas** — `duplicadas(reglas: list[Regla]) -> list[tuple[int,int]]`: pares de índices con reglas equivalentes (usa `==`, que `@dataclass` da gratis).
+<details class="sol"><summary>Solución</summary>
 
 ```python
-stock: dict[str, int] = {"camisa": 10}
-
-print(stock.get("gorra"))      # -> None
-print(stock.get("gorra", 0))   # -> 0     valor por defecto: mucho más cómodo
-
-# stock["gorra"] lanzaría KeyError. Con .get() decides tú qué pasa si no está.
+def duplicadas(reglas: list) -> list[tuple[int, int]]:
+    pares = []
+    for i in range(len(reglas)):
+        for j in range(i + 1, len(reglas)):
+            if reglas[i] == reglas[j]:
+                pares.append((i, j))
+    return pares
 ```
 </details>
 
-
-### Tema 5 · `break` y `continue`
-
-**5.1.** Busca el primer número negativo de una lista y sal del bucle en cuanto lo encuentres.
-<details><summary>Solución</summary>
+**13 · 🔴 Segmentación en tres zonas** — `zona(ip: str) -> str`: `"dmz"`, `"lan"` o `"externa"` según el CIDR (usa `ipaddress`).
+<details class="sol"><summary>Solución</summary>
 
 ```python
-numeros = [4, 7, -2, 9, -5]
-
-for n in numeros:
-    if n < 0:
-        print(f"Primer negativo: {n}")   # -> Primer negativo: -2
-        break
+import ipaddress
+def zona(ip: str) -> str:
+    direccion = ipaddress.ip_address(ip)
+    if direccion in ipaddress.ip_network("10.0.1.0/24"):
+        return "dmz"
+    if direccion in ipaddress.ip_network("10.0.2.0/24"):
+        return "lan"
+    return "externa"
 ```
 </details>
 
-**5.2.** Suma solo los números positivos de una lista, saltándote el resto con `continue`.
-<details><summary>Solución</summary>
+**14 · 🔴 Validar deny-by-default en un conjunto de reglas** — `tiene_regla_final_deny(fw: Cortafuegos) -> bool`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-numeros = [4, -7, 2, -9, 5]
-
-total: int = 0
-for n in numeros:
-    if n < 0:
-        continue      # este no me interesa: al siguiente
-    total = total + n
-
-print(total)   # -> 11
+def tiene_regla_final_deny(fw: Cortafuegos) -> bool:
+    if not fw.reglas:
+        return False
+    ultima = fw.reglas[-1]
+    return ultima.accion.upper() == "DENEGAR" and ultima.origen == "*" and ultima.puerto == 0
 ```
 </details>
 
-**5.3.** ¿Cuál es la diferencia entre `break` y `continue`? Explícalo con una frase cada uno.
-<details><summary>Solución</summary>
+**15 · 🔴 Simulación de tráfico y resumen** — `resumen(fw: Cortafuegos, trafico) -> dict[str,int]`: cuántos paquetes se permiten y cuántos se deniegan.
+<details class="sol"><summary>Solución</summary>
 
-```text
-break     -> ABANDONA el bucle entero. No se mira ni un elemento mas.
-continue  -> se salta SOLO esta vuelta y sigue con la siguiente.
-
-Truco para acordarse:
-    break    = "he terminado, me voy"
-    continue = "este no, el siguiente"
+```python
+from collections import Counter
+def resumen(fw: Cortafuegos, trafico: list[tuple]) -> dict[str, int]:
+    c: Counter[str] = Counter(fw.evaluar(o, d, p) for o, d, p in trafico)
+    return dict(c)
 ```
 </details>
 
+---
 
-### Tema 6 · Excepciones
+## 9. Reto resuelto, paso a paso — Motor de cortafuegos con zonas
 
-**6.1.** Pide un número por teclado y no dejes que el programa se caiga si escriben letras.
-<details><summary>Solución</summary>
+Un cliente te pide algo muy concreto: una DMZ con un servidor web, y una LAN con una base de datos que **solo** el servidor web puede tocar. Lo construyes con POO, de principio a fin.
 
-```python
-texto: str = input("Número: ")
-
-try:
-    numero: int = int(texto)
-    print(f"El doble es {numero * 2}")
-except ValueError:
-    print("Eso no es un número")   # -> Eso no es un número
+```mermaid
+flowchart LR
+    T["evaluar(origen, destino, puerto)"] --> B["recorre reglas<br/>en orden"]
+    B -->|coincide| Ac["devuelve accion"]
+    B -->|ninguna coincide| Def["DENEGAR"]
 ```
-</details>
 
-**6.2.** Divide dos números controlando la división entre cero.
-<details><summary>Solución</summary>
+**Paso 1 — La clase `Regla`, con comodines.**
 
-```python
-def dividir(a: float, b: float) -> float:
-    """División protegida; 0.0 si el divisor es cero."""
-    try:
-        return a / b
-    except ZeroDivisionError:
-        return 0.0
+```python title="cortafuegos.py"
+from dataclasses import dataclass, field
 
-print(dividir(10, 2))   # -> 5.0
-print(dividir(10, 0))   # -> 0.0
+@dataclass
+class Regla:
+    accion: str
+    origen: str = "*"
+    destino: str = "*"
+    puerto: int = 0
+
+    def coincide(self, origen: str, destino: str, puerto: int) -> bool:
+        def encaja(v: str, p: str) -> bool:
+            return p == "*" or p == v
+        return (encaja(origen, self.origen) and encaja(destino, self.destino)
+                and (self.puerto == 0 or self.puerto == puerto))
 ```
-</details>
 
-**6.3.** Este `except` es peligroso. ¿Por qué? Arréglalo:
+**Paso 2 — La clase `Cortafuegos`, que contiene reglas y decide.**
 
-```python
-try:
-    n = int(input())
-except:
-    pass
+```python title="cortafuegos.py (continúa)"
+@dataclass
+class Cortafuegos:
+    reglas: list[Regla] = field(default_factory=list)
+
+    def anadir(self, regla: Regla) -> None:
+        self.reglas.append(regla)
+
+    def evaluar(self, origen: str, destino: str, puerto: int) -> str:
+        for regla in self.reglas:
+            if regla.coincide(origen, destino, puerto):
+                return regla.accion.upper()
+        return "DENEGAR"
 ```
-<details><summary>Solución</summary>
 
-```python
-try:
-    n: int = int(input("Número: "))
-    print(n)
-except ValueError:
-    print("Entrada no válida")   # -> Entrada no válida
+**Paso 3 — Cargar reglas desde un fichero de texto** (así el cliente puede editar su política sin tocar código):
 
-# El except pelado se traga TODO: errores de tipado, de nombre, hasta el
-# Ctrl+C. Y con 'pass' ademas no deja rastro: el programa falla en silencio
-# y te vuelves loco buscando por que.
-# Captura el error concreto que esperas y di algo cuando ocurra.
-```
-</details>
-
-
-### Tema 7 · Depurar
-
-**7.1.** Este código da un resultado raro. Añade `print()` para ver qué pasa en cada vuelta.
-
-```python
-total = 0
-for n in [1, 2, 3]:
-    total = n
-print(total)
-```
-<details><summary>Solución</summary>
-
-```python
-total: int = 0
-for n in [1, 2, 3]:
-    total = n
-    print(f"vuelta n={n} -> total={total}")   # el print que lo desvela
-
-print("final:", total)   # -> final: 3
-
-# -> vuelta n=1 -> total=1
-# -> vuelta n=2 -> total=2
-# -> vuelta n=3 -> total=3
-# El fallo: total = n  machaca; lo correcto era  total = total + n
-```
-</details>
-
-**7.2.** Localiza el fallo leyendo el traceback:
-
-```
-Traceback (most recent call last):
-  File "a.py", line 3, in <module>
-    print(notas[3])
-IndexError: list index out of range
-```
-<details><summary>Solución</summary>
-
-```text
-El traceback se lee de ABAJO ARRIBA:
-
-1. Ultima linea: el tipo de error -> IndexError: list index out of range
-   Es decir: he pedido una posicion que no existe en la lista.
-2. Justo encima: la linea culpable -> print(notas[3]) en a.py, linea 3.
-
-Si la lista tiene 3 elementos, sus posiciones son 0, 1 y 2. La 3 no existe.
-Solucion: usar notas[-1] para el ultimo, o comprobar len(notas) antes.
-```
-</details>
-
-**7.3.** Escribe `elemento(lista, i)` que devuelva `None` en vez de reventar si la posición no existe.
-<details><summary>Solución</summary>
-
-```python
-def elemento(lista: list[int], i: int) -> int | None:
-    """Devuelve el elemento en la posición i, o None si no existe."""
-    try:
-        return lista[i]
-    except IndexError:
-        return None
-
-print(elemento([1, 2, 3], 1))    # -> 2
-print(elemento([1, 2, 3], 9))    # -> None
-```
-</details>
-
-
-### Actividades guiadas
-
-#### Actividad 1 — Clasificar una nota
-Pide una nota y muestra su calificación (Insuficiente / Suficiente / Bien / Notable / Sobresaliente).
-<details><summary>Solución</summary>
-
-```python
-nota: float = float(input("Nota: "))
-if nota >= 9:
-    print("Sobresaliente")
-elif nota >= 7:
-    print("Notable")
-elif nota >= 6:
-    print("Bien")
-elif nota >= 5:
-    print("Suficiente")
-else:
-    print("Insuficiente")
-```
-</details>
-
-#### Actividad 2 — Tabla de multiplicar
-Pide un número y muestra su tabla del 1 al 10.
-<details><summary>Solución</summary>
-
-```python
-n: int = int(input("Número: "))
-for i in range(1, 11):
-    print(f"{n} x {i} = {n * i}")
-```
-</details>
-
-#### Actividad 3 — Media de una lista con control
-Calcula la media de una lista, pero devuelve `0.0` si está vacía.
-<details><summary>Solución</summary>
-
-```python
-def media(numeros: list[float]) -> float:
-    if len(numeros) == 0:
-        return 0.0
-    return sum(numeros) / len(numeros)
-```
-</details>
-
-#### Actividad 4 — Entrada validada
-Pide un número entero y no continúes hasta que sea válido.
-<details><summary>Solución</summary>
-
-```python
-while True:
-    try:
-        numero: int = int(input("Número: "))
-        break
-    except ValueError:
-        print("Entrada no válida")
-print(f"Has escrito {numero}")
-```
-</details>
-
-### Ejercicios propuestos
-
-**E1 ○ · Mayor de dos.** `mayor(a: int, b: int) -> int`.
-<details><summary>Solución</summary>
-
-```python
-def mayor(a: int, b: int) -> int:
-    if a > b:
-        return a
-    return b
-```
-</details>
-
-**E2 ○ · Contar hasta N.** Muestra los números del 1 a N, uno por línea.
-<details><summary>Solución</summary>
-
-```python
-n: int = int(input())
-for i in range(1, n + 1):
-    print(i)
-```
-</details>
-
-**E3 ◐ · Suma de pares.** `suma_pares(numeros: list[int]) -> int`.
-<details><summary>Solución</summary>
-
-```python
-def suma_pares(numeros: list[int]) -> int:
-    total = 0
-    for n in numeros:
-        if n % 2 == 0:
-            total += n
-    return total
-```
-</details>
-
-**E4 ◐ · Buscar.** `posicion(numeros: list[int], buscado: int) -> int`: devuelve la posición o `-1`.
-<details><summary>Pista</summary>Usa <code>enumerate</code> o <code>range(len(numeros))</code> y <code>return</code> en cuanto lo encuentres.</details>
-<details><summary>Solución</summary>
-
-```python
-def posicion(numeros: list[int], buscado: int) -> int:
-    for i, n in enumerate(numeros):
-        if n == buscado:
-            return i
-    return -1
-```
-</details>
-
-**E5 ◐ · División segura.** `dividir(a: float, b: float) -> float`: devuelve `0.0` si `b` es cero, usando `try/except`.
-<details><summary>Solución</summary>
-
-```python
-def dividir(a: float, b: float) -> float:
-    try:
-        return a / b
-    except ZeroDivisionError:
-        return 0.0
-```
-</details>
-
-**E6 ● · FizzBuzz.** Del 1 al N: múltiplos de 3 → `Fizz`, de 5 → `Buzz`, de ambos → `FizzBuzz`, resto → el número.
-<details><summary>Pista</summary>Comprueba primero el caso de los dos a la vez.</details>
-<details><summary>Solución</summary>
-
-```python
-n: int = int(input())
-for i in range(1, n + 1):
-    if i % 15 == 0:
-        print("FizzBuzz")
-    elif i % 3 == 0:
-        print("Fizz")
-    elif i % 5 == 0:
-        print("Buzz")
-    else:
-        print(i)
-```
-</details>
-
-**E7 ◐ · Recuento de palabras.** `recuento(palabras: list[str]) -> dict[str, int]` devuelve cuántas veces aparece cada palabra.
-<details><summary>Pista</summary>Recorre la lista y usa <code>.get(palabra, 0)</code> para partir de cero la primera vez que aparece cada una.</details>
-<details><summary>Solución</summary>
-
-```python
-def recuento(palabras: list[str]) -> dict[str, int]:
-    """Cuántas veces aparece cada palabra."""
-    conteo: dict[str, int] = {}
-    for palabra in palabras:
-        conteo[palabra] = conteo.get(palabra, 0) + 1
-    return conteo
-```
-</details>
-
-**E8 ● · Validar una lista de notas.** `validar_notas(textos: list[str]) -> list[float]` convierte cada texto a número y **se queda solo** con los que son números válidos entre 0 y 10. Los demás se descartan sin que el programa se rompa.
-<details><summary>Pista</summary>Un <code>try</code>/<code>except ValueError</code> dentro del bucle: si la conversión falla, <code>continue</code> y a por el siguiente.</details>
-<details><summary>Solución</summary>
-
-```python
-def validar_notas(textos: list[str]) -> list[float]:
-    """Notas válidas (0-10) de una lista de textos; descarta el resto."""
-    validas: list[float] = []
-    for texto in textos:
-        try:
-            nota = float(texto)
-        except ValueError:
+```python title="cortafuegos.py (continúa)"
+def cargar_reglas(texto: str) -> Cortafuegos:
+    fw = Cortafuegos()
+    for linea in texto.strip().splitlines():
+        if not linea.strip() or linea.startswith("#"):
             continue
-        if 0 <= nota <= 10:
-            validas.append(nota)
-    return validas
+        partes = linea.split()
+        accion, origen, destino = partes[0], partes[1], partes[2]
+        puerto = int(partes[3]) if len(partes) > 3 else 0
+        fw.anadir(Regla(accion, origen, destino, puerto))
+    return fw
+```
+
+**Paso 4 — Simular tráfico y sacar un resumen.**
+
+```python title="cortafuegos.py (continúa)"
+from collections import Counter
+
+def resumen(fw: Cortafuegos, trafico: list[tuple[str, str, int]]) -> dict[str, int]:
+    return dict(Counter(fw.evaluar(o, d, p) for o, d, p in trafico))
+```
+
+**Paso 5 — CLI con `argparse`.**
+
+```python title="cortafuegos.py (continúa)"
+import argparse
+from pathlib import Path
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="cortafuegos", description="Motor de cortafuegos por reglas")
+    ap.add_argument("reglas", type=Path, help="fichero de política")
+    ap.add_argument("origen"); ap.add_argument("destino"); ap.add_argument("puerto", type=int)
+    args = ap.parse_args()
+    fw = cargar_reglas(args.reglas.read_text(encoding="utf-8"))
+    print(fw.evaluar(args.origen, args.destino, args.puerto))
+
+if __name__ == "__main__":
+    main()
+```
+
+**Paso 6 — Pruébalo con Docker: la política de la DMZ, sin `sudo`.**
+
+```yaml title="docker-compose.yml"
+services:
+  demo:
+    image: python:3.12-alpine
+    volumes: ["./cortafuegos.py:/cortafuegos.py"]
+    working_dir: /app
+    command: >
+      sh -c "mkdir -p /app; cd /app;
+      printf 'PERMITIR internet dmz 443\nPERMITIR dmz lan 5432\nDENEGAR * * 0\n' > politica.txt;
+      echo '--- Internet a la DMZ (443) ---'; python /cortafuegos.py politica.txt internet dmz 443;
+      echo '--- Internet directo a la LAN ---'; python /cortafuegos.py politica.txt internet lan 5432;
+      echo '--- DMZ a la LAN (5432) ---'; python /cortafuegos.py politica.txt dmz lan 5432"
+```
+
+```bash title="Ejecutar"
+docker compose run --rm demo
+```
+
+```text title="Salida esperada"
+--- Internet a la DMZ (443) ---
+PERMITIR
+--- Internet directo a la LAN ---
+DENEGAR
+--- DMZ a la LAN (5432) ---
+PERMITIR
+```
+
+<details class="sol"><summary>📄 cortafuegos.py completo</summary>
+
+```python
+import argparse
+from collections import Counter
+from dataclasses import dataclass, field
+from pathlib import Path
+
+@dataclass
+class Regla:
+    accion: str
+    origen: str = "*"
+    destino: str = "*"
+    puerto: int = 0
+    def coincide(self, origen: str, destino: str, puerto: int) -> bool:
+        def encaja(v: str, p: str) -> bool:
+            return p == "*" or p == v
+        return (encaja(origen, self.origen) and encaja(destino, self.destino)
+                and (self.puerto == 0 or self.puerto == puerto))
+
+@dataclass
+class Cortafuegos:
+    reglas: list[Regla] = field(default_factory=list)
+    def anadir(self, regla: Regla) -> None:
+        self.reglas.append(regla)
+    def evaluar(self, origen: str, destino: str, puerto: int) -> str:
+        for regla in self.reglas:
+            if regla.coincide(origen, destino, puerto):
+                return regla.accion.upper()
+        return "DENEGAR"
+
+def cargar_reglas(texto: str) -> Cortafuegos:
+    fw = Cortafuegos()
+    for linea in texto.strip().splitlines():
+        if not linea.strip() or linea.startswith("#"):
+            continue
+        partes = linea.split()
+        accion, origen, destino = partes[0], partes[1], partes[2]
+        puerto = int(partes[3]) if len(partes) > 3 else 0
+        fw.anadir(Regla(accion, origen, destino, puerto))
+    return fw
+
+def resumen(fw: Cortafuegos, trafico: list[tuple[str, str, int]]) -> dict[str, int]:
+    return dict(Counter(fw.evaluar(o, d, p) for o, d, p in trafico))
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="cortafuegos", description="Motor de cortafuegos por reglas")
+    ap.add_argument("reglas", type=Path)
+    ap.add_argument("origen"); ap.add_argument("destino"); ap.add_argument("puerto", type=int)
+    args = ap.parse_args()
+    fw = cargar_reglas(args.reglas.read_text(encoding="utf-8"))
+    print(fw.evaluar(args.origen, args.destino, args.puerto))
+
+if __name__ == "__main__":
+    main()
 ```
 </details>
 
 ---
 
----
+## 10. Reto para ti (propuesto, sin solución)
 
-## 10. Práctica tipo examen
+### 🕐 Cortafuegos con reglas horarias
 
-Los ejercicios de arriba tienen la solución a la vista. Lo que viene
-ahora **no**: aquí se comprueba si sabes hacerlo solo, que es lo que mide el examen.
+Amplía tu motor con **`ReglaHoraria`**: reglas que solo se aplican dentro de un rango de horas (por ejemplo, el acceso remoto de mantenimiento solo debe estar `PERMITIDO` de 8:00 a 18:00).
 
-Son dos escalones, y en este orden:
-
-| | Qué es | Cómo sabes si va bien |
-|---|---|---|
-| **Proyecto de la unidad** | Un proyecto Python completo, para trabajar con calma | Sus tests, que ejecutas tú |
-| **Simulacro** | Mismo formato, tamaño y rúbrica que el examen, contrarreloj | Sus tests, y la tabla de apartados |
-
----
-
-## 11. Proyecto de la unidad
-
-Toda la práctica de esta unidad se hace sobre un **proyecto base**: un analizador de notas que no se rompe con datos raros. Está montado
-con la estructura real de un proyecto Python y trae una **batería de tests** que puedes
-ejecutar en cualquier momento para ver si va todo bien.
-
-**[Proyecto Gestor de notas →](../proyectos/ud3/README.md)**
-
-```
-proyecto-ud3/
-├── src/      ← tu código (funciones con TODO)
-└── tests/    ← 31 tests que comprueban tu trabajo
+```mermaid
+flowchart TB
+    subgraph "Cortafuegos.evaluar_ahora(...)"
+    E["¿coincide origen/destino/puerto?"] -->|sí| H{"¿es ReglaHoraria?"}
+    H -->|sí| Ho["¿hora actual dentro<br/>del rango?"]
+    H -->|no| Ok["aplica la acción"]
+    Ho -->|sí| Ok
+    Ho -->|no| Sig["sigue a la<br/>siguiente regla"]
+    end
 ```
 
-### Cómo se trabaja
+**Objetivo.** Una clase `ReglaHoraria(Regla)` que añade `hora_inicio` y `hora_fin`, y un método `Cortafuegos.evaluar_ahora(origen, destino, puerto, hora)` que, si la regla que coincide es horaria, **además** comprueba que la hora está en rango — si no lo está, sigue mirando las siguientes reglas (no se detiene ahí).
 
-```bash
-pip install -r requirements.txt
-pytest
-```
+**Requisitos**
 
-La primera vez falla casi todo: aún no has escrito nada. A partir de ahí, lee una función,
-escríbela, vuelve a lanzar `pytest` y comprueba si ese test ya pasa. Terminas cuando está
-**todo en verde** y `mypy src` dice *Success*.
+- `ReglaHoraria` hereda de `Regla` (reutiliza `coincide`, no la reescribas).
+- `evaluar_ahora` recibe la hora como parámetro (no uses el reloj del sistema: así es testeable).
+- CLI con `argparse` que cargue una política de texto (reutiliza `cargar_reglas`, amplíala para reconocer una sintaxis con horas, p. ej. `PERMITIR * * 22 08-18`).
+- Código tipado, `mypy` limpio.
+- Demuéstralo con Docker: un `docker-compose.yml` que pruebe la misma regla a las 10:00 (permite) y a las 22:00 (deniega, cae a la política por defecto).
 
-!!! tip "De uno en uno"
-    `pytest -x` se detiene en el primer fallo. Arreglas esa función y sigues. Mucho más
-    llevadero que enfrentarse a todos los errores a la vez.
+**Criterios de aceptación**
 
-!!! warning "Los tests son la especificación"
-    No los modifiques para que pasen: describen exactamente lo que tu código debe hacer, y
-    el examen usará una batería equivalente.
+1. Una `ReglaHoraria` fuera de horario **no bloquea** la evaluación: el motor sigue mirando las reglas siguientes.
+2. Si ninguna otra regla coincide, se aplica `DENEGAR` igual que siempre.
+3. Las reglas normales (`Regla`) siguen funcionando exactamente igual que antes (no las rompas).
 
-Detalles y comandos útiles en **[Proyectos](../proyectos/index.md)**.
+**Pistas** (no solución): en `evaluar_ahora`, usa `isinstance(regla, ReglaHoraria)` para saber si tienes que comprobar la hora además del resto · `ReglaHoraria` puede añadir su propio método `activa_a_las(hora) -> bool`.
 
----
+**Si te sobra tiempo:** añade logging de cada decisión (`accion, origen, destino, puerto, motivo`) a un fichero · genera una regla `ReglaHoraria` a partir de una cadena tipo `"08-18"` con un método de clase (`@classmethod`).
 
----
-
-## 12. Simulacro de examen
-
-Cuando tengas el proyecto terminado, mídete: el **simulacro** es un examen de mentira con
-**el mismo formato, tamaño y rúbrica** que el de verdad — y con los tests publicados.
-
-**[Simulacro RA3 · Registro de pulsaciones →](../simulacros/ra3/README.md)** · 21 tests · 45–50 min
-
-Hazlo **contrarreloj y sin ayuda**, como si fuera el examen. Al terminar, aplica la rúbrica
-y tendrás una estimación bastante fiel de tu nota.
-
-!!! warning "El examen de verdad va sin tests"
-    Allí solo tendrás los **docstrings** y unos ejemplos. Por eso, en el simulacro, intenta
-    resolver cada función leyendo solo su docstring y mira el test únicamente cuando falle.
+> Esto es justo el tipo de reto que resolverás en el **test práctico**.
 
 ---
 
----
+## Autoevaluación rápida (conceptos)
 
-## 13. Retos opcionales
+<details><summary>1. ¿Qué es "deny by default"?</summary>Que si ninguna regla coincide, la acción por defecto es denegar.</details>
+<details><summary>2. ¿Qué da <code>@dataclass</code> automáticamente?</summary><code>__init__</code>, <code>__repr__</code> y <code>__eq__</code>.</details>
+<details><summary>3. ¿Por qué importa el orden de las reglas?</summary>Porque gana la <b>primera</b> que coincide; una regla genérica antes puede "tapar" a una específica después.</details>
+<details><summary>4. ¿Qué es una DMZ?</summary>Una red intermedia para servicios accesibles desde Internet, sin exponer la LAN interna.</details>
+<details><summary>5. ¿Qué significa que una clase "hereda" de otra?</summary>Que tiene todo lo de la clase padre y puede añadir comportamiento propio.</details>
 
-- **R1.** Menú completo: añadir notas, ver media, listar y salir, con toda la entrada validada.
-- **R2.** Adivina el número: el programa piensa uno con `random.randint(1, 100)` y te dice «mayor» o «menor» hasta acertar.
-- **R3.** Cuenta cuántas veces aparece cada palabra en una frase, usando un diccionario.
-
-- **R4.** Menú de consola con cuatro opciones que se repita hasta que el usuario elija salir, sin que ninguna entrada rara lo rompa.
-- **R5.** Adivina el número: el programa piensa uno del 1 al 100 y va diciendo «mayor» o «menor» hasta acertar. Cuenta los intentos.
-- **R6.** Cuenta las vocales de una frase usando un diccionario, y muestra el recuento ordenado de mayor a menor.
----
-
----
-
-## 14. Autoevaluación rápida
-
-<details><summary>1. ¿Qué imprime <code>for i in range(3)</code>?</summary><code>0</code>, <code>1</code>, <code>2</code>.</details>
-<details><summary>2. ¿Cuándo usar <code>while</code> en vez de <code>for</code>?</summary>Cuando no sabes cuántas vueltas hará: repites hasta que ocurra algo.</details>
-<details><summary>3. Diferencia entre <code>break</code> y <code>continue</code>.</summary><code>break</code> sale del bucle; <code>continue</code> salta a la siguiente vuelta.</details>
-<details><summary>4. ¿Qué excepción lanza <code>int("hola")</code>?</summary><code>ValueError</code>.</details>
-<details><summary>5. ¿Por qué es mala idea <code>except:</code> a secas?</summary>Atrapa todos los errores, incluidos los tuyos de programación, y los oculta.</details>
-<details><summary>6. ¿Qué falla en <code>if edad >= 18 and <= 65</code>?</summary>Hay que repetir la variable: <code>edad >= 18 and edad <= 65</code>.</details>
-
----
-
----
-
-## 15. Glosario
+## Glosario
 
 | Término | Definición |
 |---|---|
-| **Estructura de selección** | `if`/`elif`/`else`: elige qué código ejecutar. |
-| **Estructura de repetición** | `while`/`for`: repite instrucciones. |
-| **Iterar** | Recorrer los elementos de una colección. |
-| **Acumulador** | Variable que va sumando dentro de un bucle. |
-| **Excepción** | Error en tiempo de ejecución que interrumpe el programa. |
-| **`try` / `except`** | Bloque que intenta algo y reacciona si falla. |
-| **Diccionario** | Colección de pares clave → valor. |
-| **Punto de ruptura** | Marca que detiene el programa en el depurador. |
+| **ACL** | Lista de reglas que deciden qué tráfico se permite o deniega. |
+| **Deny by default** | Política por defecto: si nada coincide, se deniega. |
+| **DMZ** | Red intermedia para servicios expuestos, aislada de la LAN. |
+| **`@dataclass`** | Decorador que genera `__init__`, `__repr__` y `__eq__` automáticamente. |
+| **Herencia** | Una clase reutiliza atributos/métodos de otra y añade los suyos. |
+| **AAA** | Autenticación, Autorización, Auditoría (Accounting). |
+
+## Cómo se evalúa esta unidad (RA3)
+
+El instrumento principal es un **test práctico**: resuelves en Python un reto parecido al de esta unidad y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún ejercicio práctico).
+
+!!! reto "La nota, sin sorpresas"
+    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5.
+
+El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, definir y usar **clases**), pasar `mypy` y documentar el código.
 
 ---
 
----
+## Simulacro de examen tipo test
 
-## 16. Cómo se evalúa esta unidad (RA3)
+> 15 preguntas de opción múltiple. Cada una trae su propio código.
 
-El examen es **100 % práctico**: se entrega un proyecto con las funciones vacías y una
-especificación, y hay que escribir el código.
+**1.** ¿Qué imprime este código?
 
-**La nota sale solo de los casos de prueba.** No hay puntos por presentación ni por
-esfuerzo: cada apartado del examen vale en proporción a los casos que tiene, de modo que
-**todos los casos valen lo mismo**.
+```python
+from dataclasses import dataclass
 
-`nota del apartado = (casos superados ÷ casos del apartado) × puntos del apartado`
+@dataclass
+class Regla:
+    accion: str
+    puerto: int = 0
 
-`nota del examen = suma de los apartados`
+r1 = Regla("PERMITIR", 80)
+r2 = Regla("PERMITIR", 80)
+print(r1 == r2, r1 is r2)
+```
 
-### Así es el examen
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
 
-**Análisis de temperaturas** · entrega `src/temperaturas.py` · **50 min**
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>@dataclass</code> genera un <code>__eq__</code> que compara por valor de los campos: son iguales (<code>==</code>) aunque sean dos objetos distintos en memoria (<code>is</code> compara identidad, no valor).</details>
 
-| # | Apartado | Casos | Puntos |
-|:---:|---|:---:|:---:|
-| **A** | `media()` | 3 | **1,58** |
-| **B** | `maxima()` | 3 | **1,58** |
-| **C** | `dias_calurosos()` | 3 | **1,58** |
-| **D** | `clasificar()` | 6 | **3,16** |
-| **E** | `a_numero()` | 4 | **2,10** |
-| | **TOTAL** | **19** | **10,00** |
+**2.** ¿Qué imprime este código?
 
-Esta tabla viene en el enunciado, así que sabes desde el primer minuto **qué vale cada
-parte** y por dónde empezar si vas justo de tiempo.
+```python
+class ColaMala:
+    def __init__(self, items=[]):     # valor por defecto mutable
+        self.items = items
 
-!!! warning "El examen se reparte sin tests"
-    La carpeta `tests/` viene vacía. La especificación son los **docstrings** de cada
-    función y los ejemplos del enunciado. Por eso conviene que en el simulacro te
-    acostumbres a resolver leyendo el docstring y no el test.
+c1 = ColaMala()
+c1.items.append("a")
+c2 = ColaMala()
+print(c2.items)
+```
 
-### Así se corrige
+A) `[]`
+B) `['a']`
+C) Lanza `AttributeError`
+D) `None`
 
-Alguien que entrega el examen con **17 de los 19 casos** superados
-—se le ha escapado el apartado **C**, donde falla 2 de
-3 casos—:
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La lista <code>[]</code> por defecto se crea <b>una sola vez</b> al definir la función, y todas las instancias que no pasan su propio valor la comparten — el mismo error que <code>reglas: list = []</code> en un <code>@dataclass</code>.</details>
 
-| # | Apartado | Casos superados | Puntos |
-|:---:|---|:---:|---|
-| A | `media()` | 3 / 3 | 1,58 / 1,58 |
-| B | `maxima()` | 3 / 3 | 1,58 / 1,58 |
-| C | `dias_calurosos()` | 1 / 3 | 0,53 / 1,58  ← |
-| D | `clasificar()` | 6 / 6 | 3,16 / 3,16 |
-| E | `a_numero()` | 4 / 4 | 2,10 / 2,10 |
-| | | | **NOTA: 8,95** |
+**3.** ¿Qué imprime este código?
 
-La corrección es automática: se monta un proyecto con la batería completa más el fichero
-entregado, se ejecuta y se reparte la nota con esa cuenta. **Nadie interpreta nada.**
+```python
+from dataclasses import dataclass
 
-Además recibes un informe con los casos concretos que han fallado, con el valor que
-esperaba y el que devolvió tu función.
+@dataclass
+class Regla:
+    accion: str
+    origen: str = "*"
+    destino: str = "*"
+    puerto: int = 0
+    def coincide(self, o, d, p):
+        def encaja(v, patron): return patron == "*" or patron == v
+        return encaja(o, self.origen) and encaja(d, self.destino) and (self.puerto == 0 or self.puerto == p)
 
-!!! note "Los tres requisitos de la entrega"
-    No puntúan por separado, pero forman parte de la especificación:
+r = Regla("PERMITIR", destino="bd", puerto=5432)
+print(r.coincide("cualquiera", "bd", 5432))
+print(r.coincide("cualquiera", "web", 5432))
+```
 
-    1. Entregar **el fichero de `src/`**, con ese nombre.
-    2. `mypy src` sin errores.
-    3. Cada función con su **docstring**.
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
 
-    Un fichero que no compila o que no se puede importar da **0 casos superados**, así que
-    en la práctica valen mucho más que unos puntos.
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>origen="*"</code> es comodín, así que cualquier origen encaja. En la primera llamada el destino (<code>"bd"</code>) coincide; en la segunda, el destino pedido es <code>"web"</code>, que no coincide con la regla.</details>
+
+**4.** Un cortafuegos recorre sus reglas en orden y aplica la primera que coincide. ¿Qué imprime esto?
+
+```python
+fw = Cortafuegos()
+fw.anadir(Regla("DENEGAR"))                    # comodín total, va primero
+fw.anadir(Regla("PERMITIR", puerto=80))
+print(fw.evaluar("x", "y", 80))
+```
+
+A) `PERMITIR`
+B) `DENEGAR`
+C) Se aplican las dos, sin sentido
+D) Lanza un error por reglas contradictorias
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La regla <code>DENEGAR</code> es un comodín total y coincide con <b>cualquier</b> tráfico; al ser la primera, se aplica y la <code>PERMITIR</code> de después nunca se alcanza — queda "tapada".</details>
+
+**5.** Con el orden invertido respecto a la pregunta anterior, ¿qué imprime esto?
+
+```python
+fw = Cortafuegos()
+fw.anadir(Regla("PERMITIR", puerto=80))
+fw.anadir(Regla("DENEGAR"))
+print(fw.evaluar("x", "y", 80))
+print(fw.evaluar("x", "y", 22))
+```
+
+A) `PERMITIR` y `PERMITIR`
+B) `DENEGAR` y `DENEGAR`
+C) `PERMITIR` y `DENEGAR`
+D) `DENEGAR` y `PERMITIR`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> El tráfico al puerto 80 coincide con la primera regla (<code>PERMITIR</code>); el del puerto 22 no coincide con ninguna regla específica y cae en la <code>DENEGAR</code> final.</details>
+
+**6.** ¿Qué imprime este código?
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class ReglaHoraria(Regla):          # hereda accion, origen, destino, puerto, coincide
+    hora_inicio: int = 0
+    hora_fin: int = 23
+    def activa_a_las(self, h): return self.hora_inicio <= h <= self.hora_fin
+
+r = ReglaHoraria("PERMITIR", puerto=22, hora_inicio=9, hora_fin=17)
+print(r.coincide("*", "*", 22))
+print(r.activa_a_las(12))
+print(r.activa_a_las(20))
+```
+
+A) `True True True`
+B) `True True False`
+C) `False True False`
+D) `True False False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>coincide</code> se hereda de <code>Regla</code> sin reescribirla y sigue funcionando; las 12:00 caen dentro del rango 9-17, las 20:00 no.</details>
+
+**7.** ¿Qué te da `@dataclass` **gratis**, que tendrías que escribir a mano en una clase normal con `class Regla:`?
+
+```python
+class ReglaSinDataclass:
+    def __init__(self, accion, puerto):
+        self.accion = accion
+        self.puerto = puerto
+    # ¿qué falta aquí para poder hacer print(r) y r1 == r2?
+```
+
+A) Nada, Python ya lo da todo por defecto
+B) `__repr__` (para que `print()` muestre algo legible) y `__eq__` (para comparar con `==`)
+C) Solo `__init__`, que ya está escrito
+D) `__del__` y `__len__`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Sin ellos, <code>print(r)</code> mostraría algo como <code>&lt;__main__.ReglaSinDataclass object at 0x...&gt;</code> y <code>r1 == r2</code> compararía identidad, no valores. <code>@dataclass</code> genera ambos automáticamente, además del <code>__init__</code>.</details>
+
+**8.** ¿Qué imprime este código?
+
+```python
+import ipaddress
+
+def en_red(ip: str, cidr: str) -> bool:
+    return ipaddress.ip_address(ip) in ipaddress.ip_network(cidr)
+
+print(en_red("172.16.5.30", "172.16.5.0/24"))
+print(en_red("172.16.6.30", "172.16.5.0/24"))
+```
+
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>172.16.5.0/24</code> cubre de <code>172.16.5.0</code> a <code>172.16.5.255</code>; la primera IP cae dentro, la segunda (<code>172.16.6.30</code>) está en la subred siguiente.</details>
+
+**9.** ¿Qué imprime este código?
+
+```python
+from collections import Counter
+
+def contar_acciones(reglas) -> dict:
+    return dict(Counter(r.accion.upper() for r in reglas))
+
+reglas = [Regla("permitir"), Regla("PERMITIR"), Regla("denegar"), Regla("DENEGAR")]
+print(contar_acciones(reglas))
+```
+
+A) `{'permitir': 1, 'PERMITIR': 1, 'denegar': 1, 'DENEGAR': 1}`
+B) `{'PERMITIR': 2, 'DENEGAR': 2}`
+C) `{'PERMITIR': 4}`
+D) `{}`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>.upper()</code> normaliza <code>"permitir"</code> y <code>"PERMITIR"</code> a la misma clave antes de contar, así que se agrupan juntas.</details>
+
+**10.** ¿Qué imprime este código?
+
+```python
+def tapada(reglas_anteriores: list[tuple], nueva: tuple) -> bool:
+    _, puerto_nuevo = nueva
+    return any(puerto in (0, puerto_nuevo) for _, puerto in reglas_anteriores)
+
+print(tapada([("*", 0)], ("lan", 80)))
+print(tapada([("lan", 443)], ("lan", 80)))
+```
+
+A) `True True`
+B) `True False`
+C) `False True`
+D) `False False`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Una regla anterior con puerto <code>0</code> (comodín) tapa cualquier regla nueva. Una regla anterior con puerto <code>443</code> no tapa una nueva de puerto <code>80</code>, porque no coinciden.</details>
+
+**11.** ¿Qué imprime este código?
+
+```python
+def duplicadas(reglas: list) -> list[tuple[int, int]]:
+    pares = []
+    for i in range(len(reglas)):
+        for j in range(i + 1, len(reglas)):
+            if reglas[i] == reglas[j]:
+                pares.append((i, j))
+    return pares
+
+reglas = [Regla("PERMITIR", puerto=80), Regla("DENEGAR"), Regla("PERMITIR", puerto=80)]
+print(duplicadas(reglas))
+```
+
+A) `[]`
+B) `[(0, 1)]`
+C) `[(0, 2)]`
+D) `[(0, 1), (1, 2)]`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Las reglas en los índices 0 y 2 son iguales (mismo <code>accion</code> y <code>puerto</code>, gracias al <code>__eq__</code> de <code>@dataclass</code>); la del índice 1 es distinta.</details>
+
+**12.** ¿Qué imprime este código?
+
+```python
+import ipaddress
+
+def zona(ip: str) -> str:
+    d = ipaddress.ip_address(ip)
+    if d in ipaddress.ip_network("10.0.1.0/24"):
+        return "dmz"
+    if d in ipaddress.ip_network("10.0.2.0/24"):
+        return "lan"
+    return "externa"
+
+print(zona("10.0.1.99"))
+```
+
+A) `"dmz"`
+B) `"lan"`
+C) `"externa"`
+D) Lanza una excepción
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>10.0.1.99</code> pertenece a la subred <code>10.0.1.0/24</code>, que la función identifica como <code>"dmz"</code>.</details>
+
+**13.** ¿Qué imprime este código?
+
+```python
+def tiene_regla_final_deny(fw) -> bool:
+    if not fw.reglas:
+        return False
+    u = fw.reglas[-1]
+    return u.accion.upper() == "DENEGAR" and u.origen == "*" and u.puerto == 0
+
+fw = Cortafuegos()
+fw.anadir(Regla("PERMITIR", puerto=80))
+fw.anadir(Regla("DENEGAR"))
+print(tiene_regla_final_deny(fw))
+```
+
+A) `True`
+B) `False`
+C) Lanza `IndexError`
+D) `None`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> La última regla es <code>DENEGAR</code> con <code>origen="*"</code> (por defecto) y <code>puerto=0</code> (por defecto) — es un atrapa-todo final válido.</details>
+
+**14.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+def cargar_reglas(texto: str) -> Cortafuegos:
+    fw = Cortafuegos()
+    for linea in texto.strip().splitlines():
+        partes = linea.split()
+        accion, origen, destino = partes[0], partes[1], partes[2]
+        puerto = int(partes[3]) if len(partes) > 3 else 0
+        fw.anadir(Regla(accion, origen, destino, puerto))
+    return fw
+
+politica = "PERMITIR internet dmz 443\nDENEGAR * * 0"
+fw = cargar_reglas(politica)
+print(fw.evaluar("internet", "dmz", 443))
+print(fw.evaluar("internet", "lan", 5432))
+```
+
+A) `PERMITIR` y `PERMITIR`
+B) `PERMITIR` y `DENEGAR`
+C) `DENEGAR` y `DENEGAR`
+D) `DENEGAR` y `PERMITIR`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El primer tráfico coincide con la regla de permiso a la DMZ; el segundo (<code>internet → lan</code>) no coincide con ninguna regla de permiso y cae en la <code>DENEGAR</code> final.</details>
+
+**15.** *(Sobre el reto de la unidad)* ¿Qué imprime este código?
+
+```python
+from collections import Counter
+
+def resumen(fw, trafico: list[tuple]) -> dict:
+    return dict(Counter(fw.evaluar(o, d, p) for o, d, p in trafico))
+
+fw = Cortafuegos()
+fw.anadir(Regla("PERMITIR", puerto=80))
+fw.anadir(Regla("DENEGAR"))
+
+trafico = [("a", "b", 80), ("a", "b", 80), ("a", "b", 22)]
+print(resumen(fw, trafico))
+```
+
+A) `{'PERMITIR': 2, 'DENEGAR': 1}`
+B) `{'PERMITIR': 3}`
+C) `{'PERMITIR': 1, 'DENEGAR': 2}`
+D) `{80: 2, 22: 1}`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Los dos paquetes al puerto 80 se evalúan como <code>PERMITIR</code>; el del puerto 22 no coincide con la primera regla y cae en <code>DENEGAR</code>. <code>Counter</code> agrupa los tres resultados.</details>
