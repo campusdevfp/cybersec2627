@@ -1,8 +1,10 @@
-# Reto Verificador de integridad · UD1 (RA1)
+# Proyecto Presupuesto de tienda · UD1 (RA1)
 
-Comprueba si algún fichero ha sido modificado comparando su hash SHA-256 con un manifiesto de referencia. Es la herramienta de la cadena de custodia forense y de la verificación de descargas.
+Calcula el presupuesto de un pedido aplicando el IVA.
 
-Completa los `TODO` de `src/integridad.py` hasta que **todos los tests pasen** y `mypy src` diga *Success*.
+Practicas variables tipadas, constantes, operadores, conversión de tipos y formato de salida.
+
+Completa los `TODO` de `src/` hasta que **todos los tests pasen**.
 
 ## Estructura
 
@@ -11,9 +13,13 @@ proyecto-ud1/
 ├── README.md
 ├── requirements.txt
 ├── pytest.ini
-├── src/integridad.py      ← tu código
-└── tests/           ← los tests (no hay que tocarlos)
+├── src/          ← tu código
+└── tests/        ← los tests (no hay que tocarlos)
 ```
+
+| Módulo | Sus tests |
+|---|---|
+| `src/presupuesto.py` | `tests/test_presupuesto.py` |
 
 ## Puesta en marcha
 
@@ -26,21 +32,28 @@ pytest
 
 ## Cómo trabajar
 
-1. **Lee** `src/integridad.py`: cada función tiene un docstring que dice qué debe hacer.
-2. **Escribe** el código sustituyendo cada `TODO` (y borra el `raise NotImplementedError`).
+1. **Lee** el módulo de `src/`: cada función tiene su docstring diciendo qué debe hacer.
+2. **Escribe** el código sustituyendo cada `TODO` (y borrando el `raise NotImplementedError`).
 3. **Ejecuta los tests** y ve arreglando lo que falle:
 
 ```bash
-pytest        # todos
-pytest -x     # para en el primer fallo
-mypy src      # comprueba los tipos
+pytest
 ```
 
 4. Repite hasta que salga todo en verde.
 
-!!! warning "Los tests son la especificación"
-    No los modifiques para que pasen: describen lo que tu código debe hacer, y el examen usará una batería equivalente.
+### Comandos útiles
 
-## Técnica propia del RA1 (buena práctica que verás en el informe)
+```bash
+pytest                       # todos los tests
+pytest -q                    # salida resumida
+pytest tests/test_X.py       # solo un módulo
+pytest -k nombre_del_test    # solo un test
+pytest -x                    # para al primer fallo
+mypy src                     # comprueba los tipos
+```
 
-El código debe usar **`hashlib`** para calcular los hashes.
+!!! tip "Empieza por un test"
+    Ejecuta `pytest -x` para que se detenga en el primer fallo, arregla esa función y vuelve a
+    lanzarlo. Es mucho más llevadero que intentar resolverlo todo de golpe.
+

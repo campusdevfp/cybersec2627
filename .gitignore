@@ -1,11 +1,8 @@
-site/
 .venv/
-venv/
+site/
 __pycache__/
+.mypy_cache/
+.pytest_cache/
 *.pyc
-.DS_Store
-.cache/
-notas.csv
-notas.xlsx
-informes/
-correccion/entregas/
+*.pdf
+hooks/__pycache__/

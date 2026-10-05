@@ -1,1458 +1,1413 @@
-# Unidad 1 · Fundamentos de seguridad, criptografía y forense
+# Unidad 1 · Estructura del programa y elementos del lenguaje
 
-> **Módulo:** CMO-314 · Ciberseguridad · **RA1** · **Duración:** 20 h · **Peso:** 15 % · **Herramienta:** Python 3 (tipado) + `cryptography`
+> **Módulo:** CMO-313 · Fundamentos de programación
+> **Resultado de aprendizaje:** RA1 · **Duración:** 8 h · **Peso:** 15 %
+> **Examen:** test de código (primer trimestre)
 
-Esta es la unidad de **cimientos**. Aquí sale por primera vez el patrón que vas a repetir seis veces este curso: **entender el problema → resolverlo con código real → medir que funciona**. Vas a tocar los tres pilares de la seguridad, y las dos disciplinas que sostienen casi todo lo demás: **criptografía** (hash, cifrado, firma, certificados) y **análisis forense**. Al terminar habrás construido, línea a línea, un **verificador de integridad** de nivel profesional — el mismo principio que usan `sha256sum`, `debsums`, AIDE o Tripwire.
+Al final de esta unidad vas a tener esto funcionando en tu ordenador:
 
-!!! reto "El reto de la unidad"
-    **Detecta si unos ficheros han sido manipulados.** Vas a construir un verificador de integridad con manifiesto, auditoría y CLI. Todo lo de abajo es tu **entrenamiento** para llegar a resolverlo tú solo y demostrarlo en el examen.
+```text
+Producto: Camisa
+Unidades: 3
+Precio:   19.95
 
-```mermaid
-flowchart TB
-    A["Principios C·I·D"] --> B["Seguridad física,<br/>ambiental y lógica"]
-    A --> R["Amenaza · Vulnerabilidad<br/>Riesgo"]
-    A --> C["Criptografía"]
-    C --> C1["Hash e integridad"]
-    C --> C2["Cifrado simétrico<br/>y asimétrico"]
-    C --> C3["Firma y<br/>certificados (PKI)"]
-    C1 --> D["Análisis forense<br/>cadena de custodia"]
-    C3 --> D
-    C1 --> P["RETO<br/>Verificador de integridad"]
-    D --> P
-    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
-    style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
+Base            59.85
+IVA (21%)       12.57
+-------------------
+TOTAL           72.42
 ```
 
-**Qué sabrás hacer al terminar:** explicar C·I·D y ampliarlo con autenticidad/trazabilidad · calcular y comparar hashes con criterio · cifrar y descifrar de verdad (simétrico y asimétrico) con `cryptography` · firmar un documento y generar un certificado X.509 · aplicar las fases del análisis forense y la cadena de custodia · escribir Python tipado con CLI profesional, comprobado con `mypy` y `pytest`.
+Un programa que pregunta, calcula y presenta un resultado con buen aspecto. **No es un
+ejemplo de juguete**: es exactamente el tipo de programa que se escribe en una empresa el
+primer día, y contiene todas las piezas del lenguaje que necesitas para lo que viene
+después.
 
-**Cómo se trabaja (aula invertida):** lees la sección y ejecutas los ejemplos antes de clase, con el *reto rápido* intentado → en clase resuelves las actividades y avanzas el reto en parejas, con ayuda al lado.
-
-!!! danger "Antes de nada: uso ético y legal"
-    Vas a manejar herramientas y técnicas de seguridad. Se usan **solo** sobre tus propios sistemas o el laboratorio autorizado. Manipular sistemas ajenos sin permiso es delito (arts. 197 y 264 del Código Penal). Lee [Uso ético y legal](../recursos/uso-etico.md).
+Lo vamos a construir **poco a poco, en seis pasos**. Cada sección añade una pieza y termina
+con el programa un poco más completo que antes.
 
 ---
 
-## 1. ¿Qué es la seguridad de la información?
+## Mapa de la unidad
 
-Es el conjunto de medidas para proteger datos y servicios frente a accesos, alteraciones o interrupciones no autorizados. No es un producto que se compra: es una propiedad que se **diseña por capas** y se mantiene en el tiempo.
+<figure markdown>
+  ![Mapa de la unidad](../assets/diagramas/ud1-mapa.svg#only-light)
+  ![Mapa de la unidad](../assets/diagramas/ud1-mapa-dark.svg#only-dark)
+  <figcaption>Del problema al programa, y las piezas del lenguaje que intervienen.</figcaption>
+</figure>
 
-### 1.1 Los tres pilares: C·I·D
+### Los seis pasos
 
-| Pilar | Qué garantiza | Se rompe cuando… | La cripto que ayuda |
-|---|---|---|---|
-| **Confidencialidad** | Solo accede quien está autorizado | Se filtra una base de datos | Cifrado (§5) |
-| **Integridad** | La información no se altera sin permiso | Alguien modifica una factura | Hash / firma (§4, §6) |
-| **Disponibilidad** | El servicio está accesible cuando se necesita | Un ataque tumba la web | Copias, redundancia |
+| # | Qué añades | Con qué acaba el programa |
+|:---:|---|---|
+| **1** | La estructura de todo programa | Saluda y muestra un mensaje |
+| **2** | Variables para guardar datos | Guarda producto, unidades y precio |
+| **3** | Operadores para calcular | Calcula la base y el IVA |
+| **4** | Leer datos del teclado | Pregunta los datos al usuario |
+| **5** | Mostrar con formato | Presenta el ticket alineado |
+| **6** | Constantes y comentarios | Queda limpio y legible |
 
-Se amplían con **autenticidad** (el origen es quien dice ser) y **trazabilidad** (queda registro de quién hizo qué):
+### Antes de empezar
 
-```mermaid
-flowchart LR
-    subgraph "Pilares clásicos"
-    Cf["Confidencialidad"]
-    In["Integridad"]
-    Di["Disponibilidad"]
-    end
-    subgraph "Ampliación"
-    Au["Autenticidad"]
-    Tr["Trazabilidad"]
-    end
-    In -.->|"la firma añade"| Au
-    Au -.->|"registrar quién firmó"| Tr
-```
+Necesitas **Python y VS Code instalados y un entorno virtual creado**. Eso se monta en la
+sesión 2, en clase y entre todos, y está explicado paso a paso en
+**[Puesta en marcha](../recursos/puesta-en-marcha.md)**.
 
-Lo modelamos ya con código — nada de listas en abstracto:
+!!! tip "Cómo leer esta unidad"
+    **Con el editor abierto al lado.** Cada ejemplo está pensado para copiarlo y ejecutarlo.
+    Leer código sin ejecutarlo no sirve de nada: el ordenador hace cosas que no esperas, y
+    esa sorpresa es la que enseña.
 
-```python title="clasificar_incidentes.py"
-from dataclasses import dataclass
-from enum import Enum
-
-class Pilar(Enum):
-    CONFIDENCIALIDAD = "C"
-    INTEGRIDAD = "I"
-    DISPONIBILIDAD = "D"
-
-@dataclass
-class Incidente:
-    descripcion: str
-    pilar: Pilar
-
-INCIDENTES = [
-    Incidente("Ransomware cifra los ficheros del servidor", Pilar.DISPONIBILIDAD),
-    Incidente("Un empleado copia la lista de clientes a un USB", Pilar.CONFIDENCIALIDAD),
-    Incidente("Cambian el número de cuenta en un albarán", Pilar.INTEGRIDAD),
-    Incidente("Un ataque DDoS satura el servidor web", Pilar.DISPONIBILIDAD),
-]
-
-for i in INCIDENTES:
-    print(f"[{i.pilar.name:16}] {i.descripcion}")
-```
-
-```text title="Salida"
-[DISPONIBILIDAD ] Ransomware cifra los ficheros del servidor
-[CONFIDENCIALIDAD] Un empleado copia la lista de clientes a un USB
-[INTEGRIDAD      ] Cambian el número de cuenta en un albarán
-[DISPONIBILIDAD  ] Un ataque DDoS satura el servidor web
-```
-
-> Usamos `Enum` en vez de cadenas sueltas: así `mypy` **impide** escribir `Pilar.CONFIDENCIALIDA` mal por error. Es una técnica profesional habitual.
-
-!!! reto "Reto rápido 1"
-    Un ransomware que además **exfiltra** los datos antes de cifrarlos (doble extorsión, muy habitual en 2025-2026) rompe dos pilares a la vez. ¿Cuáles? Añádelo a `INCIDENTES` con los dos.
-
-### 1.2 Amenaza, vulnerabilidad y riesgo
-
-- **Amenaza:** lo que puede pasar (un incendio, un atacante). Está fuera de tu control.
-- **Vulnerabilidad:** la debilidad que lo permite (un servidor sin actualizar). Sí depende de ti.
-- **Riesgo:** la combinación de ambos con su impacto. Es lo que se gestiona (a fondo en la UD4).
-
-```mermaid
-flowchart LR
-    Am["Amenaza<br/>(atacante, incendio…)"] -->|explota| Vu["Vulnerabilidad<br/>(servidor sin parchear)"]
-    Vu -->|produce| Ri["Riesgo<br/>= probabilidad × impacto"]
-    Ri -->|si se materializa| Inc["Incidente"]
-```
-
-```python title="riesgo_simple.py"
-def riesgo(probabilidad: float, impacto: float) -> float:
-    """probabilidad en [0,1]; impacto en una escala (p. ej. euros o 1-10)."""
-    return round(probabilidad * impacto, 2)
-
-# Un servidor sin parchear (vulnerabilidad) frente a un exploit conocido (amenaza)
-print(riesgo(probabilidad=0.7, impacto=10))   # alto: la amenaza es muy probable
-print(riesgo(probabilidad=0.05, impacto=10))  # bajo: la amenaza es rara
-```
-
-```text title="Salida"
-7.0
-0.5
-```
+    Los ejercicios están **todos juntos al final**, agrupados por tema y con su solución.
+    Haz los de un tema en cuanto termines de leerlo.
 
 ---
 
-## 2. Seguridad física, ambiental y lógica
+## 1. Tu primer programa
 
-No toda la seguridad es software: quien entra físicamente a la sala de servidores no necesita romper ningún cifrado.
+Programar es **escribir instrucciones precisas para que un ordenador resuelva un
+problema**. El ordenador no entiende ni improvisa: hace exactamente lo que le dices, en el
+orden que se lo dices.
 
-| Tipo | Protege frente a | Ejemplos |
+Esa literalidad es la primera lección del curso. **La mayoría de los errores no son del
+ordenador: son instrucciones nuestras que no decían lo que creíamos.**
+
+> **Analogía.** Un programa es una **receta de cocina**. Los *datos* son los ingredientes,
+> el *algoritmo* son los pasos («bate dos huevos, añade harina…») y el *programa* es esa
+> receta escrita en un idioma que la cocina entiende.
+
+### 1.1 Todo programa tiene tres bloques
+
+<figure markdown>
+  ![Entrada, proceso, salida](../assets/diagramas/ud1-eps.svg#only-light)
+  ![Entrada, proceso, salida](../assets/diagramas/ud1-eps-dark.svg#only-dark)
+  <figcaption>Entrada, proceso y salida: la estructura de cualquier programa.</figcaption>
+</figure>
+
+| Bloque | Qué hace | En nuestro ticket |
 |---|---|---|
-| **Física** | Acceso físico no autorizado | Control de acceso al CPD, cerraduras, cámaras |
-| **Ambiental** | El entorno | SAI (batería), climatización, detección de incendios |
-| **Lógica** | Usos indebidos del sistema | Contraseñas, permisos, cifrado, cortafuegos, copias |
+| **Entrada** | Recoge los datos | producto, unidades, precio |
+| **Proceso** | Los transforma | calcula base, IVA y total |
+| **Salida** | Muestra el resultado | imprime el ticket |
 
-```python title="clasificar_medida.py"
-FISICA = {"camara", "cerradura", "armario", "torniquete", "biometria_entrada"}
-AMBIENTAL = {"sai", "climatizacion", "incendios", "humedad", "generador"}
+Reconocer estos tres bloques en un problema es lo primero que hay que hacer, **antes de
+escribir código**. Si no sabes cuáles son las entradas y cuál es la salida, no sabes qué
+programa tienes que escribir.
 
-def clasifica(medida: str) -> str:
-    if medida in FISICA:
-        return "física"
-    if medida in AMBIENTAL:
-        return "ambiental"
-    return "lógica"          # todo lo demás: contraseñas, cifrado, cortafuegos...
+### 1.2 El programa más pequeño que funciona
 
-for m in ["camara", "sai", "cortafuegos", "cifrado", "mfa"]:
-    print(f"{m:12} -> {clasifica(m)}")
+Crea un fichero `ticket.py` y escribe esto:
+
+```python
+print("Ticket de compra")
 ```
 
-```text title="Salida"
-camara       -> física
-sai          -> ambiental
-cortafuegos  -> lógica
-cifrado      -> lógica
-mfa          -> lógica
+Ejecútalo:
+
+```bash
+python ticket.py
 ```
 
-### 2.1 Copias de seguridad: la última línea
-
-La regla **3-2-1**: al menos **3** copias, en **2** soportes distintos, con **1** fuera del sitio. Y **la copia que nunca se ha restaurado no cuenta como copia**: hay que probar la restauración.
-
-```python title="regla_321.py"
-from dataclasses import dataclass
-
-@dataclass
-class Copia:
-    soporte: str        # "disco_local", "nas", "cloud", "cinta"...
-    ubicacion: str       # "sitio" o "externo"
-
-def cumple_321(copias: list[Copia]) -> tuple[bool, list[str]]:
-    fallos = []
-    if len(copias) < 3:
-        fallos.append(f"solo hay {len(copias)} copias, hacen falta 3")
-    soportes = {c.soporte for c in copias}
-    if len(soportes) < 2:
-        fallos.append("todas las copias usan el mismo soporte")
-    if not any(c.ubicacion == "externo" for c in copias):
-        fallos.append("ninguna copia está fuera del sitio")
-    return (not fallos, fallos)
-
-copias = [Copia("disco_local", "sitio"), Copia("nas", "sitio")]
-print(cumple_321(copias))
+```text
+Ticket de compra
 ```
 
-```text title="Salida"
-(False, ['solo hay 2 copias, hacen falta 3', 'ninguna copia está fuera del sitio'])
+Ya está: **ese es un programa**. `print()` es la instrucción que muestra algo por pantalla,
+y el texto va entre comillas.
+
+### 1.3 Un ejemplo resuelto, línea a línea
+
+Vamos a marcar los tres bloques con comentarios, para verlos:
+
+```python
+# ── Entrada ──
+producto = "Camisa"
+
+# ── Proceso ──
+mensaje = "Has elegido: " + producto
+
+# ── Salida ──
+print(mensaje)
 ```
 
-!!! reto "Reto rápido 2"
-    Un empleado se lleva un USB con la copia los viernes (soporte: `"usb"`, ubicación: `"externo"`). Añádelo a la lista de arriba junto con una copia en `"cloud"`. ¿Ahora `cumple_321` da `True`?
+```text
+Has elegido: Camisa
+```
+
+Tres líneas de código y los tres bloques identificados. Fíjate en que:
+
+- **El orden importa.** Si pones el `print` arriba, el programa falla: todavía no existe
+  `mensaje`.
+- El `+` entre textos los **pega** (se llama *concatenar*).
+- Lo que empieza por `#` es un **comentario**: Python lo ignora. Es para quien lee.
+
+### 1.4 Compilado o interpretado
+
+| | **Compilado** | **Interpretado** |
+|---|---|---|
+| Cómo funciona | Traduce **todo** antes de ejecutar | Ejecuta **línea a línea** |
+| Ejemplos | C, C++, Rust | **Python**, JavaScript |
+| Ventaja | Muy rápido al ejecutarse | Flexible, rápido de probar |
+
+Usamos **Python 3**: interpretado, de sintaxis limpia y con una comunidad enorme. Que sea
+interpretado tiene una consecuencia práctica muy útil: **puedes probar una línea y ver
+inmediatamente qué hace**.
+
+!!! success "Lo que ya sabes hacer"
+    Escribir y ejecutar un programa, mostrar texto por pantalla y reconocer los tres
+    bloques de cualquier problema. Ejercicios del **tema 1**, al final de la unidad.
 
 ---
 
-## 3. Python como herramienta de seguridad
+## 2. Variables: guardar datos
 
-Python es tu herramienta durante todo el módulo. Monta el entorno una vez:
+Una **variable** es un nombre que apunta a un valor. Guarda algo para usarlo después.
 
-```bash title="Preparar el entorno"
-python -m venv .venv
-source .venv/bin/activate         # Windows: .venv\Scripts\Activate.ps1
-pip install pytest mypy cryptography
+> **Analogía.** Una variable es una **etiqueta pegada a una caja**. La etiqueta es el
+> nombre (`precio`) y dentro está el valor (`19.95`). Puedes cambiar el contenido de la
+> caja sin cambiar la etiqueta.
+
+### 2.1 Crear y usar variables
+
+```python
+producto = "Camisa"
+unidades = 3
+precio = 19.95
+
+print(producto, unidades, precio)
 ```
 
-Escribimos **Python tipado**: las anotaciones documentan y permiten que `mypy` cace errores sin ejecutar nada.
-
-```python title="Tu primera huella digital"
-import hashlib
-
-def hash_de_texto(texto: str) -> str:      # (1)!
-    """Devuelve el hash SHA-256 de un texto, en hexadecimal."""
-    return hashlib.sha256(texto.encode("utf-8")).hexdigest()   # (2)!
-
-print(hash_de_texto("hola"))                # (3)!
-print(hash_de_texto("hola"))                # (4)!
+```text
+Camisa 3 19.95
 ```
 
-1.  Las **anotaciones de tipo** (`str -> str`) documentan y permiten que `mypy` detecte errores sin ejecutar.
-2.  `.encode("utf-8")` convierte el texto en **bytes**, que es lo que acepta `hashlib`. Olvidarlo es el error clásico.
-3.  Imprime `b221d9db…`: 64 caracteres hexadecimales (256 bits).
-4.  El mismo texto da **siempre** el mismo hash — lo comprobamos llamando dos veces.
+El signo `=` **no** es «igual» en sentido matemático: significa «guarda a la derecha en el
+nombre de la izquierda». Se lee de derecha a izquierda.
 
-```text title="Salida"
-b221d9dbb083a7f33428d7c2a3c3198ae925614d70210e28716ccaa7cd4ddb79
-b221d9dbb083a7f33428d7c2a3c3198ae925614d70210e28716ccaa7cd4ddb79
+### 2.2 Los cuatro tipos básicos
+
+| Tipo | Qué guarda | Ejemplo |
+|---|---|---|
+| `str` | texto (*string*) | `"Camisa"` |
+| `int` | número entero | `3` |
+| `float` | número con decimales | `19.95` |
+| `bool` | verdadero o falso | `True`, `False` |
+
+El tipo **no se declara**: Python lo deduce del valor. Puedes verlo con `type()`:
+
+```python
+print(type("Camisa"))   # <class 'str'>
+print(type(3))          # <class 'int'>
+print(type(19.95))      # <class 'float'>
+print(type(True))       # <class 'bool'>
 ```
 
-!!! warning "Atención"
-    Muchas funciones devuelven **texto**; para hashear hay que pasar a **bytes** con `.encode()`. Si ves `TypeError: Strings must be encoded before hashing`, es justo esto.
+<figure markdown>
+  ![Variables en memoria](../assets/diagramas/ud1-memoria.svg#only-light)
+  ![Variables en memoria](../assets/diagramas/ud1-memoria-dark.svg#only-dark)
+  <figcaption>Cada variable es un nombre que apunta a un valor guardado en memoria.</figcaption>
+</figure>
+
+### 2.3 Un ejemplo resuelto: reasignar
+
+```python
+precio = 19.95
+print(precio)        # 19.95
+
+precio = 24.50       # la misma etiqueta, otro valor
+print(precio)        # 24.5
+
+print(type(precio))  # <class 'float'>
+```
+
+Dos cosas que sorprenden la primera vez:
+
+- `24.50` se muestra como `24.5`. Python no guarda los ceros de adorno; en la sección 5
+  veremos cómo mostrarlo con dos decimales.
+- El valor anterior **se pierde**. Si lo necesitas, guárdalo en otra variable antes.
+
+### 2.4 Anotar el tipo (y por qué conviene)
+
+En este módulo escribimos el tipo de cada variable. No es obligatorio para Python, pero es
+como se trabaja en cualquier empresa:
+
+```python
+producto: str = "Camisa"
+unidades: int = 3
+precio: float = 19.95
+```
+
+Eso `: str`, `: int`, `: float` son **anotaciones de tipo**. Python **las ignora al
+ejecutar**: sirven para documentar y para que una herramienta llamada `mypy` compruebe que
+todo cuadra sin tener que ejecutar el programa. Está explicado en
+[Puesta en marcha](../recursos/puesta-en-marcha.md#6-las-anotaciones-de-tipo-y-mypy).
+
+!!! warning "Anotar no valida"
+    Esto **no da error** al ejecutar, aunque sea una mentira evidente:
+
+    ```python
+    edad: int = "veinte"      # Python no protesta
+    ```
+
+    Quien protesta es `mypy`. Python confía en ti.
+
+!!! success "Lo que ya sabes hacer"
+    Guardar los datos del ticket en variables con su tipo anotado. Ejercicios del
+    **tema 2**.
 
 ---
 
-## 4. Criptografía I — funciones hash e integridad
+## 3. Operadores: calcular
 
-Una **función hash** transforma cualquier dato en una huella de longitud fija.
+Ya tienes los datos guardados. Ahora hay que **hacer cuentas** con ellos.
 
-| Propiedad | Qué significa |
+### 3.1 Aritméticos
+
+| Operador | Qué hace | Ejemplo | Resultado |
+|:---:|---|---|---|
+| `+` `-` `*` | suma, resta, multiplicación | `3 * 19.95` | `59.85` |
+| `/` | división, **siempre decimal** | `7 / 2` | `3.5` |
+| `//` | división **entera** | `7 // 2` | `3` |
+| `%` | **resto** de la división | `7 % 2` | `1` |
+| `**` | potencia | `2 ** 3` | `8` |
+
+Los dos que más cuesta interiorizar son `//` y `%`, y son utilísimos:
+
+```python
+segundos = 3725
+
+minutos = segundos // 60      # 62   ¿cuántos minutos enteros caben?
+sobran = segundos % 60        # 5    ¿qué se queda fuera?
+
+print(minutos, sobran)
+```
+
+```text
+62 5
+```
+
+!!! warning "`/` siempre devuelve decimal"
+    ```python
+    print(6 / 3)          # 2.0   ¡con decimal, aunque sea exacto!
+    print(type(6 / 3))    # <class 'float'>
+    print(6 // 3)         # 2     este sí es entero
+    ```
+
+### 3.2 Comparar y combinar
+
+| Operador | Qué pregunta |
+|:---:|---|
+| `==` `!=` | ¿son iguales? ¿son distintos? |
+| `<` `>` `<=` `>=` | ¿menor? ¿mayor? |
+| `and` | ¿se cumplen **las dos**? |
+| `or` | ¿se cumple **alguna**? |
+| `not` | lo contrario |
+
+El resultado de una comparación es un `bool`:
+
+```python
+unidades = 3
+print(unidades > 0)              # True
+print(unidades > 0 and unidades < 10)   # True
+```
+
+!!! danger "`=` no es `==`"
+    `=` **guarda** un valor. `==` **compara**. Confundirlos es el error de sintaxis más
+    repetido del curso.
+
+### 3.3 Precedencia: el orden de las operaciones
+
+Python respeta el orden matemático de siempre: primero `**`, después `*` `/` `//` `%`, y al
+final `+` `-`.
+
+```python
+print(10 - 2 ** 3)        # 2     la potencia primero: 10 - 8
+print((10 - 2) ** 3)      # 512   los paréntesis mandan
+```
+
+<figure markdown>
+  ![Precedencia de operadores](../assets/diagramas/ud1-precedencia.svg#only-light)
+  ![Precedencia de operadores](../assets/diagramas/ud1-precedencia-dark.svg#only-dark)
+  <figcaption>De arriba abajo: lo de arriba se evalúa antes.</figcaption>
+</figure>
+
+!!! tip "Usa paréntesis aunque no hagan falta"
+    `base + base * 0.21` funciona, pero `base + (base * 0.21)` se lee mejor. El código lo
+    vas a leer mucha más veces de las que lo escribes.
+
+### 3.4 Un ejemplo resuelto: el ticket calcula
+
+```python
+producto: str = "Camisa"
+unidades: int = 3
+precio: float = 19.95
+
+base: float = unidades * precio
+iva: float = base * 21 / 100
+total: float = base + iva
+
+print(producto, unidades, precio)
+print(base, iva, total)
+```
+
+```text
+Camisa 3 19.95
+59.849999999999994 12.568499999999998 72.4185
+```
+
+Funciona… pero esos decimales son horribles. **Eso no es un error tuyo**: es como el
+ordenador guarda los números con decimales. Lo arreglamos en la sección 5, dándole formato
+a la salida.
+
+!!! success "Lo que ya sabes hacer"
+    Calcular la base, el IVA y el total. Ejercicios del **tema 3**.
+
+---
+
+## 4. Leer datos del teclado
+
+Hasta ahora los datos estaban escritos en el código. Un programa de verdad **los pregunta**.
+
+### 4.1 `input()`
+
+```python
+producto = input("Producto: ")
+print("Has elegido:", producto)
+```
+
+```text
+Producto: Camisa
+Has elegido: Camisa
+```
+
+El texto entre paréntesis es la pregunta que ve el usuario.
+
+### 4.2 La trampa: `input()` SIEMPRE devuelve texto
+
+Aquí falla casi todo el mundo la primera vez:
+
+```python
+unidades = input("Unidades: ")      # el usuario escribe 3
+print(unidades + 1)
+```
+
+```text
+Unidades: 3
+TypeError: can only concatenate str (not "int") to str
+```
+
+Python no se ha equivocado. `unidades` **no vale 3**, vale `"3"`, que es el **texto** tres.
+Y a un texto no se le puede sumar un número.
+
+!!! danger "El error más repetido del curso"
+    Todo lo que llega de `input()` es `str`. **Si vas a calcular con él, hay que
+    convertirlo.**
+
+### 4.3 Convertir: `int()` y `float()`
+
+| Función | Convierte a | Ejemplo |
+|---|---|---|
+| `int(x)` | entero | `int("3")` → `3` |
+| `float(x)` | decimal | `float("19.95")` → `19.95` |
+| `str(x)` | texto | `str(3)` → `"3"` |
+
+```python
+unidades = int(input("Unidades: "))     # convertido al leerlo
+print(unidades + 1)
+```
+
+```text
+Unidades: 3
+4
+```
+
+Dos comportamientos que conviene conocer:
+
+```python
+print(int(9.99))        # 9    int() TRUNCA, no redondea
+print(round(9.99))      # 10   round() sí redondea
+print(int("3.5"))       # ValueError: no puede con el punto
+print(float("3.5"))     # 3.5  este sí
+```
+
+!!! tip "Convierte al leer, no al calcular"
+    ```python
+    unidades = int(input("Unidades: "))     # bien: ya es número
+    ```
+    Mejor que dejarlo en texto y convertirlo en cada cuenta. Un dato mal tipado se propaga
+    por todo el programa.
+
+### 4.4 Un ejemplo resuelto: el ticket pregunta
+
+```python
+producto: str = input("Producto: ")
+unidades: int = int(input("Unidades: "))
+precio: float = float(input("Precio:   "))
+
+base: float = unidades * precio
+iva: float = base * 21 / 100
+total: float = base + iva
+
+print(base, iva, total)
+```
+
+```text
+Producto: Camisa
+Unidades: 3
+Precio:   19.95
+59.849999999999994 12.568499999999998 72.4185
+```
+
+!!! success "Lo que ya sabes hacer"
+    Un programa que pregunta los datos y calcula con ellos. Ejercicios del **tema 4**.
+
+---
+
+## 5. Mostrar el resultado con formato
+
+Solo falta que el ticket tenga buen aspecto. Y esto no es cosmética: **en los exámenes la
+salida se compara carácter a carácter**, así que el formato exacto es parte del ejercicio.
+
+### 5.1 f-strings
+
+Una **f-string** es un texto que empieza por `f` y puede llevar variables entre llaves:
+
+```python
+producto = "Camisa"
+unidades = 3
+
+print(f"{unidades} x {producto}")
+```
+
+```text
+3 x Camisa
+```
+
+Es más corto y más legible que ir pegando trozos con `+`, y no hay que convertir nada a
+texto.
+
+### 5.2 Decimales: `:.2f`
+
+Detrás de la variable, dos puntos y el formato:
+
+```python
+total = 72.4185
+
+print(f"{total:.2f}")      # 72.42
+```
+
+`:.2f` significa «decimal con **2** cifras después del punto». Es el formato del dinero, y
+lo vas a usar constantemente.
+
+### 5.3 Alinear en columnas
+
+| Formato | Qué hace |
 |---|---|
-| **Determinista** | El mismo dato da siempre el mismo hash |
-| **Efecto avalancha** | Cambiar un bit cambia por completo la salida |
-| **Unidireccional** | No se puede volver del hash al dato |
-| **Resistente a colisiones** | Es inviable encontrar dos datos con el mismo hash |
+| `:<12` | alinea a la **izquierda** en 12 caracteres |
+| `:>8` | alinea a la **derecha** en 8 |
+| `:^10` | **centra** en 10 |
+| `:>8.2f` | derecha, 8 de ancho, 2 decimales |
+| `:,` | separador de miles |
 
-```mermaid
-flowchart LR
-    D1["'seguridad'"] --> F["SHA-256"]
-    D2["'Seguridad'"] --> F
-    F --> H1["1ea9f394… (64 hex)"]
-    F --> H2["b64167f5… (64 hex)"]
-    H1 -.->|"57 de 64 caracteres distintos"| H2
+```python
+print(f"{'Base':<12}{59.85:>8.2f}")
+print(f"{'IVA (21%)':<12}{12.5685:>8.2f}")
 ```
 
-### 4.1 Efecto avalancha, medido con código
-
-```python title="avalancha.py"
-import hashlib
-
-def h(t: str) -> str:
-    return hashlib.sha256(t.encode()).hexdigest()
-
-def avalancha(a: str, b: str) -> int:
-    ha, hb = h(a), h(b)
-    return sum(1 for x, y in zip(ha, hb) if x != y)
-
-a, b = "seguridad", "Seguridad"     # solo cambia una letra a mayúscula
-print(h(a))
-print(h(b))
-print(f"Cambian {avalancha(a, b)} de 64 caracteres del hash")
+```text
+Base           59.85
+IVA (21%)      12.57
 ```
 
-```text title="Salida"
-1ea9f394f510e2beb43cb0b317258b09bce9f4fccef69407360483690ac9b746
-b64167f58e1cf0c322747fbe1a7361084a004ffb5c145fd64e5413ef11215965
-Cambian 57 de 64 caracteres del hash
+!!! tip "Los números, a la derecha"
+    Alineados a la derecha las unidades quedan una debajo de otra y la tabla se lee de un
+    vistazo. Ese es el detalle que separa una salida profesional de una improvisada.
+
+### 5.4 Un ejemplo resuelto: el ticket terminado
+
+```python
+producto: str = input("Producto: ")
+unidades: int = int(input("Unidades: "))
+precio: float = float(input("Precio:   "))
+
+base: float = unidades * precio
+iva: float = base * 21 / 100
+total: float = base + iva
+
+print()
+print(f"{'Base':<12}{base:>8.2f}")
+print(f"{'IVA (21%)':<12}{iva:>8.2f}")
+print("-" * 20)
+print(f"{'TOTAL':<12}{total:>8.2f}")
 ```
 
-> Un cambio mínimo en la entrada altera casi todo el hash: por eso sirve para detectar la más pequeña manipulación.
+```text
+Producto: Camisa
+Unidades: 3
+Precio:   19.95
 
-### 4.2 Elegir el algoritmo (no todos valen)
-
-```python title="comparar_algoritmos.py"
-import hashlib
-
-dato = b"documento importante"
-for alg in ("md5", "sha1", "sha256", "sha3_256", "blake2b"):
-    d = hashlib.new(alg, dato).hexdigest()
-    print(f"{alg:9} {len(d)*4:4} bits   {d[:24]}...")
+Base           59.85
+IVA (21%)      12.57
+--------------------
+TOTAL          72.42
 ```
 
-```text title="Salida"
-md5        128 bits   73943af0696212b0ebfb60cf...
-sha1       160 bits   3d8dd0ba48b54b431502c4f6...
-sha256     256 bits   dd1cd769ac316412f9a0669e...
-sha3_256   256 bits   ce5c2e89bddab0174ba19299...
-blake2b    512 bits   e29f58fbe35b5357d889089c...
+**Ese es el programa del principio de la unidad**, y lo has construido tú en cinco pasos.
+
+!!! success "Lo que ya sabes hacer"
+    Presentar resultados con el formato exacto que se pide. Ejercicios del **tema 5**.
+
+---
+
+## 6. Dejarlo limpio: constantes, nombres y comentarios
+
+El programa funciona. Ahora hay que dejarlo de forma que **dentro de un mes lo entiendas**
+—o que lo entienda quien lo herede—. Esto no es un adorno: es la diferencia entre código
+que se puede mantener y código que se tira.
+
+### 6.1 Constantes
+
+El `21` de nuestro programa es el IVA. Aparece suelto en medio de un cálculo y no dice qué
+es. Eso se llama **número mágico** y es un problema: si mañana cambia el IVA, hay que ir a
+buscarlo.
+
+Una **constante** es un valor con nombre que no cambia. Por convenio se escribe en
+MAYÚSCULAS:
+
+```python
+IVA: int = 21
+
+iva = base * IVA / 100
 ```
 
-| Algoritmo | Estado | Uso recomendado |
+Ahora se lee, y si cambia se toca **en un solo sitio**.
+
+!!! note "En Python es un acuerdo, no una regla"
+    Python te deja cambiar una constante; nadie te lo impide. Las MAYÚSCULAS son una señal
+    para quien lee el código: «esto no se toca».
+
+### 6.2 Nombres
+
+| Regla | Bien | Mal |
 |---|---|---|
-| MD5 / SHA-1 | **Rotos** | Nunca para integridad seria |
-| **SHA-256** | Vigente, estándar de facto | Integridad, firma, certificados TLS |
-| **SHA-3 / BLAKE2** | Vigente, más modernos | Alternativas cuando se busca velocidad o margen extra |
+| Empieza por letra o `_` | `precio`, `_tmp` | `2dias` |
+| Solo letras, números y `_` | `precio_final` | `precio-final` |
+| No usar palabras reservadas | `grupo` | `class`, `for`, `if` |
+| `snake_case`, en minúsculas | `precio_unidad` | `PrecioUnidad` |
+| Que **diga qué es** | `unidades` | `x`, `dato`, `a2` |
 
-### 4.3 Hash de un fichero grande (por bloques) y comparación segura
+La última es la importante. `precio_unidad` no cuesta más de escribir que `p` y te ahorra
+diez minutos de releer dentro de dos semanas.
 
-```python title="hash_fichero.py"
-import hashlib, hmac
-from pathlib import Path
+### 6.3 Comentarios
 
-def hash_fichero(ruta: Path, algoritmo: str = "sha256") -> str:
-    """Hashea leyendo por bloques: funciona igual de bien con 1 KB que con 10 GB."""
-    h = hashlib.new(algoritmo)
-    with open(ruta, "rb") as f:
-        for bloque in iter(lambda: f.read(8192), b""):   # 8 KiB por lectura
-            h.update(bloque)
-    return h.hexdigest()
+```python
+# Un comentario de una línea
 
-def integro(esperado: str, actual: str) -> bool:
-    """Comparación en tiempo constante: no filtra información por temporización."""
-    return hmac.compare_digest(esperado, actual)
+"""
+Varias líneas, normalmente al principio
+del fichero para explicar de qué va.
+"""
 ```
 
-!!! analogia "Analogía"
-    El hash es el **número de precinto** de una caja de pruebas: no dice qué hay dentro, pero si el precinto coincide, nadie la ha abierto.
+Un comentario bueno explica **el porqué**, no el qué:
 
-!!! warning "Hash ≠ cifrado"
-    El hash **no se deshace**: no sirve para guardar algo que luego haya que recuperar, sino para **comprobar** que no ha cambiado. Para contraseñas se usa hash **con sal** y funciones lentas (bcrypt, Argon2) — lo verás en la UD4.
+```python
+precio = precio * 1.21     # ✗ multiplica por 1.21   (eso ya se ve)
+precio = precio * 1.21     # ✓ IVA general vigente en 2026
+```
 
-!!! reto "Reto rápido 3"
-    Ejecuta `avalancha("1234", "1235")`. ¿Cambia también casi todo el hash aunque solo varíe un dígito? ¿Y `avalancha("1234", "1234 ")` (con un espacio al final)?
+Cuando un comentario repite el código, sobra. Cuando explica una decisión, vale oro.
+
+### 6.4 El programa terminado
+
+```python
+"""Ticket de compra con IVA."""
+
+IVA: int = 21          # tipo general vigente
+
+# ── Entrada ──
+producto: str = input("Producto: ")
+unidades: int = int(input("Unidades: "))
+precio: float = float(input("Precio:   "))
+
+# ── Proceso ──
+base: float = unidades * precio
+iva: float = base * IVA / 100
+total: float = base + iva
+
+# ── Salida ──
+print()
+print(f"{'Base':<12}{base:>8.2f}")
+print(f"{'IVA (' + str(IVA) + '%)':<12}{iva:>8.2f}")
+print("-" * 20)
+print(f"{'TOTAL':<12}{total:>8.2f}")
+```
+
+Compáralo con el `print("Ticket de compra")` de la sección 1. Mismo programa, seis pasos.
+
+!!! success "Lo que ya sabes hacer"
+    Todo el RA1. Ejercicios del **tema 6**, y después el bloque de ejercicios largos y el
+    simulacro.
 
 ---
 
-## 5. Criptografía II — cifrado simétrico y asimétrico
+## 7. Errores frecuentes
 
-Cifrar es transformar un mensaje para que solo lo lea quien tenga la clave.
+Ten esta tabla a mano: casi todos los fallos de esta unidad están aquí.
 
-| | **Simétrico** | **Asimétrico** |
+| Lo que ves | Qué significa | Cómo se arregla |
 |---|---|---|
-| Claves | Una sola, compartida | Par: pública + privada |
-| Algoritmos típicos | AES, ChaCha20 (Fernet los usa por debajo) | RSA, curvas elípticas (ECC) |
-| Ventaja | Muy rápido | No hay que compartir un secreto |
-| Problema | ¿Cómo comparto la clave con seguridad? | Lento para grandes volúmenes |
+| `SyntaxError: invalid syntax` | Falta algo: un paréntesis, una comilla, los dos puntos | Mirar **la línea anterior** a la que señala |
+| `NameError: name 'x' is not defined` | Usas una variable que no existe (o mal escrita) | Comprobar que se crea **antes** de usarla |
+| `TypeError: can only concatenate str...` | Mezclas texto y número | Convertir con `int()` o `float()` |
+| `ValueError: invalid literal for int()` | `int()` con algo que no es un número entero | Comprobar lo que escribe el usuario |
+| `ZeroDivisionError` | División entre cero | Comprobar el divisor antes |
+| `IndentationError` | Espacios de más o de menos al principio de la línea | Usar siempre 4 espacios, sin mezclar tabuladores |
+| Sale `2.0` donde esperabas `2` | Has usado `/`, que siempre da decimal | Usar `//` si quieres entero |
+| Sale `59.849999999999994` | Así guarda el ordenador los decimales | Dar formato con `:.2f` al mostrarlo |
 
-### 5.1 Simétrico de verdad: Fernet (AES) con `cryptography`
-
-```python title="simetrico_fernet.py"
-from cryptography.fernet import Fernet, InvalidToken
-
-clave = Fernet.generate_key()          # ⚠️ guárdala en secreto: cifra y descifra por igual
-f = Fernet(clave)
-
-token = f.encrypt(b"numero de cuenta: ES12 3456 7890")
-print("Cifrado :", token[:50], b"...")
-print("Descifrado:", f.decrypt(token))
-
-# ¿Qué pasa si alguien manipula el mensaje cifrado?
-try:
-    manipulado = token[:-5] + b"XXXXX"
-    f.decrypt(manipulado)
-except InvalidToken:
-    print("Detectado: el token manipulado NO se puede descifrar")
-```
-
-```text title="Salida"
-Cifrado : b'gAAAAABo3k9f...' ...
-Descifrado: b'numero de cuenta: ES12 3456 7890'
-Detectado: el token manipulado NO se puede descifrar
-```
-
-> Fernet no solo cifra: también **autentica** el mensaje. Si alguien lo toca, `decrypt` lanza `InvalidToken` en vez de devolver basura silenciosamente. Es cifrado autenticado (AEAD), el estándar profesional.
-
-### 5.2 Asimétrico: RSA (candado público, llave privada)
-
-```python title="asimetrico_rsa.py"
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import hashes
-
-# Genera el par de claves (esto lo hace Ana, una sola vez)
-privada_ana = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-publica_ana = privada_ana.public_key()
-
-oaep = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
-
-# Cualquiera (tú) cifra con la clave PÚBLICA de Ana
-cifrado = publica_ana.encrypt(b"clave de sesion: 7f3a9c", oaep)
-print("Cifrado (bytes):", cifrado[:20], "...")
-
-# Solo Ana, con su clave PRIVADA, puede descifrarlo
-print("Descifrado:", privada_ana.decrypt(cifrado, oaep))
-```
-
-```text title="Salida"
-Cifrado (bytes): b'\x8f\x3a\x1c...' ...
-Descifrado: b'clave de sesion: 7f3a9c'
-```
-
-```mermaid
-flowchart LR
-    M["Mensaje"] -->|"se cifra con<br/>la pública de Ana"| C["🔒 Cifrado"]
-    C -->|"se descifra con<br/>la privada de Ana"| M2["Mensaje"]
-    style C fill:#7c3aed,color:#fff
-```
-
-!!! analogia "Analogía"
-    La clave **pública** es un candado abierto que repartes a todo el mundo; la **privada**, la única llave que lo abre y que guardas tú. En la práctica se combinan (**cifrado híbrido**): el mensaje se cifra con una clave simétrica rápida, y esa clave se cifra con RSA. Así funciona HTTPS.
-
-!!! reto "Reto rápido 4"
-    Quieres enviar un fichero secreto a una compañera. ¿Con qué clave lo cifras: tu pública, tu privada, la suya pública o la suya privada? ¿Y si además quieres demostrar que lo enviaste tú?
+!!! tip "Lee el error de abajo arriba"
+    Python te dice al final **qué** ha pasado y justo encima **dónde**. Con esas dos líneas
+    se resuelve la mayoría de los fallos, sin tocar nada más.
 
 ---
 
-## 6. Criptografía III — firma electrónica y certificados
+## 8. Ejercicios
+Aquí están **todos los ejercicios de la unidad**, agrupados por el
+tema al que corresponden y con la solución desplegable.
 
-La **firma** invierte el uso del par de claves para garantizar **autenticidad, integridad y no repudio**: se firma con la **privada** y cualquiera verifica con la **pública**.
+**Haz los de un tema en cuanto termines de leerlo.** Son cortos y solo usan lo que acabas
+de ver, así que si algo no ha quedado claro lo descubres en el momento.
 
-```mermaid
-sequenceDiagram
-    participant A as Autor (clave privada)
-    participant D as Documento
-    participant V as Verificador (clave pública)
-    A->>D: calcula hash(documento)
-    A->>A: cifra el hash con su clave privada
-    A->>V: envía documento + firma
-    V->>D: calcula hash(documento) de nuevo
-    V->>V: descifra la firma con la clave pública
-    V->>V: compara los dos hashes
-    Note over V: ¿coinciden? → auténtico e íntegro
-```
+!!! warning "Intenta antes de desplegar"
+    Abrir la solución sin haberlo intentado da sensación de aprender, y no enseña nada. Si
+    llevas quince minutos sin avanzar, mírala. Si llevas dos, no.
 
-```python title="firma_rsa.py"
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import hashes
-from cryptography.exceptions import InvalidSignature
+### Tema 1 · Tu primer programa
+**1.1.** Descompón en **entrada, proceso y salida** el cálculo del área de un rectángulo. No escribas código todavía: solo los tres bloques.
+<details><summary>Solución</summary>
 
-privada = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-publica = privada.public_key()
-pss = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
-
-documento = b"Transferir 100 EUR a la cuenta ES12-555"
-firma = privada.sign(documento, pss, hashes.SHA256())
-
-def verifica(doc: bytes, firma: bytes) -> bool:
-    try:
-        publica.verify(firma, doc, pss, hashes.SHA256())
-        return True
-    except InvalidSignature:
-        return False
-
-print("Documento original :", verifica(documento, firma))
-print("Documento alterado :", verifica(b"Transferir 999 EUR a la ES12-555", firma))
-```
-
-```text title="Salida"
-Documento original : True
-Documento alterado : False
-```
-
-> Cambiar **un solo carácter** del documento rompe la verificación: integridad y autenticidad a la vez, en una sola operación.
-
-### 6.1 Firmar un fichero real, no solo una cadena en memoria
-
-En la práctica no firmas literales de Python: firmas **ficheros** (un informe, un instalador, un contrato en PDF). La firma se guarda aparte, como un fichero `.sig`, y se distribuye junto al original.
-
-```python title="firma_de_fichero.py"
-from pathlib import Path
-
-# Un informe real en disco (reutiliza privada/pss/verifica del ejemplo anterior)
-Path("informe.txt").write_text("Informe trimestral: cifras confidenciales del cliente.")
-
-# Se firma el CONTENIDO en bytes del fichero, no una cadena en memoria
-contenido = Path("informe.txt").read_bytes()
-firma_fichero = privada.sign(contenido, pss, hashes.SHA256())
-Path("informe.txt.sig").write_bytes(firma_fichero)
-print(f"Firma guardada en informe.txt.sig ({len(firma_fichero)} bytes)")
-
-# La verificación se hace RELEYENDO ambos ficheros del disco — así ocurre en la vida real
-contenido_releido = Path("informe.txt").read_bytes()
-firma_releida = Path("informe.txt.sig").read_bytes()
-print("Verificación tras releer del disco:", verifica(contenido_releido, firma_releida))
-```
-
-```text title="Salida"
-Firma guardada en informe.txt.sig (256 bytes)
-Verificación tras releer del disco: True
-```
-
-> 256 bytes es justo el tamaño de una firma RSA de 2048 bits (2048 ÷ 8), **siempre**, sin importar si el fichero firmado pesa 10 bytes o 10 GB — la firma es del hash del documento, no del documento entero.
-
-### 6.2 Certificados digitales: generar uno de verdad
-
-Un **certificado X.509** vincula una clave pública con una identidad. En producción lo firma una **CA** (Autoridad de Certificación); para practicar, generamos uno **autofirmado**:
-
-```python title="certificado_x509.py"
-from cryptography import x509
-from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-import datetime
-
-clave = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-nombre = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "cmo314.local")])
-ahora = datetime.datetime.now(datetime.timezone.utc)
-
-certificado = (
-    x509.CertificateBuilder()
-    .subject_name(nombre)
-    .issuer_name(nombre)                         # autofirmado: emisor = sujeto
-    .public_key(clave.public_key())
-    .serial_number(x509.random_serial_number())
-    .not_valid_before(ahora)
-    .not_valid_after(ahora + datetime.timedelta(days=365))
-    .sign(clave, hashes.SHA256())
-)
-
-print("Sujeto      :", certificado.subject.rfc4514_string())
-print("Emisor      :", certificado.issuer.rfc4514_string())
-print("Válido hasta:", certificado.not_valid_after_utc.date())
-print("Autofirmado :", certificado.subject == certificado.issuer)
-
-pem = certificado.public_bytes(serialization.Encoding.PEM)
-print(pem.decode().splitlines()[0])
-```
-
-```text title="Salida"
-Sujeto      : CN=cmo314.local
-Emisor      : CN=cmo314.local
-Válido hasta: 2027-09-14
-Autofirmado : True
------BEGIN CERTIFICATE-----
-```
-
-Un certificado no vive en una variable: se **guarda como fichero `.pem`** y así es como lo lee un servidor web o un navegador.
-
-```python title="certificado_a_fichero.py"
-from pathlib import Path
-
-# Los certificados se distribuyen como ficheros .pem, no en memoria
-Path("cert.pem").write_bytes(pem)
-print("Certificado guardado en cert.pem")
-
-# Comprobación real: lo recargamos desde el disco, como haría un servidor web
-recargado = x509.load_pem_x509_certificate(Path("cert.pem").read_bytes())
-print("Mismo sujeto tras recargar del disco:", recargado.subject == certificado.subject)
-print("Tamaño del fichero:", Path("cert.pem").stat().st_size, "bytes")
-```
-
-```text title="Salida"
-Certificado guardado en cert.pem
-Mismo sujeto tras recargar del disco: True
-Tamaño del fichero: 1005 bytes
-```
-
-| Concepto | Qué es |
-|---|---|
-| **CA (Autoridad de Certificación)** | Entidad de confianza que firma certificados ajenos |
-| **Certificado autofirmado** | El emisor y el sujeto son el mismo — vale para pruebas, **no** para producción pública |
-| **PKI** | Toda la infraestructura: CAs, certificados, revocación, cadenas de confianza |
-
-!!! reto "Reto rápido 5"
-    Si tu navegador visita una web con un certificado **autofirmado**, avisa de "conexión no segura". ¿Por qué, si el cifrado funciona igual de bien?
-
----
-
-## 7. Análisis forense digital
-
-Investiga un incidente para responder **qué pasó, cómo, cuándo y con qué alcance**, preservando las evidencias para que tengan validez legal.
-
-```mermaid
-flowchart LR
-    A["1 · Identificación<br/>¿qué ha pasado?"] --> B["2 · Adquisición<br/>copia bit a bit"]
-    B --> C["3 · Análisis<br/>sobre la copia"]
-    C --> D["4 · Documentación<br/>qué se hizo y cuándo"]
-    D --> E["5 · Presentación<br/>informe pericial"]
-```
-
-### 7.1 Cadena de custodia, con código
-
-Cada evidencia debe demostrar que **no se ha alterado** desde su recogida: se trabaja sobre una **copia**, se calcula el **hash** del original y de la copia (deben coincidir), y se registra quién la tuvo y cuándo.
-
-```python title="cadena_custodia.py"
-import hmac
-from dataclasses import dataclass, field
-from datetime import datetime
-
-@dataclass
-class RegistroCustodia:
-    responsable: str
-    fecha: datetime = field(default_factory=datetime.now)
-    accion: str = "acceso"
-
-def verifica_integridad(hash_original: str, hash_copia: str) -> str:
-    return "ÍNTEGRA" if hmac.compare_digest(hash_original, hash_copia) else "⚠️ ALTERADA"
-
-registro = [
-    RegistroCustodia("Agente López", accion="adquisición"),
-    RegistroCustodia("Perito García", accion="análisis"),
-]
-for r in registro:
-    print(f"{r.fecha:%Y-%m-%d %H:%M} · {r.responsable} · {r.accion}")
-
-print(verifica_integridad("abc123", "abc123"))   # ÍNTEGRA
-print(verifica_integridad("abc123", "abc999"))   # ⚠️ ALTERADA
-```
-
-!!! analogia "Analogía"
-    El hash de la evidencia es su **precinto digital**. Por eso se calcula **antes** de tocar nada: si al terminar sigue igual, has demostrado que no la manipulaste.
-
-!!! reto "Reto rápido 6"
-    ¿Por qué el forense calcula el hash **antes** de empezar a analizar y no después? ¿Qué pasaría con una prueba en un juicio si no lo hiciera?
-
----
-
-## 8. Errores frecuentes (ten esto a mano)
-
-| Error | Causa | Solución |
-|---|---|---|
-| `Strings must be encoded before hashing` | Pasar `str` a `hashlib` | `.encode("utf-8")` primero |
-| Hashes que "no coinciden" | Espacios, mayúsculas o saltos de línea | Normaliza antes de comparar |
-| Comparar hashes/secretos con `==` | Filtra información por tiempos | `hmac.compare_digest(a, b)` |
-| Fichero grande lentísimo | Leerlo entero en memoria | Leer por bloques con `update()` |
-| Usar MD5 para integridad | Algoritmo roto (colisiones conocidas) | SHA-256 o BLAKE2 |
-| `InvalidSignature` inesperado | Verificar con datos distintos a los firmados | Comprueba que pasas el **mismo** `documento` |
-
----
-
-## 9. Actividades: de lo más sencillo a preguntas tipo examen
-
-> Una única escalera, sin saltos: empieza por el 🟢 1 y no mires la solución hasta intentarlo. Al final tienes preguntas del mismo estilo que el examen. Librerías reales: `hashlib`, `hmac`, `secrets`, `pathlib`, `re`, `cryptography`.
-
-**1 · 🟢 Verificar una descarga** — acabas de descargar un fichero y la web publica su SHA-256. `descarga_integra(contenido: str, hash_publicado: str) -> bool`: ¿coincide de verdad?
-<details class="sol"><summary>Solución</summary>
-
-```python
-import hashlib, hmac
-def descarga_integra(contenido: str, hash_publicado: str) -> bool:
-    hash_real = hashlib.sha256(contenido.encode("utf-8")).hexdigest()
-    return hmac.compare_digest(hash_real, hash_publicado.strip().lower())
+```text
+Entrada:  base y altura (los pide el usuario)
+Proceso:  area = base * altura
+Salida:   mostrar el area por pantalla
 ```
 </details>
 
-**2 · 🟢 ¿Ha cambiado el fichero?** — guardaste el hash de un `config.ini` la semana pasada. `ha_cambiado(hash_guardado: str, contenido_actual: str) -> bool`: ¿es distinto ahora? (este es, en miniatura, exactamente lo que hace `auditar()` en el reto de esta unidad).
-<details class="sol"><summary>Solución</summary>
+**1.2.** Escribe en lenguaje natural el algoritmo para decidir si un número es **par**.
+<details><summary>Solución</summary>
 
-```python
-import hashlib, hmac
-def ha_cambiado(hash_guardado: str, contenido_actual: str) -> bool:
-    hash_actual = hashlib.sha256(contenido_actual.encode("utf-8")).hexdigest()
-    return not hmac.compare_digest(hash_actual, hash_guardado.strip().lower())
+```text
+1. Pedir un numero
+2. Calcular el resto de dividirlo entre 2
+3. Si el resto es 0 -> es par
+4. Si no -> es impar
+5. Mostrar el resultado
 ```
 </details>
 
-**3 · 🟢 Clasificar incidente** — `pilar(x)` para `"filtracion"/"alteracion"/"caida"` → `"C"`/`"I"`/`"D"`.
-<details class="sol"><summary>Solución</summary>
+**1.3.** Ordena estos pasos del ciclo de desarrollo: *ejecutar*, *analizar el problema*, *escribir el código*, *corregir errores*, *diseñar el algoritmo*.
+<details><summary>Solución</summary>
 
-```python
-def pilar(x: str) -> str:
-    return {"filtracion": "C", "alteracion": "I", "caida": "D"}.get(x, "?")
+```text
+1. Analizar el problema  (que me piden exactamente)
+2. Disenar el algoritmo   (como lo resuelvo, en lenguaje natural)
+3. Escribir el codigo     (traducirlo a Python)
+4. Ejecutar               (probarlo de verdad)
+5. Corregir errores       (y volver a ejecutar)
 ```
 </details>
 
-**4 · 🟢 ¿Formato de hash válido?** — `es_sha256(cadena: str) -> bool` con una expresión regular (64 hex).
-<details class="sol"><summary>Solución</summary>
+**1.4.** Escribe un programa con la estructura **entrada → proceso → salida** que pida el nombre del usuario y lo salude.
+<details><summary>Solución</summary>
 
 ```python
-import re
-def es_sha256(cadena: str) -> bool:
-    return bool(re.fullmatch(r"[0-9a-f]{64}", cadena.strip().lower()))
+# Entrada
+nombre: str = input("¿Cómo te llamas? ")
+
+# Proceso
+saludo: str = f"¡Hola, {nombre}!"
+
+# Salida
+print(saludo)   # -> ¡Hola, Ada!
 ```
 </details>
 
-**5 · 🟡 Hash de bytes por bloques** — `hash_bloques(datos: bytes, n: int = 1024) -> str`.
-<details class="sol"><summary>Solución</summary>
+**1.5.** Pide dos números enteros y muestra su suma. Marca con comentarios dónde está cada bloque del ciclo.
+<details><summary>Solución</summary>
 
 ```python
-import hashlib
-def hash_bloques(datos: bytes, n: int = 1024) -> str:
-    h = hashlib.sha256()
-    for i in range(0, len(datos), n):
-        h.update(datos[i:i + n])
-    return h.hexdigest()
+# Entrada
+a: int = int(input("Primer número: "))
+b: int = int(input("Segundo número: "))
+
+# Proceso
+suma: int = a + b
+
+# Salida
+print(f"La suma es {suma}")   # -> La suma es 12
 ```
 </details>
 
-**6 · 🟡 Contar cambios (avalancha)** — `avalancha(a: str, b: str) -> int`: caracteres hex distintos entre sus SHA-256.
-<details class="sol"><summary>Solución</summary>
+**1.6.** Este programa está todo mezclado. Reescríbelo separando los tres bloques:
 
 ```python
-import hashlib
-def avalancha(a: str, b: str) -> int:
-    ha = hashlib.sha256(a.encode()).hexdigest()
-    hb = hashlib.sha256(b.encode()).hexdigest()
-    return sum(1 for x, y in zip(ha, hb) if x != y)
+print(f"Doble: {int(input('Número: ')) * 2}")
+```
+<details><summary>Solución</summary>
+
+```python
+# Entrada
+numero: int = int(input("Número: "))
+
+# Proceso
+doble: int = numero * 2
+
+# Salida
+print(f"Doble: {doble}")   # -> Doble: 42
+
+# Hace lo mismo, pero ahora se lee, se prueba y se corrige por partes.
 ```
 </details>
 
-**7 · 🟡 Sal aleatoria** — `con_sal(pwd: str) -> tuple[str, str]` con `secrets` (no `random`).
-<details class="sol"><summary>Solución</summary>
+### Tema 2 · Variables y tipos
+**2.1.** Crea cuatro variables, una de cada tipo básico (`str`, `int`, `float`, `bool`), y muestra su valor y su tipo.
+<details><summary>Solución</summary>
 
 ```python
-import hashlib, secrets
-def con_sal(pwd: str) -> tuple[str, str]:
-    sal = secrets.token_hex(16)
-    return sal, hashlib.sha256((sal + pwd).encode()).hexdigest()
+nombre = "Ada"
+edad = 36
+altura = 1.68
+matriculada = True
+
+print(nombre, type(nombre))         # -> <class 'str'>
+print(edad, type(edad))             # -> <class 'int'>
+print(altura, type(altura))         # -> <class 'float'>
+print(matriculada, type(matriculada))  # -> <class 'bool'>
 ```
 </details>
 
-**8 · 🟡 Detectar el algoritmo por longitud** — `adivina(hash_hex: str) -> str`: `"md5"` (32), `"sha1"` (40), `"sha256"` (64) o `"desconocido"`.
-<details class="sol"><summary>Solución</summary>
+**2.2.** Tienes `a = 5` y `b = 9`. Intercambia sus valores y compruébalo.
+<details><summary>Solución</summary>
 
 ```python
-def adivina(hash_hex: str) -> str:
-    return {32: "md5", 40: "sha1", 64: "sha256"}.get(len(hash_hex.strip()), "desconocido")
+a = 5
+b = 9
+
+a, b = b, a   # Python permite el intercambio directo
+
+print(a, b)   # -> 9 5
 ```
 </details>
 
-**9 · 🟠 Manifiesto: ficheros alterados** — `alterados(esperados, actuales) -> list[str]`.
-<details class="sol"><summary>Solución</summary>
+**2.3.** ¿Qué **tipo** devuelven `7 / 2`, `7 // 2` y `7 % 2`? Predícelo antes de ejecutar.
+<details><summary>Solución</summary>
 
 ```python
-def alterados(esperados: dict[str, str], actuales: dict[str, str]) -> list[str]:
-    return [f for f, h in esperados.items() if actuales.get(f) != h]
+print(7 / 2, type(7 / 2))     # -> 3.5 <class 'float'>
+print(7 // 2, type(7 // 2))   # -> 3 <class 'int'>
+print(7 % 2, type(7 % 2))     # -> 1 <class 'int'>
+
+# La division / SIEMPRE da float, aunque el resultado sea exacto: 6 / 2 -> 3.0
 ```
 </details>
 
-**10 · 🟠 Auditoría completa** — `audita(man, ahora) -> dict[str,str]` con estados `OK`/`MODIFICADO`/`NUEVO`/`AUSENTE`.
-<details class="sol"><summary>Solución</summary>
+**2.4.** Escribe una función **tipada** `area_rectangulo(base, altura)` que devuelva el área.
+<details><summary>Solución</summary>
 
 ```python
-def audita(man: dict[str, str], ahora: dict[str, str]) -> dict[str, str]:
-    r: dict[str, str] = {}
-    for f, h in man.items():
-        r[f] = "AUSENTE" if f not in ahora else ("OK" if ahora[f] == h else "MODIFICADO")
-    for f in ahora:
-        if f not in man:
-            r[f] = "NUEVO"
-    return r
+def area_rectangulo(base: float, altura: float) -> float:
+    """Área de un rectángulo."""
+    return base * altura
+
+print(area_rectangulo(3, 4.5))   # -> 13.5
 ```
 </details>
 
-**11 · 🟠 Detectar ficheros duplicados** — `duplicados(archivos: dict[str,str]) -> dict[str, list[str]]`: agrupa nombres que comparten el mismo hash.
-<details class="sol"><summary>Solución</summary>
+**2.5.** Anota los tipos de estas variables y ejecuta `mypy` sobre el fichero:
 
 ```python
-from collections import defaultdict
-def duplicados(archivos: dict[str, str]) -> dict[str, list[str]]:
-    por_hash: dict[str, list[str]] = defaultdict(list)
-    for nombre, h in archivos.items():
-        por_hash[h].append(nombre)
-    return {h: n for h, n in por_hash.items() if len(n) > 1}
+nombre = "Ada"
+edad = 36
+notas = [7.5, 8.0]
+```
+<details><summary>Solución</summary>
+
+```python
+nombre: str = "Ada"
+edad: int = 36
+notas: list[float] = [7.5, 8.0]
+
+print(nombre, edad, notas)   # -> Ada 36 [7.5, 8.0]
+
+# En la terminal:  mypy fichero.py   ->  Success: no issues found
 ```
 </details>
 
-**12 · 🔴 Autenticar un mensaje (HMAC)** — `firma(clave, msg) -> str` y `valida(clave, msg, f) -> bool`. Así se firman webhooks y APIs reales.
-<details class="sol"><summary>Solución</summary>
+**2.6.** Escribe `iniciales(nombre, apellido)` que devuelva las iniciales en mayúsculas, con sus anotaciones de tipo.
+<details><summary>Solución</summary>
 
 ```python
-import hmac, hashlib
-def firma(clave: str, msg: str) -> str:
-    return hmac.new(clave.encode(), msg.encode(), hashlib.sha256).hexdigest()
-def valida(clave: str, msg: str, f: str) -> bool:
-    return hmac.compare_digest(firma(clave, msg), f)
+def iniciales(nombre: str, apellido: str) -> str:
+    """Devuelve las iniciales, en mayúsculas y separadas por punto."""
+    return f"{nombre[0].upper()}.{apellido[0].upper()}."
+
+print(iniciales("ada", "lovelace"))   # -> A.L.
 ```
 </details>
 
-**13 · 🔴 Cadena de hashes (mini-blockchain)** — `cadena(bloques: list[str]) -> list[str]`: cada hash depende del anterior; `cadena_valida(bloques, hashes) -> bool` detecta si algo se alteró.
-<details class="sol"><summary>Solución</summary>
+### Tema 3 · Operadores
+**3.1.** Sin ejecutar, ¿cuánto valen `10 - 2 ** 3`, `(10 - 2) ** 3` y `10 % 4 * 2`? Compruébalo después.
+<details><summary>Solución</summary>
 
 ```python
-import hashlib
-def cadena(bloques: list[str]) -> list[str]:
-    hashes, anterior = [], "0" * 64
-    for b in bloques:
-        h = hashlib.sha256((anterior + b).encode()).hexdigest()
-        hashes.append(h)
-        anterior = h
-    return hashes
-
-def cadena_valida(bloques: list[str], hashes: list[str]) -> bool:
-    return cadena(bloques) == hashes
+print(10 - 2 ** 3)      # -> 2      la potencia va primero
+print((10 - 2) ** 3)    # -> 512    los parentesis mandan
+print(10 % 4 * 2)       # -> 4      % y * tienen la misma prioridad: de izquierda a derecha
 ```
 </details>
 
-**14 · 🔴 Firma RSA con `cryptography`** — dados `privada`/`publica`, `firma_rsa(privada, doc: bytes) -> bytes` y `verifica_rsa(publica, doc, firma) -> bool`.
-<details class="sol"><summary>Solución</summary>
+**3.2.** Comprueba si una persona de 20 años con carnet puede alquilar un coche (mínimo 21 años **y** carnet).
+<details><summary>Solución</summary>
 
 ```python
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import hashes
-from cryptography.exceptions import InvalidSignature
-_PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
+edad: int = 20
+tiene_carnet: bool = True
 
-def firma_rsa(privada, doc: bytes) -> bytes:
-    return privada.sign(doc, _PSS, hashes.SHA256())
+puede: bool = edad >= 21 and tiene_carnet
 
-def verifica_rsa(publica, doc: bytes, firma: bytes) -> bool:
-    try:
-        publica.verify(firma, doc, _PSS, hashes.SHA256()); return True
-    except InvalidSignature:
-        return False
+print(puede)   # -> False
 ```
 </details>
 
-**15 · 🔴 ¿Cuánto le queda al certificado?** — `dias_restantes(fecha_expiracion: datetime) -> int`, usando `datetime.now(timezone.utc)`.
-<details class="sol"><summary>Solución</summary>
+**3.3.** Convierte 3725 segundos a horas, minutos y segundos usando `//` y `%`.
+<details><summary>Solución</summary>
 
 ```python
-from datetime import datetime, timezone
+total: int = 3725
 
-def dias_restantes(fecha_expiracion: datetime) -> int:
-    return (fecha_expiracion - datetime.now(timezone.utc)).days
+horas: int = total // 3600
+resto: int = total % 3600
+minutos: int = resto // 60
+segundos: int = resto % 60
+
+print(f"{horas}h {minutos}m {segundos}s")   # -> 1h 2m 5s
 ```
 </details>
 
-**16 · 🔴 Manifiesto en dos formatos** — `a_texto(man: dict[str,str]) -> str` en formato `sha256sum` (`hash  nombre` por línea) y `de_texto(s: str) -> dict[str,str]` que lo lee de vuelta.
-<details class="sol"><summary>Solución</summary>
+### Tema 4 · Leer y convertir
+**4.1.** Este programa falla. ¿Por qué? Arréglalo:
 
 ```python
-def a_texto(man: dict[str, str]) -> str:
-    return "\n".join(f"{h}  {n}" for n, h in man.items())
+edad = input("Edad: ")
+print(edad + 1)
+```
+<details><summary>Solución</summary>
 
-def de_texto(s: str) -> dict[str, str]:
-    m: dict[str, str] = {}
-    for ln in s.splitlines():
-        if ln.strip():
-            h, _, n = ln.partition("  ")
-            m[n.strip()] = h.strip().lower()
-    return m
+```python
+# input() SIEMPRE devuelve texto: "20" + 1 mezcla str con int y lanza TypeError
+edad: int = int(input("Edad: "))
+print(edad + 1)   # -> 21
+```
+</details>
+
+**4.2.** ¿Qué hace `int(9.99)`? ¿Y `round(9.99)`? Comprueba la diferencia.
+<details><summary>Solución</summary>
+
+```python
+print(int(9.99))     # -> 9    int() TRUNCA: se queda con la parte entera
+print(round(9.99))   # -> 10   round() REDONDEA al mas cercano
+print(int(-2.7))     # -> -2   ojo: trunca hacia cero, no hacia abajo
+```
+</details>
+
+**4.3.** El usuario escribe los decimales con coma (`3,5`). Conviértelo a `float` sin que reviente.
+<details><summary>Solución</summary>
+
+```python
+texto: str = "3,5"
+
+# float("3,5") lanza ValueError: en Python el separador decimal es el punto
+numero: float = float(texto.replace(",", "."))
+
+print(numero)   # -> 3.5
+```
+</details>
+
+### Tema 5 · Formato de salida
+**5.1.** Muestra el número `3.14159` con **dos decimales** y el precio `1234.5` con dos decimales y separador de miles.
+<details><summary>Solución</summary>
+
+```python
+pi: float = 3.14159
+precio: float = 1234.5
+
+print(f"{pi:.2f}")        # -> 3.14
+print(f"{precio:,.2f}")   # -> 1,234.50
+```
+</details>
+
+**5.2.** Muestra estos tres productos en columnas: el nombre alineado a la izquierda en 12 huecos y el precio a la derecha en 8, con dos decimales.
+<details><summary>Solución</summary>
+
+```python
+productos = [("Camisa", 19.9), ("Pantalón", 34.5), ("Gorra", 7.25)]
+
+for nombre, precio in productos:
+    print(f"{nombre:<12}{precio:>8.2f}")
+
+# Camisa         19.90
+# Pantalón       34.50
+# Gorra           7.25
+```
+</details>
+
+**5.3.** Pide un importe por teclado y muéstralo formateado como `Total:    45.00 €`.
+<details><summary>Solución</summary>
+
+```python
+importe: float = float(input("Importe: "))
+print(f"Total: {importe:>8.2f} €")   # -> Total:    45.00 €
+```
+</details>
+
+### Tema 6 · Constantes, nombres y comentarios
+**6.1.** Define el IVA como **constante** y calcula el precio final de un artículo de 80 €.
+<details><summary>Solución</summary>
+
+```python
+IVA: int = 21          # constante: en MAYÚSCULAS porque no cambia
+
+precio: float = 80.0
+final: float = precio * (1 + IVA / 100)
+
+print(f"{final:.2f}")   # -> 96.80
+```
+</details>
+
+**6.2.** ¿Cuáles de estos nombres son válidos como variable? `total`, `2pagos`, `precio-final`, `_temp`, `for`, `añoNacimiento`.
+<details><summary>Solución</summary>
+
+```text
+Validos:    total, _temp, anoNacimiento
+No validos: 2pagos        -> no puede empezar por numero
+            precio-final  -> el guion es el operador resta; usa precio_final
+            for           -> es una palabra reservada del lenguaje
+```
+</details>
+
+**6.3.** Este código no funciona porque usa una palabra reservada. Arréglalo:
+
+```python
+class = "1DAW"
+print(class)
+```
+<details><summary>Solución</summary>
+
+```python
+# 'class' esta reservada para declarar clases: hay que renombrar la variable
+grupo: str = "1DAW"
+print(grupo)   # -> 1DAW
+```
+</details>
+
+**6.4.** Añade un **docstring** de una línea a esta función:
+
+```python
+def doble(n: int) -> int:
+    return n * 2
+```
+<details><summary>Solución</summary>
+
+```python
+def doble(n: int) -> int:
+    """Devuelve el doble del número recibido."""
+    return n * 2
+
+print(doble.__doc__)   # -> Devuelve el doble del número recibido.
+```
+</details>
+
+**6.5.** Estos comentarios sobran porque repiten lo que ya dice el código. Sustitúyelos por uno que explique **el porqué**:
+
+```python
+# suma 1 a i
+i = i + 1
+# multiplica por 1.21
+precio = precio * 1.21
+```
+<details><summary>Solución</summary>
+
+```python
+i = 0
+precio = 100.0
+
+i = i + 1                 # (sin comentario: el codigo ya se lee solo)
+precio = precio * 1.21    # IVA general del 21 % vigente en 2026
+
+print(i, round(precio, 2))   # -> 1 121.0
+```
+</details>
+
+**6.6.** Documenta un módulo `conversiones.py` con su docstring de módulo y una función documentada.
+<details><summary>Solución</summary>
+
+```python
+"""Conversiones entre unidades de longitud."""
+
+
+def metros_a_km(metros: float) -> float:
+    """Convierte metros a kilómetros."""
+    return metros / 1000
+
+print(metros_a_km(2500))   # -> 2.5
+```
+</details>
+
+### Actividades guiadas
+
+Las hacemos en clase, pero tienes la solución para repasarlas después.
+
+#### Actividad 1 — Ficha de una persona
+Crea variables **tipadas** `nombre`, `edad`, `altura` y muéstralas con su tipo.
+<details><summary>Solución</summary>
+
+```python
+nombre: str = "Ada"
+edad: int = 36
+altura: float = 1.68
+print(nombre, type(nombre))
+print(edad, type(edad))
+print(altura, type(altura))
+```
+</details>
+
+#### Actividad 2 — Área del círculo (constantes y operadores)
+Define `PI` como constante y calcula el área de un círculo de radio 5.
+<details><summary>Solución</summary>
+
+```python
+PI: float = 3.14159
+radio: int = 5
+area: float = PI * radio ** 2
+print(f"Área: {area:.2f}")   # Área: 78.54
+```
+</details>
+
+#### Actividad 3 — Función tipada de operaciones
+Escribe `operaciones(a: int, b: int) -> None` que muestre suma, división entera, resto y potencia.
+<details><summary>Solución</summary>
+
+```python
+def operaciones(a: int, b: int) -> None:
+    print("Suma:", a + b)
+    print("División entera:", a // b)
+    print("Resto:", a % b)
+    print("Potencia:", a ** b)
+
+operaciones(17, 5)   # 22 / 3 / 2 / 1419857
+```
+</details>
+
+#### Actividad 4 — Conversión y entrada
+Pide dos enteros por teclado y muestra su suma (recuerda convertir).
+<details><summary>Solución</summary>
+
+```python
+n1: int = int(input("Primer número: "))
+n2: int = int(input("Segundo número: "))
+print(f"Suma: {n1 + n2}")
 ```
 </details>
 
 ---
 
-## 10. Reto resuelto, paso a paso — Verificador de integridad profesional
+### Ejercicios propuestos
 
-Te acaban de contratar como técnico junior en una consultora de ciberseguridad. Tu primer encargo: **una herramienta de línea de comandos** que genere un manifiesto de una carpeta y audite si algo cambió — el mismo principio que `sha256sum --check`, `debsums` o un HIDS como **AIDE**/**Tripwire**. La construimos contigo, de principio a fin.
+Trabajo autónomo. ○ básico · ◐ medio · ● avanzado. **Anota los tipos** en todas tus soluciones y pásales `mypy`.
 
-```mermaid
-flowchart LR
-    G["generar"] -->|escribe| M["MANIFEST.json<br/>ruta → hash"]
-    M -->|más tarde| Au["auditar"]
-    Au -->|compara con| Fs["ficheros actuales"]
-    Fs --> R["OK / MODIFICADO<br/>NUEVO / AUSENTE"]
-```
+!!! warning "Intenta antes de desplegar"
+    Leer la solución sin haberlo intentado da sensación de aprender, pero no enseña. Usa primero la pista.
 
-**Paso 1 — Hash de un fichero.** La pieza más pequeña: hashear leyendo por bloques, para que funcione igual con 1 KB que con 10 GB.
-
-```python title="verificador.py"
-import hashlib
-from pathlib import Path
-
-def hash_fichero(ruta: Path, algoritmo: str = "sha256") -> str:
-    h = hashlib.new(algoritmo)
-    with open(ruta, "rb") as f:
-        for bloque in iter(lambda: f.read(8192), b""):
-            h.update(bloque)
-    return h.hexdigest()
-```
-
-**Paso 2 — Manifiesto de una carpeta entera.** Recorremos con `pathlib.rglob` y hasheamos cada fichero, saltando el propio manifiesto para no auto-referenciarnos:
-
-```python title="verificador.py (continúa)"
-def generar_manifiesto(carpeta: Path, algoritmo: str = "sha256") -> dict[str, str]:
-    manifiesto: dict[str, str] = {}
-    for ruta in sorted(carpeta.rglob("*")):
-        if ruta.is_file() and ruta.name != "MANIFEST.json":
-            manifiesto[str(ruta.relative_to(carpeta))] = hash_fichero(ruta, algoritmo)
-    return manifiesto
-```
-
-**Paso 3 — Persistir en JSON.** Un manifiesto real se guarda estructurado, no como texto suelto: así es fácil de extender (algoritmo, fecha…).
-
-```python title="verificador.py (continúa)"
-import json
-from datetime import datetime, timezone
-
-def guardar(manifiesto: dict[str, str], destino: Path, algoritmo: str) -> None:
-    datos = {"generado": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-             "algoritmo": algoritmo, "ficheros": manifiesto}
-    destino.write_text(json.dumps(datos, indent=2, ensure_ascii=False), encoding="utf-8")
-
-def cargar(origen: Path) -> dict[str, str]:
-    return dict(json.loads(origen.read_text(encoding="utf-8"))["ficheros"])
-```
-
-**Paso 4 — Auditar.** El corazón de la herramienta: comparar lo guardado con lo actual, en tiempo constante.
-
-```python title="verificador.py (continúa)"
-import hmac
-
-def auditar(previo: dict[str, str], actual: dict[str, str]) -> dict[str, str]:
-    resultado: dict[str, str] = {}
-    for nombre, h in previo.items():
-        if nombre not in actual:
-            resultado[nombre] = "AUSENTE"
-        elif hmac.compare_digest(h, actual[nombre]):
-            resultado[nombre] = "OK"
-        else:
-            resultado[nombre] = "MODIFICADO"
-    for nombre in actual:
-        if nombre not in previo:
-            resultado[nombre] = "NUEVO"
-    return resultado
-```
-
-**Paso 5 — CLI profesional con `argparse`.** Nada de leer `sys.argv` a mano: `argparse` da ayuda automática (`-h`), validación de opciones y aspecto de herramienta real.
-
-```python title="verificador.py (continúa)"
-import argparse
-
-def main() -> None:
-    ap = argparse.ArgumentParser(
-        prog="verificador",
-        description="Genera y audita un manifiesto de integridad de una carpeta.")
-    ap.add_argument("accion", choices=["generar", "auditar"])
-    ap.add_argument("carpeta", type=Path, help="carpeta a proteger")
-    ap.add_argument("--algoritmo", default="sha256",
-                    choices=["sha256", "sha3_256", "blake2b"])
-    args = ap.parse_args()
-
-    manifiesto_path = args.carpeta / "MANIFEST.json"
-    if args.accion == "generar":
-        guardar(generar_manifiesto(args.carpeta, args.algoritmo), manifiesto_path, args.algoritmo)
-        print(f"Manifiesto creado en {manifiesto_path}")
-    else:
-        previo = cargar(manifiesto_path)
-        actual = generar_manifiesto(args.carpeta, args.algoritmo)
-        for nombre, estado in sorted(auditar(previo, actual).items()):
-            print(f"[{estado:10}] {nombre}")
-
-if __name__ == "__main__":
-    main()
-```
-
-**Paso 6 — Pruébalo como cadena de custodia (Docker, sin `sudo`).**
-
-```yaml title="docker-compose.yml"
-services:
-  demo:
-    image: python:3.12-alpine
-    volumes: ["./datos:/datos", "./verificador.py:/verificador.py"]
-    working_dir: /datos
-    command: >
-      sh -c "echo 'binario de la app'     > app.bin;
-             echo 'config=produccion'     > app.conf;
-             python /verificador.py generar .;
-             echo '--- alguien altera config.conf ---';
-             echo 'config=HACKEADA'        > app.conf;
-             echo 'malware.sh'             > intruso.sh;
-             python /verificador.py auditar ."
-```
-
-```bash title="Ejecutar"
-mkdir -p datos && docker compose run --rm demo
-```
-
-```text title="Salida esperada"
-Manifiesto creado en datos/MANIFEST.json
---- alguien altera config.conf ---
-[MODIFICADO] app.conf
-[NUEVO     ] intruso.sh
-[OK        ] app.bin
-```
-
-<details class="sol"><summary>📄 verificador.py completo (los 5 pasos juntos, para comparar)</summary>
+**E1 ○ · Celsius a Fahrenheit.** `F = C · 9/5 + 32`.
+<details><summary>Pista</summary>Convierte la entrada con <code>float()</code>.</details>
+<details><summary>Solución</summary>
 
 ```python
-import argparse, hashlib, hmac, json
-from pathlib import Path
-from datetime import datetime, timezone
+c: float = float(input("Grados Celsius: "))
+f: float = c * 9 / 5 + 32
+print(f"{c} °C = {f:.1f} °F")
+```
+</details>
 
-def hash_fichero(ruta: Path, algoritmo: str = "sha256") -> str:
-    h = hashlib.new(algoritmo)
-    with open(ruta, "rb") as f:
-        for bloque in iter(lambda: f.read(8192), b""):
-            h.update(bloque)
-    return h.hexdigest()
+**E2 ○ · Rectángulo.** Pide base y altura y muestra área y perímetro.
+<details><summary>Solución</summary>
 
-def generar_manifiesto(carpeta: Path, algoritmo: str = "sha256") -> dict[str, str]:
-    m: dict[str, str] = {}
-    for ruta in sorted(carpeta.rglob("*")):
-        if ruta.is_file() and ruta.name != "MANIFEST.json":
-            m[str(ruta.relative_to(carpeta))] = hash_fichero(ruta, algoritmo)
-    return m
+```python
+base: float = float(input("Base: "))
+altura: float = float(input("Altura: "))
+print(f"Área: {base * altura:.2f}")
+print(f"Perímetro: {2 * (base + altura):.2f}")
+```
+</details>
 
-def guardar(manifiesto: dict[str, str], destino: Path, algoritmo: str) -> None:
-    datos = {"generado": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-             "algoritmo": algoritmo, "ficheros": manifiesto}
-    destino.write_text(json.dumps(datos, indent=2, ensure_ascii=False), encoding="utf-8")
+**E3 ◐ · Segundos a h:m:s.**
+<details><summary>Pista</summary>Usa <code>//</code> y <code>%</code> con 3600 y 60.</details>
+<details><summary>Solución</summary>
 
-def cargar(origen: Path) -> dict[str, str]:
-    return dict(json.loads(origen.read_text(encoding="utf-8"))["ficheros"])
+```python
+total: int = int(input("Segundos: "))
+horas: int = total // 3600
+minutos: int = (total % 3600) // 60
+seg: int = total % 60
+print(f"{horas}h {minutos}m {seg}s")   # 3661 -> 1h 1m 1s
+```
+</details>
 
-def auditar(previo: dict[str, str], actual: dict[str, str]) -> dict[str, str]:
-    r: dict[str, str] = {}
-    for n, h in previo.items():
-        r[n] = "AUSENTE" if n not in actual else ("OK" if hmac.compare_digest(h, actual[n]) else "MODIFICADO")
-    for n in actual:
-        if n not in previo:
-            r[n] = "NUEVO"
-    return r
+**E4 ◐ · Descuento.** `DESCUENTO = 15` (constante).
+<details><summary>Solución</summary>
 
-def main() -> None:
-    ap = argparse.ArgumentParser(prog="verificador", description="Manifiesto de integridad")
-    ap.add_argument("accion", choices=["generar", "auditar"])
-    ap.add_argument("carpeta", type=Path)
-    ap.add_argument("--algoritmo", default="sha256", choices=["sha256", "sha3_256", "blake2b"])
-    args = ap.parse_args()
-    ruta_man = args.carpeta / "MANIFEST.json"
-    if args.accion == "generar":
-        guardar(generar_manifiesto(args.carpeta, args.algoritmo), ruta_man, args.algoritmo)
-        print(f"Manifiesto creado en {ruta_man}")
-    else:
-        previo = cargar(ruta_man)
-        actual = generar_manifiesto(args.carpeta, args.algoritmo)
-        for n, e in sorted(auditar(previo, actual).items()):
-            print(f"[{e:10}] {n}")
+```python
+DESCUENTO: int = 15
+precio: float = float(input("Precio: "))
+final: float = precio - precio * DESCUENTO / 100
+print(f"Precio final: {final:.2f} €")
+```
+</details>
 
-if __name__ == "__main__":
-    main()
+**E5 ◐ · Media de tres notas** con función tipada.
+<details><summary>Solución</summary>
+
+```python
+def media(a: float, b: float, c: float) -> float:
+    return (a + b + c) / 3
+
+print(f"Media: {media(5, 7, 9):.2f}")   # 7.00
+```
+</details>
+
+**E6 ● · Cambio de monedas.** Importe en céntimos → monedas de 50, 20, 10, 5, 2, 1.
+<details><summary>Pista</summary>Divide con <code>//</code> y guarda el resto con <code>%</code> para la siguiente moneda.</details>
+<details><summary>Solución</summary>
+
+```python
+c: int = int(input("Céntimos: "))
+for valor in (50, 20, 10, 5, 2, 1):
+    print(f"{valor}c: {c // valor}")
+    c = c % valor
+```
+*(Usa un `for`, que verás en la UD3; también vale repetir seis bloques.)*
+</details>
+
+**E7 ◐ · Línea de ticket.** `linea_ticket(producto: str, unidades: int, precio: float) -> str` devuelve una línea como `Camisa        2 x  19.90 =    39.80 €`: el producto a la izquierda en 12 huecos, las unidades a la derecha en 3, el precio en 6 con 2 decimales y el importe en 8.
+<details><summary>Pista</summary>Una sola f-string con cuatro campos: <code>:&lt;12</code>, <code>:&gt;3</code>, <code>:&gt;6.2f</code> y <code>:&gt;8.2f</code>.</details>
+<details><summary>Solución</summary>
+
+```python
+def linea_ticket(producto: str, unidades: int, precio: float) -> str:
+    """Línea de ticket alineada en columnas."""
+    importe: float = unidades * precio
+    return f"{producto:<12}{unidades:>3} x {precio:>6.2f} = {importe:>8.2f} €"
+```
+</details>
+
+**E8 ● · Desglose de una compra.** `desglose(unidades: int, precio: float) -> tuple[float, float, float]` devuelve la base, el IVA y el total, **redondeados a 2 decimales**. El IVA es una constante del 21 %.
+<details><summary>Pista</summary><code>round(valor, 2)</code> en cada uno, y devuelve los tres separados por comas: eso ya es una tupla.</details>
+<details><summary>Solución</summary>
+
+```python
+IVA: int = 21
+
+
+def desglose(unidades: int, precio: float) -> tuple[float, float, float]:
+    """Base, IVA y total de una compra, redondeados a 2 decimales."""
+    base: float = unidades * precio
+    iva: float = base * IVA / 100
+    return round(base, 2), round(iva, 2), round(base + iva, 2)
 ```
 </details>
 
 ---
 
-## 11. Reto para ti (propuesto, sin solución)
+---
 
-### 🛡️ Centinela de integridad — un HIDS mínimo en Docker
+## 9. Simulacro tipo test
 
-Un **HIDS** (*Host Intrusion Detection System*) vigila que los ficheros de un sistema no cambien sin permiso. Constrúyelo **partiendo de tu `verificador.py`**.
+El examen de esta unidad es un **test de código**: 12 preguntas de opción múltiple sobre
+fragmentos como los que has visto en la teoría.
 
-```mermaid
-flowchart TB
-    subgraph "Contenedor: objetivo"
-    F["Ficheros vigilados"]
-    end
-    subgraph "Contenedor: centinela (tu código)"
-    Ge["1. genera manifiesto"] --> Bu["2. bucle cada 5s"]
-    Bu --> Au["3. audita"]
-    Au -->|cambio detectado| Lo["4. log con timestamp"]
-    Au -->|sin cambios| Bu
-    end
-    F -.->|volumen compartido| Ge
-    F -.->|volumen compartido| Au
-```
+Tienes un simulacro con **8 preguntas por cada uno de los seis temas** —48 en total— con la
+respuesta y la explicación desplegables:
 
-**Objetivo.** Un contenedor "objetivo" tiene una carpeta con ficheros. Tu **centinela** (otro contenedor con tu Python) genera el manifiesto **una vez** y luego, **en bucle cada 5 segundos**, reaudita y **registra en un log** cualquier cambio con marca de tiempo, distinguiendo `MODIFICADO`, `NUEVO` y `AUSENTE`.
+**[Simulacro tipo test RA1](../simulacros/ra1/README.md)**
 
-**Requisitos**
+!!! tip "Cómo sacarle partido"
+    Haz **un tema cada vez**, justo después de leerlo y hacer sus ejercicios. No los 48 de
+    golpe el día antes: así sabes qué tema tienes flojo cuando todavía hay margen.
 
-- `docker-compose.yml` con dos servicios que comparten un volumen: uno que va tocando ficheros (simula cambios con un `sh` que escribe de vez en cuando) y el **centinela** (tu programa).
-- El centinela **no** reescribe el manifiesto tras detectar un cambio (si lo hiciera, no volvería a alertar de lo mismo).
-- CLI con `argparse`: `python centinela.py <carpeta> --intervalo 5`.
-- Log con formato `2026-05-01T10:00:05+00:00  [MODIFICADO] app.conf`.
-- Código **tipado** (`mypy` limpio), reutilizando funciones de tu `verificador.py`.
-- Nada de `sudo`: todo dentro de `docker compose up`.
-
-**Criterios de aceptación**
-
-1. Al arrancar, crea el manifiesto y no alerta de nada.
-2. Cuando un fichero cambia, aparece **una sola** línea de alerta con su marca de tiempo (no se repite en cada vuelta del bucle).
-3. Si se crea o se borra un fichero, lo marca como `NUEVO` o `AUSENTE`.
-4. Se puede parar y volver a arrancar sin perder el manifiesto (persístelo en el volumen).
-
-**Pistas** (no solución): reutiliza `generar_manifiesto`, `auditar`, `guardar` y `cargar` tal cual · para no repetir alertas, guarda en memoria el **último estado conocido** de cada fichero y compara antes de loguear · bucle `while True: ...; time.sleep(args.intervalo)` · para el log, `logging.basicConfig(filename=..., level=logging.INFO)`.
-
-**Si te sobra tiempo:** añade un modo `--formato texto` que además escriba un `MANIFEST.sha256` estilo `sha256sum` · firma el `MANIFEST.json` con RSA (§6) para que nadie pueda falsificarlo sin que se note · investiga `Pillow` (`Image.open(ruta)._getexif()`) para extraer metadatos EXIF de una fotografía como evidencia forense.
-
-> Entrega el `docker-compose.yml` y tu código. Esto es justo el tipo de reto que resolverás en el **test práctico**.
+    Y no ejecutes el código hasta haber contestado. Después sí: pasa por Python las que
+    hayas fallado y mira por qué.
 
 ---
 
-## Autoevaluación rápida (conceptos)
+## 10. Proyecto de la unidad
 
-<details><summary>1. ¿Qué garantiza la <b>integridad</b>?</summary>Que la información no se altera sin autorización.</details>
-<details><summary>2. ¿Se puede recuperar un dato a partir de su hash?</summary>No: la función hash es unidireccional.</details>
-<details><summary>3. ¿Con qué clave cifras un mensaje para que solo lo lea Ana?</summary>Con la clave <b>pública</b> de Ana.</details>
-<details><summary>4. ¿Por qué MD5 no sirve para integridad seria?</summary>Está roto: se pueden encontrar colisiones.</details>
-<details><summary>5. ¿Por qué se trabaja sobre una copia en forense?</summary>Para no alterar el original y preservar la cadena de custodia.</details>
+Toda la práctica de esta unidad se hace sobre un **proyecto base**: una calculadora de presupuestos con IVA. Está montado
+con la estructura real de un proyecto Python y trae una **batería de tests** que puedes
+ejecutar en cualquier momento para ver si va todo bien.
 
-## Glosario
+**[Proyecto Presupuesto de tienda →](../proyectos/ud1/README.md)**
+
+```
+proyecto-ud1/
+├── src/      ← tu código (funciones con TODO)
+└── tests/    ← 16 tests que comprueban tu trabajo
+```
+
+### Cómo se trabaja
+
+```bash
+pip install -r requirements.txt
+pytest
+```
+
+La primera vez falla casi todo: aún no has escrito nada. A partir de ahí, lee una función,
+escríbela, vuelve a lanzar `pytest` y comprueba si ese test ya pasa. Terminas cuando está
+**todo en verde** y `mypy src` dice *Success*.
+
+!!! tip "De uno en uno"
+    `pytest -x` se detiene en el primer fallo. Arreglas esa función y sigues. Mucho más
+    llevadero que enfrentarse a todos los errores a la vez.
+
+!!! warning "Los tests son la especificación"
+    No los modifiques para que pasen: describen exactamente lo que tu código debe hacer, y
+    el examen usará una batería equivalente.
+
+Detalles y comandos útiles en **[Proyectos](../proyectos/index.md)**.
+
+---
+
+---
+
+## 11. Retos opcionales
+
+- **R1.** Amplía E5 para que, además de la media, diga `Aprobado`/`Suspenso` comparándola con 5.
+- **R2.** Investiga `divmod(a, b)` (devuelve cociente y resto a la vez) y reescribe E3 con él.
+- **R3.** Formatea un pequeño ticket con los precios alineados a la derecha (`:>8`), en columnas.
+- **R4.** Añade anotaciones de tipo a **todos** tus ejercicios y consigue que `mypy` diga *Success* en cada uno.
+
+- **R5.** Convierte una cantidad de segundos introducida por teclado a días, horas, minutos y segundos, y muéstralo como `2d 3h 04m 05s`.
+- **R6.** Formatea un ticket de tres productos con los importes alineados a la derecha y una línea de total separada por guiones del mismo ancho.
+---
+
+---
+
+## 12. Autoevaluación rápida
+
+<details><summary>1. ¿Qué muestra <code>print(7 // 2)</code>?</summary><code>3</code> (división entera).</details>
+<details><summary>2. ¿Qué tipo devuelve siempre <code>input()</code>?</summary><code>str</code>.</details>
+<details><summary>3. ¿Por qué falla <code>"5" + 1</code>?</summary>Mezcla <code>str</code> e <code>int</code> (<code>TypeError</code>).</details>
+<details><summary>4. Diferencia entre <code>=</code> y <code>==</code>.</summary><code>=</code> asigna; <code>==</code> compara.</details>
+<details><summary>5. ¿Comprueba Python las anotaciones de tipo al ejecutar?</summary>No; las comprueba <b>mypy</b> de forma estática.</details>
+<details><summary>6. ¿Para qué sirve un entorno virtual?</summary>Aislar los paquetes de cada proyecto para que no se mezclen.</details>
+<details><summary>7. ¿Qué comando guarda las dependencias?</summary><code>pip freeze > requirements.txt</code>.</details>
+
+---
+
+---
+
+## 13. Glosario
 
 | Término | Definición |
 |---|---|
-| **C·I·D** | Confidencialidad, integridad y disponibilidad. |
-| **Hash** | Huella de longitud fija de un dato; unidireccional y determinista. |
-| **Efecto avalancha** | Un cambio mínimo altera casi todo el hash. |
-| **HMAC** | Hash con clave secreta: autentica un mensaje, no solo lo hashea. |
-| **Cifrado simétrico / asimétrico** | Una clave compartida / par pública-privada. |
-| **Cifrado autenticado (AEAD)** | Cifrado que además detecta si el texto cifrado fue manipulado. |
-| **Firma electrónica** | Hash cifrado con la clave privada; prueba autoría e integridad. |
-| **Certificado / CA / PKI** | Vínculo clave-identidad / quien lo firma / la infraestructura completa. |
-| **Cadena de custodia** | Garantía de que una evidencia no se ha alterado. |
-| **HIDS** | Sistema que detecta cambios no autorizados en los ficheros de un host. |
-
-## Cómo se evalúa esta unidad (RA1)
-
-El instrumento principal es un **test práctico**: resuelves en Python un reto parecido al de esta unidad y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún ejercicio práctico).
-
-!!! reto "La nota, sin sorpresas"
-    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.
-
-El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `hashlib`), pasar `mypy` y documentar el código.
+| **Algoritmo** | Pasos para resolver un problema, independientes del lenguaje. |
+| **Variable** | Nombre que guarda un valor y puede cambiar. |
+| **Tipo** | Clase de dato: `int`, `float`, `str`, `bool`. |
+| **Anotación de tipo** | Indicación `: tipo` que documenta y verifica con mypy. |
+| **Literal / Constante** | Valor escrito directamente / valor que no debe cambiar. |
+| **Operador / Expresión** | Símbolo que opera / combinación que produce un resultado. |
+| **Casting** | Conversión de tipo (`int()`, `float()`, `str()`). |
+| **f-string** | Cadena con formato `f"...{valor}..."`. |
+| **Entorno virtual (venv)** | Copia aislada de Python por proyecto. |
+| **pip** | Gestor de paquetes de Python. |
+| **mypy** | Herramienta que comprueba los tipos sin ejecutar. |
 
 ---
 
-## Simulacro de examen tipo test
+---
 
-> 15 preguntas de opción múltiple. Cada una trae su propio código — no necesitas recordar de qué sección era, solo leerlo y razonar.
+## 14. Cómo se evalúa esta unidad (RA1)
 
-**1.** ¿Qué imprime este código?
+El RA1 es del **primer trimestre**, y ahí el examen es un **test de 12 preguntas de
+opción múltiple**. Pero no de definiciones: **todas las preguntas son de código**.
 
-```python
-import hashlib
-def h(t): return hashlib.sha256(t.encode()).hexdigest()
+### Cómo son las preguntas
 
-print(h("clave123") == h("clave123"))
-print(h("clave123") == h("Clave123"))
-```
+Se te da un fragmento y tienes que decir qué hace. Hay cuatro formas:
 
-A) `True` y `True`
-B) `True` y `False`
-C) `False` y `False`
-D) `False` y `True`
+| Tipo | Qué te piden |
+|---|---|
+| **Qué imprime** | Seguir un programa de 5–12 líneas y dar la salida exacta, carácter a carácter. |
+| **Qué error da** | Identificar la excepción: `TypeError`, `ValueError`, `UnboundLocalError`… |
+| **Cuál es correcta** | Cuatro versiones de una función; solo una pasa todos los casos. |
+| **Cuál es falsa** | Una función y cuatro pares «llamada → resultado»; uno de ellos miente. |
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El hash es determinista (mismo texto exacto → mismo resultado), pero es sensible a mayúsculas: <code>"clave123"</code> y <code>"Clave123"</code> son cadenas distintas, así que sus hashes también lo son.</details>
+No son preguntas de una línea. Son fragmentos del mismo tipo que los ejercicios que haces:
+presupuestos con IVA y descuento, tickets con formato, conversión de lo que escribe el
+usuario, medias con la lista vacía. Y las cuatro opciones son **resultados reales de errores
+concretos**, así que por descarte no se acierta: hay que seguir el cálculo.
 
-**2.** ¿Qué imprime este código?
+Es exactamente lo que haces en clase cuando lees un error o predices un resultado antes de
+ejecutar. Temas del RA1: tipos y variables · conversión de tipos · operadores y precedencia · constantes y nombres · formato de salida.
 
-```python
-import hashlib
-def h(t): return hashlib.sha256(t.encode()).hexdigest()
+### Cómo se puntúa
 
-a, b = h("1234"), h("1235")
-iguales = sum(1 for x, y in zip(a, b) if x == y)
-print(iguales < 20)
-```
+| | |
+|---|---|
+| Acierto | **+0.83** puntos |
+| Error | **−0.28** puntos |
+| En blanco | 0 |
 
-A) `True`
-B) `False`
-C) Lanza una excepción, `zip` no funciona con cadenas
-D) Depende de la máquina donde se ejecute
+`nota = (aciertos − errores ÷ 3) × 0.83`, con un mínimo de 0.
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Es el efecto avalancha: cambiar un solo carácter de la entrada altera la mayoría del hash, así que muy pocos de los 64 caracteres siguen coincidiendo entre los dos hashes.</details>
+Se resta un tercio por error porque hay cuatro opciones: así **contestar al azar no
+compensa**. La regla práctica es sencilla:
 
-**3.** Tienes estas dos funciones para comparar dos cadenas secretas:
+- Si lo sabes, marca.
+- Si dudas **entre dos**, marca: sigue saliéndote a cuenta.
+- Si no tienes ni idea, **déjalo en blanco**.
 
-```python
-import hmac
+### Un ejemplo de corrección
 
-def comparar_lento(a: str, b: str) -> bool:
-    return a == b
+| Alumno | Aciertos | Errores | En blanco | Cuenta | Nota |
+|---|:---:|:---:|:---:|---|:---:|
+| Lo lleva bien | 10 | 2 | 0 | (10 − 0,67) × 0.83 | **7,78** |
+| Va justo | 8 | 4 | 0 | (8 − 1,33) × 0.83 | **5,56** |
+| Prudente | 6 | 0 | 6 | (6 − 0) × 0.83 | **5,00** |
+| A ciegas | 3 | 9 | 0 | (3 − 3) × 0.83 | **0,00** |
 
-def comparar_seguro(a: str, b: str) -> bool:
-    return hmac.compare_digest(a, b)
-```
+Fíjate en las dos últimas filas: quien contesta solo lo que sabe aprueba, y quien marca a
+voleo se queda a cero. **No es lo mismo dudar que adivinar.**
 
-¿Cuál de las dos es vulnerable a un ataque de temporización, y por qué?
+### Cómo prepararte
 
-A) `comparar_seguro`, porque `hmac` es más lento
-B) `comparar_lento`, porque `==` se detiene en el primer carácter distinto y el tiempo de respuesta varía según cuántos caracteres coincidan
-C) Ninguna, ambas tardan exactamente lo mismo siempre
-D) `comparar_lento`, porque Python no permite comparar cadenas con `==`
+1. Los **ejercicios de sección** y los **ejercicios largos**: el test pregunta justo eso.
+2. El **proyecto de la unidad**: escribir el código es lo que te enseña a leerlo.
+3. El **[test de práctica](../simulacros/ra1/README.md)**, con las mismas 12 preguntas
+   de formato y las respuestas al final.
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>==</code> compara carácter a carácter y se detiene en el primer fallo; ese tiempo variable puede filtrar información a un atacante. <code>compare_digest</code> siempre tarda lo mismo, sin importar dónde esté la diferencia.</details>
+!!! tip "Lee el código antes de ejecutarlo"
+   Durante el curso, cada vez que vayas a ejecutar algo, predice primero qué va a salir.
+   Ese hábito es literalmente el examen.
 
-**4.** ¿Qué imprime este código?
+!!! note "En el segundo y tercer trimestre cambia"
+    A partir del RA3 los exámenes son **retos de programación**: se escribe código y se
+    corrige con una batería de casos de prueba. El test es solo para arrancar.
 
-```python
-import hashlib
+---
 
-def hash_bloques(datos: bytes, n: int = 4) -> str:
-    h = hashlib.sha256()
-    for i in range(0, len(datos), n):
-        h.update(datos[i:i + n])
-    return h.hexdigest()
+### Material de apoyo de la unidad
 
-print(hash_bloques(b"holamundo", 4) == hashlib.sha256(b"holamundo").hexdigest())
-```
-
-A) `True`
-B) `False`
-C) Lanza `TypeError`
-D) Depende del valor de `n`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Hashear un dato entero de una vez o alimentarlo por trozos con <code>update()</code> produce exactamente el mismo resultado — es lo que permite hashear ficheros enormes sin cargarlos enteros en memoria.</details>
-
-**5.** ¿Qué imprime este código?
-
-```python
-from cryptography.fernet import Fernet, InvalidToken
-
-clave = Fernet.generate_key()
-f = Fernet(clave)
-token = f.encrypt(b"mensaje")
-alterado = token[:-1] + b"X"      # se cambia el último byte
-
-try:
-    f.decrypt(alterado)
-    resultado = "descifrado sin problema"
-except InvalidToken:
-    resultado = "rechazado"
-
-print(resultado)
-```
-
-A) `descifrado sin problema`, porque Fernet ignora bytes sueltos manipulados
-B) `rechazado`, porque Fernet detecta que el texto cifrado fue alterado
-C) El programa se cuelga esperando una respuesta
-D) Lanza `KeyError`, no `InvalidToken`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Fernet es cifrado autenticado: verifica la integridad del texto cifrado antes de descifrar, y si detecta manipulación lanza <code>InvalidToken</code> en vez de devolver datos corruptos.</details>
-
-**6.** Ana tiene un par de claves (`privada_ana`, `publica_ana`). Quieres enviarle un mensaje que **solo ella** pueda leer:
-
-```python
-oaep = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
-mensaje_cifrado = ____.encrypt(b"secreto", oaep)
-```
-
-¿Qué clave va en el hueco?
-
-A) `privada_ana`
-B) `publica_ana`
-C) Tu propia clave privada
-D) Cualquiera de las dos, da igual
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Se cifra con la clave <b>pública</b> del destinatario; solo su clave privada (que nadie más tiene) puede descifrarlo después.</details>
-
-**7.** ¿Qué imprime este código?
-
-```python
-firma = privada.sign(documento, pss, hashes.SHA256())
-
-def verifica(doc: bytes) -> bool:
-    try:
-        publica.verify(firma, doc, pss, hashes.SHA256())
-        return True
-    except InvalidSignature:
-        return False
-
-print(verifica(documento))
-print(verifica(documento + b"!"))
-```
-
-A) `True` y `True`
-B) `True` y `False`
-C) `False` y `True`
-D) `False` y `False`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La firma se calculó sobre <code>documento</code> exacto; verificar ese mismo documento da <code>True</code>, pero cambiar un solo carácter (<code>documento + b"!"</code>) hace que la verificación falle.</details>
-
-**8.** Generas un certificado así:
-
-```python
-certificado = (
-    x509.CertificateBuilder()
-    .subject_name(nombre)
-    .issuer_name(nombre)          # mismo valor que subject_name
-    .public_key(clave.public_key())
-    .sign(clave, hashes.SHA256())
-)
-print(certificado.subject == certificado.issuer)
-```
-
-¿Qué imprime, y qué tipo de certificado es?
-
-A) `False`; es un certificado firmado por una CA
-B) `True`; es un certificado autofirmado
-C) Lanza una excepción, `subject` e `issuer` no se pueden comparar
-D) `True`; es un certificado revocado
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Como <code>issuer_name</code> recibe el mismo <code>nombre</code> que <code>subject_name</code>, el certificado se firma a sí mismo — por definición, un certificado autofirmado.</details>
-
-**9.** ¿Qué imprime este código, sabiendo que `privada` es una clave RSA de 2048 bits?
-
-```python
-contenido = b"informe confidencial de la empresa"
-firma = privada.sign(contenido, pss, hashes.SHA256())
-print(len(firma))
-```
-
-A) `19`, la longitud del texto en bytes
-B) `32`, el tamaño de un hash SHA-256 en bytes
-C) `256`, el tamaño fijo que da una clave RSA de 2048 bits (2048 ÷ 8)
-D) Depende de la longitud de `contenido`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> El tamaño de una firma RSA lo determina el tamaño de la <b>clave</b>, no el del documento firmado — por eso firmar un byte o firmar un fichero de 10 GB da siempre 256 bytes con esta clave.</details>
-
-**10.** Tienes esta función de auditoría:
-
-```python
-def auditar(previo: dict, actual: dict) -> dict:
-    r = {}
-    for n, h in previo.items():
-        if n not in actual:
-            r[n] = "AUSENTE"
-        elif h == actual[n]:
-            r[n] = "OK"
-        else:
-            r[n] = "MODIFICADO"
-    for n in actual:
-        if n not in previo:
-            r[n] = "NUEVO"
-    return r
-
-print(auditar({"a": "x", "b": "y"}, {"a": "x", "c": "z"}))
-```
-
-¿Qué imprime?
-
-A) `{'a': 'OK', 'b': 'AUSENTE', 'c': 'NUEVO'}`
-B) `{'a': 'OK', 'b': 'MODIFICADO'}`
-C) `{'a': 'OK', 'b': 'OK', 'c': 'OK'}`
-D) `{'a': 'OK'}`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>"a"</code> tiene el mismo hash en ambos → <code>OK</code>. <code>"b"</code> estaba en <code>previo</code> pero ya no está en <code>actual</code> → <code>AUSENTE</code>. <code>"c"</code> no estaba en <code>previo</code> → <code>NUEVO</code>.</details>
-
-**11.** Tienes esta cadena de hashes (cada uno depende del anterior):
-
-```python
-def cadena(bloques: list[str]) -> list[str]:
-    hashes_, anterior = [], "0" * 64
-    for b in bloques:
-        h = hashlib.sha256((anterior + b).encode()).hexdigest()
-        hashes_.append(h)
-        anterior = h
-    return hashes_
-
-c1 = cadena(["a", "b", "c"])
-c2 = cadena(["a", "X", "c"])     # se altera el bloque del medio
-print(c1[0] == c2[0], c1[1] == c2[1], c1[2] == c2[2])
-```
-
-¿Qué imprime?
-
-A) `True True True`
-B) `False False False`
-C) `True False False`
-D) `True True False`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> El primer bloque no depende del alterado, así que su hash no cambia. Pero a partir de ahí, cada hash incorpora el anterior — alterar el bloque 2 cambia su hash y, en cascada, también el del bloque 3.</details>
-
-**12.** ¿Qué imprime este código?
-
-```python
-from dataclasses import dataclass
-
-@dataclass
-class Copia:
-    soporte: str
-    ubicacion: str
-
-def cumple_321(copias: list[Copia]) -> tuple[bool, list[str]]:
-    fallos = []
-    if len(copias) < 3:
-        fallos.append("num")
-    if len({c.soporte for c in copias}) < 2:
-        fallos.append("soporte")
-    if not any(c.ubicacion == "externo" for c in copias):
-        fallos.append("externo")
-    return (not fallos, fallos)
-
-copias = [Copia("disco_local", "sitio"), Copia("disco_local", "sitio"), Copia("nas", "externo")]
-print(cumple_321(copias))
-```
-
-A) `(True, [])`
-B) `(False, ['num'])`
-C) `(False, ['soporte'])`
-D) `(False, ['num', 'soporte'])`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> Hay 3 copias (cumple), dos soportes distintos (<code>disco_local</code> y <code>nas</code>, cumple) y una está en <code>"externo"</code> (cumple) — las tres condiciones se satisfacen.</details>
-
-**13.** ¿Qué imprime este código?
-
-```python
-from enum import Enum
-
-class Pilar(Enum):
-    CONFIDENCIALIDAD = "C"
-    INTEGRIDAD = "I"
-    DISPONIBILIDAD = "D"
-
-def describe(p: Pilar) -> str:
-    return f"Rompe: {p.name}"
-
-incidente = Pilar.DISPONIBILIDAD
-print(describe(incidente))
-```
-
-A) `Rompe: D`
-B) `Rompe: DISPONIBILIDAD`
-C) `Rompe: Pilar.DISPONIBILIDAD`
-D) Lanza `AttributeError`, `Enum` no tiene atributo `name`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>.name</code> devuelve el nombre del miembro del <code>Enum</code> (<code>"DISPONIBILIDAD"</code>), no su valor (<code>.value</code> daría <code>"D"</code>).</details>
-
-**14.** ¿Qué imprime este código?
-
-```python
-def riesgo(probabilidad: float, impacto: float) -> float:
-    return round(probabilidad * impacto, 2)
-
-print(riesgo(probabilidad=0.9, impacto=6))
-```
-
-A) `5.4`
-B) `6.9`
-C) `0.9`
-D) `54.0`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>0.9 × 6 = 5.4</code>, redondeado a 2 decimales sigue siendo <code>5.4</code>.</details>
-
-**15.** *(Sobre el reto de la unidad)* Un fichero de configuración cambia de valor, y aparece un fichero nuevo. Con las funciones del verificador de integridad:
-
-```python
-manifiesto = {"app.conf": "hash_de_puerto=8080", "app.bin": "hash_binario"}
-actual =     {"app.conf": "hash_de_puerto=9090", "app.bin": "hash_binario", "nuevo.txt": "hash_x"}
-
-print(auditar(manifiesto, actual))
-```
-
-(`auditar` es la misma función de la pregunta 10.) ¿Qué imprime?
-
-A) `{'app.conf': 'OK', 'app.bin': 'OK', 'nuevo.txt': 'NUEVO'}`
-B) `{'app.conf': 'MODIFICADO', 'app.bin': 'OK', 'nuevo.txt': 'NUEVO'}`
-C) `{'app.conf': 'AUSENTE', 'app.bin': 'OK'}`
-D) `{'app.conf': 'MODIFICADO', 'app.bin': 'MODIFICADO', 'nuevo.txt': 'NUEVO'}`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>app.conf</code> cambió de valor (hash distinto) → <code>MODIFICADO</code>. <code>app.bin</code> sigue igual → <code>OK</code>. <code>nuevo.txt</code> no estaba en el manifiesto original → <code>NUEVO</code>. Es exactamente el mecanismo que usa tu <code>verificador.py</code> para detectar manipulaciones.</details>
-
-**16.** *(Sobre el reto de la unidad)* ¿Qué ocurre al ejecutar este código?
-
-```python
-import argparse
-
-ap = argparse.ArgumentParser()
-ap.add_argument("accion", choices=["generar", "auditar"])
-ap.add_argument("--algoritmo", default="sha256", choices=["sha256", "sha3_256", "blake2b"])
-
-args = ap.parse_args(["generar", "--algoritmo", "md5"])
-print(args.algoritmo)
-```
-
-A) Imprime `"md5"` sin problema
-B) `argparse` rechaza la ejecución, porque `"md5"` no está entre los `choices` permitidos
-C) Imprime `"sha256"`, ignorando el valor inválido
-D) Lanza `TypeError` en tiempo de ejecución
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Al declarar <code>choices=[...]</code>, <code>argparse</code> valida el valor <b>antes</b> de que tu código lo use, y termina el programa con un mensaje de error si no está en la lista — así el <code>verificador.py</code> nunca llega a intentar hashear con un algoritmo roto como MD5.</details>
+- **[Proyecto de la unidad](../proyectos/ud1/README.md)** — `presupuesto`, 16 tests.
+- **[Test de práctica](../simulacros/ra1/README.md)** — 12 preguntas de código, con respuestas.
+- **[Entorno de trabajo](../recursos/entorno.md)** — chuleta de `venv`, `pip` y `mypy`.

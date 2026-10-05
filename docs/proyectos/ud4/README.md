@@ -1,8 +1,10 @@
-# Reto Riesgo y contraseñas · UD4 (RA4)
+# Proyecto Flota de vehículos · UD4 (RA4)
 
-Calcula el nivel de riesgo y la pérdida anual esperada (ALE), decide si una salvaguarda es rentable, evalúa contraseñas contra una política y comprueba si un conjunto de factores es MFA real.
+Modela una flota con una clase base y dos clases derivadas.
 
-Completa los `TODO` de `src/riesgo.py` hasta que **todos los tests pasen** y `mypy src` diga *Success*.
+Practicas clases, atributos, métodos, encapsulación con `property` y herencia.
+
+Completa los `TODO` de `src/` hasta que **todos los tests pasen**.
 
 ## Estructura
 
@@ -11,9 +13,13 @@ proyecto-ud4/
 ├── README.md
 ├── requirements.txt
 ├── pytest.ini
-├── src/riesgo.py      ← tu código
-└── tests/           ← los tests (no hay que tocarlos)
+├── src/          ← tu código
+└── tests/        ← los tests (no hay que tocarlos)
 ```
+
+| Módulo | Sus tests |
+|---|---|
+| `src/vehiculos.py` | `tests/test_vehiculos.py` |
 
 ## Puesta en marcha
 
@@ -26,21 +32,28 @@ pytest
 
 ## Cómo trabajar
 
-1. **Lee** `src/riesgo.py`: cada función tiene un docstring que dice qué debe hacer.
-2. **Escribe** el código sustituyendo cada `TODO` (y borra el `raise NotImplementedError`).
+1. **Lee** el módulo de `src/`: cada función tiene su docstring diciendo qué debe hacer.
+2. **Escribe** el código sustituyendo cada `TODO` (y borrando el `raise NotImplementedError`).
 3. **Ejecuta los tests** y ve arreglando lo que falle:
 
 ```bash
-pytest        # todos
-pytest -x     # para en el primer fallo
-mypy src      # comprueba los tipos
+pytest
 ```
 
 4. Repite hasta que salga todo en verde.
 
-!!! warning "Los tests son la especificación"
-    No los modifiques para que pasen: describen lo que tu código debe hacer, y el examen usará una batería equivalente.
+### Comandos útiles
 
-## Técnica propia del RA4 (buena práctica que verás en el informe)
+```bash
+pytest                       # todos los tests
+pytest -q                    # salida resumida
+pytest tests/test_X.py       # solo un módulo
+pytest -k nombre_del_test    # solo un test
+pytest -x                    # para al primer fallo
+mypy src                     # comprueba los tipos
+```
 
-El código debe **validar entradas** y lanzar/gestionar excepciones donde proceda.
+!!! tip "Empieza por un test"
+    Ejecuta `pytest -x` para que se detenga en el primer fallo, arregla esa función y vuelve a
+    lanzarlo. Es mucho más llevadero que intentar resolverlo todo de golpe.
+

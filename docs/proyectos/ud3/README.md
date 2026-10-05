@@ -1,8 +1,10 @@
-# Reto Motor de cortafuegos · UD3 (RA3)
+# Proyecto Gestor de notas · UD3 (RA3)
 
-Modela una ACL con clases: carga reglas, evalúa cada paquete por primera coincidencia y aplica denegar por defecto.
+Analiza las notas de un grupo sin romperse nunca, pase lo que pase.
 
-Completa los `TODO` de `src/cortafuegos.py` hasta que **todos los tests pasen** y `mypy src` diga *Success*.
+Practicas condiciones, bucles, acumuladores y control de excepciones.
+
+Completa los `TODO` de `src/` hasta que **todos los tests pasen**.
 
 ## Estructura
 
@@ -11,9 +13,13 @@ proyecto-ud3/
 ├── README.md
 ├── requirements.txt
 ├── pytest.ini
-├── src/cortafuegos.py      ← tu código
-└── tests/           ← los tests (no hay que tocarlos)
+├── src/          ← tu código
+└── tests/        ← los tests (no hay que tocarlos)
 ```
+
+| Módulo | Sus tests |
+|---|---|
+| `src/notas.py` | `tests/test_notas.py` |
 
 ## Puesta en marcha
 
@@ -26,21 +32,28 @@ pytest
 
 ## Cómo trabajar
 
-1. **Lee** `src/cortafuegos.py`: cada función tiene un docstring que dice qué debe hacer.
-2. **Escribe** el código sustituyendo cada `TODO` (y borra el `raise NotImplementedError`).
+1. **Lee** el módulo de `src/`: cada función tiene su docstring diciendo qué debe hacer.
+2. **Escribe** el código sustituyendo cada `TODO` (y borrando el `raise NotImplementedError`).
 3. **Ejecuta los tests** y ve arreglando lo que falle:
 
 ```bash
-pytest        # todos
-pytest -x     # para en el primer fallo
-mypy src      # comprueba los tipos
+pytest
 ```
 
 4. Repite hasta que salga todo en verde.
 
-!!! warning "Los tests son la especificación"
-    No los modifiques para que pasen: describen lo que tu código debe hacer, y el examen usará una batería equivalente.
+### Comandos útiles
 
-## Técnica propia del RA3 (buena práctica que verás en el informe)
+```bash
+pytest                       # todos los tests
+pytest -q                    # salida resumida
+pytest tests/test_X.py       # solo un módulo
+pytest -k nombre_del_test    # solo un test
+pytest -x                    # para al primer fallo
+mypy src                     # comprueba los tipos
+```
 
-El código debe definir y usar **clases** (orientación a objetos).
+!!! tip "Empieza por un test"
+    Ejecuta `pytest -x` para que se detenga en el primer fallo, arregla esa función y vuelve a
+    lanzarlo. Es mucho más llevadero que intentar resolverlo todo de golpe.
+

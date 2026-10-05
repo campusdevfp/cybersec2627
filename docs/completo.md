@@ -1,7 +1,11 @@
-# Todo el material
+# Todo el material en una página
 
-> Esta página reúne **todo el temario** en un único documento, pensado para leerlo del tirón o **exportarlo a PDF**.
+<div class="barra-pdf" markdown>
+<button class="boton-pdf" onclick="window.print()">Exportar a PDF</button>
+<span class="nota-pdf">Se abrirá el diálogo de impresión: elige <strong>Guardar como PDF</strong>.</span>
+</div>
 
-<button onclick="window.print()" style="padding:.6rem 1rem;border:0;border-radius:6px;background:var(--md-primary-fg-color);color:#fff;cursor:pointer;font-size:.9rem;">🖨️ Exportar a PDF</button>
+!!! tip "Consejo para imprimir"
+    En el diálogo de impresión, activa **Gráficos de fondo** para que las tablas y los recuadros conserven su color. Al exportar, la navegación del sitio se oculta automáticamente y solo sale el contenido.
 
 <!--CONTENIDO-->
