@@ -418,61 +418,94 @@ flowchart LR
 
 > La regla de oro: **se cifra con la clave pública del destinatario.** Fíjate en que la clave pública de *Ana* no interviene para nada cuando Ana **envía**: solo cuando alguien le escribe **a ella**.
 
-#### En Python: Ana y Luis se escriben
+#### En Python: Luis publica su clave pública en un fichero
 
-Cada uno genera su par de claves. Para cifrar se usa un "relleno" llamado **OAEP** (lo explicamos justo después):
+En la vida real, Luis no le pasa a Ana una variable de Python: **exporta su clave pública a un fichero `.pem`** y se lo envía (o lo pone en su web). Ana lo **carga** desde ese fichero y cifra con él. La privada, en cambio, no sale nunca de su ordenador.
 
-```python title="asimetrico_dos_usuarios.py"
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import hashes
+```python title="exportar_publica.py"
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from pathlib import Path
 
-def nuevo_par():
-    privada = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    return privada, privada.public_key()
+# Luis genera su par de claves (una sola vez en su vida)
+privada_luis = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+publica_luis = privada_luis.public_key()
 
-# Cada persona genera su par UNA vez. La privada no se comparte jamás.
-privada_ana,  publica_ana  = nuevo_par()
-privada_luis, publica_luis = nuevo_par()
+# Luis EXPORTA solo su pública a un fichero .pem para repartirla
+pem = publica_luis.public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+)
+Path("luis_publica.pem").write_bytes(pem)
+print(pem.decode())
+```
+
+```text title="Salida (así se ve un .pem de clave pública)"
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmoMf6nnbfxZ1PEKCoeMP
+...  (varias líneas de texto en base64)  ...
+fQIDAQAB
+-----END PUBLIC KEY-----
+```
+
+Ese fichero `luis_publica.pem` es el que Luis reparte sin miedo. Ahora **Ana lo carga** y cifra un mensaje para Luis:
+
+```python title="cifrar_desde_pem.py"
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from pathlib import Path
 
 OAEP = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
 
-# Ana -> Luis: cifra con la PÚBLICA de LUIS
-para_luis = publica_luis.encrypt(b"Hola Luis, el plan sigue en pie", OAEP)
-print("Luis descifra:", privada_luis.decrypt(para_luis, OAEP).decode())
+# Ana CARGA la pública de Luis desde el fichero que él le pasó
+publica_luis = serialization.load_pem_public_key(Path("luis_publica.pem").read_bytes())
 
-# Luis -> Ana: cifra con la PÚBLICA de ANA
-para_ana = publica_ana.encrypt(b"Recibido Ana, alli estare", OAEP)
-print("Ana descifra :", privada_ana.decrypt(para_ana, OAEP).decode())
+# y cifra con ella (sin tener ni idea de la privada de Luis)
+cifrado = publica_luis.encrypt(b"Hola Luis, nos vemos a las 5", OAEP)
+Path("mensaje.bin").write_bytes(cifrado)
+print("Mensaje cifrado y guardado en mensaje.bin")
 ```
 
 ```text title="Salida"
-Luis descifra: Hola Luis, el plan sigue en pie
-Ana descifra : Recibido Ana, alli estare
+Mensaje cifrado y guardado en mensaje.bin
+```
+
+Y **Luis lo descifra** con su clave privada, la única que puede:
+
+```python title="descifrar.py"
+# (Luis, en su ordenador, con privada_luis del primer bloque)
+cifrado = Path("mensaje.bin").read_bytes()
+print("Luis lee:", privada_luis.decrypt(cifrado, OAEP).decode())
+```
+
+```text title="Salida"
+Luis lee: Hola Luis, nos vemos a las 5
 ```
 
 #### ¿Y si un espía intercepta el mensaje?
 
-Aquí está la magia. Eva intercepta el mensaje cifrado que iba para Luis. Eva **tiene** la clave pública de Luis (es pública, la tiene todo el mundo)… pero eso no le sirve de nada: la pública **solo cifra, no descifra**. Y su propia clave privada tampoco abre un mensaje cifrado para Luis.
+Eva captura `mensaje.bin` **y** el fichero `luis_publica.pem` (es público, lo tiene todo el mundo). Aun así no puede leer nada: la clave pública **solo cifra, no descifra**, y la privada de Eva no abre un mensaje cifrado para Luis.
 
 ```mermaid
 flowchart LR
-    C["🔒 Mensaje cifrado<br/>para Luis"] --> Eva["🕵️ Eva lo intercepta"]
-    Eva -->|"prueba con la<br/>pública de Luis"| X1["❌ la pública<br/>no descifra"]
-    Eva -->|"prueba con su<br/>propia privada"| X2["❌ no es la<br/>privada de Luis"]
+    C["🔒 mensaje.bin<br/>(para Luis)"] --> Eva["🕵️ Eva lo intercepta"]
+    PEM["📄 luis_publica.pem"] --> Eva
+    Eva -->|"con la pública<br/>de Luis"| X1["❌ la pública<br/>no descifra"]
+    Eva -->|"con su propia<br/>privada"| X2["❌ no es la<br/>privada de Luis"]
     style X1 fill:#fee2e2,color:#991b1b
     style X2 fill:#fee2e2,color:#991b1b
 ```
 
 ```python title="espia_fracasa.py"
-# (continúa del ejemplo anterior: Eva ha interceptado 'para_luis')
-privada_eva, publica_eva = nuevo_par()
+# (continúa: Eva tiene 'cifrado' y la pública de Luis cargada del .pem)
 
-# Eva tiene la clave PÚBLICA de Luis, pero una clave pública no tiene ni método para descifrar:
+# 1) Una clave PÚBLICA no tiene ni siquiera método para descifrar:
 print("¿La pública puede descifrar?:", hasattr(publica_luis, "decrypt"))
 
-# Eva intenta con la única clave privada que posee (la suya): falla
+# 2) Eva prueba con la única privada que posee (la suya): falla
+privada_eva = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 try:
-    privada_eva.decrypt(para_luis, OAEP)
+    privada_eva.decrypt(cifrado, OAEP)
 except ValueError:
     print("Eva NO puede leer el mensaje: no tiene la privada de Luis")
 ```
@@ -494,6 +527,37 @@ RSA "a secas" es inseguro: cifrar dos veces el mismo mensaje daría el mismo res
 | **PSS** | Para **firmar** (demostrar autoría) | `sign` / `verify` (sección 6) |
 
 No hace falta que te sepas sus interioridades matemáticas. Lo que tienes que recordar para el examen: **OAEP cifra, PSS firma**, y ambos añaden aleatoriedad para que RSA sea seguro.
+
+**¿El OAEP de descifrar tiene que ser el mismo que el de cifrar?** No el mismo *objeto*, pero **sí la misma configuración**. Quien descifra crea su propio `OAEP`, pero el algoritmo de hash y el `label` tienen que coincidir con los que se usaron al cifrar; si no, falla:
+
+```python title="oaep_debe_coincidir.py"
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import hashes
+
+privada = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+publica = privada.public_key()
+
+oaep_sha256 = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+cifrado = publica.encrypt(b"secreto", oaep_sha256)
+
+# Otro objeto OAEP distinto pero con la MISMA config: funciona
+otro_igual = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+print("Misma config (otro objeto):", privada.decrypt(cifrado, otro_igual).decode())
+
+# Config DISTINTA (SHA1 en vez de SHA256): falla
+oaep_sha1 = padding.OAEP(mgf=padding.MGF1(hashes.SHA1()), algorithm=hashes.SHA1(), label=None)
+try:
+    privada.decrypt(cifrado, oaep_sha1)
+except ValueError:
+    print("Config distinta (SHA1): no descifra")
+```
+
+```text title="Salida"
+Misma config (otro objeto): secreto
+Config distinta (SHA1): no descifra
+```
+
+> Por eso, en todo el proyecto que uses, define el `OAEP` una sola vez (como una constante) y reutilízalo: así cifrado y descifrado usan exactamente la misma configuración sin riesgo de equivocarte.
 
 !!! warning "Lo lento no se cifra con RSA directamente"
     RSA es lento y solo cifra mensajes cortos (más pequeños que la clave). Por eso en la práctica se usa **cifrado híbrido**: se genera una clave simétrica rápida (Fernet/AES), con ella se cifra todo el mensaje, y **solo esa clave corta** se cifra con RSA. Es exactamente lo que hace tu navegador en cada conexión **HTTPS**.
@@ -523,85 +587,126 @@ flowchart LR
     style NO fill:#fee2e2,color:#991b1b
 ```
 
-Para firmar se usa el relleno **PSS** (recuerda de la sección 5.2: **PSS firma**, OAEP cifra). El ejemplo: Ana firma una autorización de pago; cualquiera comprueba que es suya.
+Para firmar se usa el relleno **PSS** (recuerda de la sección 5.2: **PSS firma**, OAEP cifra). Como en el cifrado, lo hacemos con **dos scripts separados**: uno lo ejecuta **Ana** para firmar un contrato, y otro lo ejecuta **Luis** (en su ordenador, solo con los ficheros que Ana le envía) para comprobar que la firma es auténtica.
 
-```python title="firma_rsa.py"
+```mermaid
+flowchart LR
+    subgraph ANA["👩 Ana (firma.py)"]
+      D["📄 contrato.txt"] -->|"firma con su<br/>PRIVADA"| S["✍️ contrato.sig"]
+      PUB["📄 ana_publica.pem"]
+    end
+    subgraph LUIS["👨 Luis (verifica.py)"]
+      V{"verifica con la<br/>PÚBLICA de Ana"}
+    end
+    D --> V
+    S --> V
+    PUB --> V
+    V -->|coinciden| OK["✅ auténtico<br/>e intacto"]
+    V -->|no coinciden| NO["❌ falso o<br/>modificado"]
+    style OK fill:#d1fae5,color:#065f46
+    style NO fill:#fee2e2,color:#991b1b
+```
+
+**Script 1 — Ana firma el contrato.** Firma el **contenido del fichero**, guarda la firma en `contrato.sig` y exporta su clave **pública** a un `.pem` para que cualquiera pueda verificar:
+
+```python title="firma.py"
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import hashes
-from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes, serialization
+from pathlib import Path
 
 privada_ana = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-publica_ana = privada_ana.public_key()
 PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
 
-mensaje = b"Yo, Ana, autorizo el pago de 100 euros"
-firma = privada_ana.sign(mensaje, PSS, hashes.SHA256())    # firma con SU privada
+# El documento a firmar
+Path("contrato.txt").write_text("Yo, Ana, autorizo el pago de 100 euros")
 
-def es_autentico(mensaje: bytes, firma: bytes) -> bool:
+# Firma el CONTENIDO del fichero con la clave PRIVADA de Ana
+firma = privada_ana.sign(Path("contrato.txt").read_bytes(), PSS, hashes.SHA256())
+Path("contrato.sig").write_bytes(firma)
+
+# Exporta la PÚBLICA para que otros puedan verificar
+Path("ana_publica.pem").write_bytes(privada_ana.public_key().public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo))
+
+print(f"Firma creada: contrato.sig ({len(firma)} bytes)")
+print("Pública exportada: ana_publica.pem")
+```
+
+```text title="Salida"
+Firma creada: contrato.sig (256 bytes)
+Pública exportada: ana_publica.pem
+```
+
+La firma mide siempre **256 bytes** con una clave de 2048 bits (2048 ÷ 8), da igual que el documento sea una línea o un vídeo entero: se firma el hash del documento, no el documento completo.
+
+**Script 2 — Luis verifica.** Luis solo tiene tres ficheros (`contrato.txt`, `contrato.sig` y `ana_publica.pem`); **no** tiene nada de la memoria de Ana. Carga la pública del `.pem` y comprueba:
+
+```python title="verifica.py"
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.exceptions import InvalidSignature
+from pathlib import Path
+
+PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
+publica_ana = serialization.load_pem_public_key(Path("ana_publica.pem").read_bytes())
+
+def verificar(fichero: str, fichero_firma: str) -> bool:
     try:
-        publica_ana.verify(firma, mensaje, PSS, hashes.SHA256())   # verifica con la pública de Ana
+        publica_ana.verify(
+            Path(fichero_firma).read_bytes(),   # la firma
+            Path(fichero).read_bytes(),          # el documento
+            PSS, hashes.SHA256())
         return True
     except InvalidSignature:
         return False
 
-print("Mensaje original de Ana  :", es_autentico(mensaje, firma))
-print("Mensaje con el importe cambiado:", es_autentico(b"Yo, Ana, autorizo el pago de 900 euros", firma))
+print("¿Firma válida?:", verificar("contrato.txt", "contrato.sig"))
+
+# Alguien altera el contrato DESPUÉS de firmarlo (cambia 100 por 900)
+Path("contrato.txt").write_text("Yo, Ana, autorizo el pago de 900 euros")
+print("Tras alterar el contrato:", verificar("contrato.txt", "contrato.sig"))
 ```
 
 ```text title="Salida"
-Mensaje original de Ana  : True
-Mensaje con el importe cambiado: False
+¿Firma válida?: True
+Tras alterar el contrato: False
 ```
 
-Cambiar **un solo carácter** (de `100` a `900`) rompe la verificación: integridad y autenticidad en una sola operación.
+Cambiar **un solo carácter** (de `100` a `900`) rompe la verificación: integridad y autenticidad en una sola operación. Y como en el cifrado, el **PSS** del que verifica debe tener la **misma configuración** que el del que firmó.
 
-**¿Y si un impostor intenta hacerse pasar por Ana?** No puede: para firmar en nombre de Ana haría falta la clave **privada** de Ana, que solo ella tiene. Una firma hecha con cualquier otra clave no supera la verificación con la pública de Ana:
+**¿Y si un impostor intenta hacerse pasar por Ana?** No puede: para firmar en nombre de Ana haría falta su clave **privada**, que solo ella tiene. Una firma hecha con otra clave no supera la verificación con la pública de Ana:
 
 ```python title="impostor.py"
-# (continúa del ejemplo anterior)
-privada_impostor = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-firma_falsa = privada_impostor.sign(mensaje, PSS, hashes.SHA256())   # firma con OTRA privada
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.exceptions import InvalidSignature
+from pathlib import Path
 
-print("Firma de un impostor:", es_autentico(mensaje, firma_falsa))
+PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
+
+# El impostor firma el mismo contrato, pero con SU propia clave
+privada_impostor = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+Path("contrato.txt").write_text("Yo, Ana, autorizo el pago de 100 euros")
+firma_falsa = privada_impostor.sign(Path("contrato.txt").read_bytes(), PSS, hashes.SHA256())
+
+# Pero se verifica contra la PÚBLICA de Ana (la del .pem)
+publica_ana = serialization.load_pem_public_key(Path("ana_publica.pem").read_bytes())
+try:
+    publica_ana.verify(firma_falsa, Path("contrato.txt").read_bytes(), PSS, hashes.SHA256())
+    print("Firma del impostor aceptada (MAL)")
+except InvalidSignature:
+    print("Firma del impostor RECHAZADA: no tiene la privada de Ana")
 ```
 
 ```text title="Salida"
-Firma de un impostor: False
+Firma del impostor RECHAZADA: no tiene la privada de Ana
 ```
 
 !!! tip "Cifrar y firmar son simétricos entre sí"
-    Fíjate en el patrón: para **cifrar hacia alguien** usas su **pública** (y él descifra con su privada). Para **firmar** usas **tu privada** (y los demás verifican con tu pública). Lo privado es siempre tuyo y nunca sale de tu ordenador; lo público lo tiene todo el mundo.
+    Fíjate en el patrón: para **cifrar hacia alguien** usas su **pública** (y él descifra con su privada). Para **firmar** usas **tu privada** (y los demás verifican con tu pública). Lo privado es siempre tuyo y nunca sale de tu ordenador; lo público lo reparte su `.pem`.
 
-### 6.1 Firmar un fichero real, no solo una cadena en memoria
-
-En la práctica no firmas literales de Python: firmas **ficheros** (un informe, un instalador, un contrato en PDF). La firma se guarda aparte, como un fichero `.sig`, y se distribuye junto al original.
-
-```python title="firma_de_fichero.py"
-from pathlib import Path
-
-# Un informe real en disco (reutiliza privada/pss/verifica del ejemplo anterior)
-Path("informe.txt").write_text("Informe trimestral: cifras confidenciales del cliente.")
-
-# Se firma el CONTENIDO en bytes del fichero, no una cadena en memoria
-contenido = Path("informe.txt").read_bytes()
-firma_fichero = privada.sign(contenido, pss, hashes.SHA256())
-Path("informe.txt.sig").write_bytes(firma_fichero)
-print(f"Firma guardada en informe.txt.sig ({len(firma_fichero)} bytes)")
-
-# La verificación se hace RELEYENDO ambos ficheros del disco — así ocurre en la vida real
-contenido_releido = Path("informe.txt").read_bytes()
-firma_releida = Path("informe.txt.sig").read_bytes()
-print("Verificación tras releer del disco:", verifica(contenido_releido, firma_releida))
-```
-
-```text title="Salida"
-Firma guardada en informe.txt.sig (256 bytes)
-Verificación tras releer del disco: True
-```
-
-> 256 bytes es justo el tamaño de una firma RSA de 2048 bits (2048 ÷ 8), **siempre**, sin importar si el fichero firmado pesa 10 bytes o 10 GB — la firma es del hash del documento, no del documento entero.
-
-### 6.2 Certificados digitales: generar uno de verdad
+### 6.1 Certificados digitales: generar uno de verdad
 
 Un **certificado X.509** vincula una clave pública con una identidad. En producción lo firma una **CA** (Autoridad de Certificación); para practicar, generamos uno **autofirmado**:
 
@@ -690,72 +795,56 @@ flowchart LR
 
 ### 7.1 Cadena de custodia, con código
 
-El perito nunca trabaja sobre la evidencia original: podría estropearla y la prueba perdería validez en el juicio. El procedimiento es siempre el mismo:
+Cuando el perito recibe una prueba (un fichero, un disco, un log), tiene que poder demostrar en el juicio que **no la ha cambiado** mientras la investigaba. La idea es la misma del hash que ya conoces, en tres tiempos: **hash antes → investigar → hash después**. Si los dos hashes coinciden, la prueba está intacta.
 
-1. **Antes de tocar nada**, se calcula el hash del original: es su **precinto digital**.
-2. Se hace una **copia** y se trabaja siempre sobre ella.
-3. Al terminar, se recalcula el hash de la copia: si coincide con el precinto, queda **demostrado** que nadie la alteró.
+Reutilizamos la función `sha256_fichero` de la sección 5:
 
-Y en paralelo se lleva la **cadena de custodia**: un registro de quién tuvo la prueba y cuándo.
-
-Vamos a hacerlo de verdad sobre un fichero (aquí, un log que sería la evidencia):
-
-```python title="cadena_custodia.py"
-import hashlib, hmac, shutil
+```python title="forense.py"
+import hashlib
 from pathlib import Path
-from datetime import datetime
 
 def sha256_fichero(ruta: str) -> str:
     return hashlib.sha256(Path(ruta).read_bytes()).hexdigest()
 
-# La evidencia: un registro recogido del servidor del cliente
-Path("evidencia.log").write_text("2026-05-01 10:03 acceso root desde 10.0.0.7\n")
+# La prueba que recibe el perito (aquí, un registro del servidor)
+Path("prueba.log").write_text("10:03 acceso de root desde 10.0.0.7")
 
-# PASO 1 · Precinto: hash del original, ANTES de tocar nada
-precinto = sha256_fichero("evidencia.log")
-custodia = [(datetime(2026, 5, 1, 10, 30), "Agente López", "recoge la evidencia")]
+# 1) ANTES de tocar nada: calcula el hash. Es el "precinto" de la prueba.
+precinto = sha256_fichero("prueba.log")
 
-# PASO 2 · Se trabaja SIEMPRE sobre una copia, nunca el original
-shutil.copy("evidencia.log", "copia_trabajo.log")
-custodia.append((datetime(2026, 5, 1, 11, 0), "Perito García", "crea copia de trabajo"))
+# 2) ... el perito analiza la prueba: la lee, la estudia ...
 
-# PASO 3 · Antes del juicio: ¿la copia sigue siendo idéntica al original?
-hash_copia = sha256_fichero("copia_trabajo.log")
-estado = "ÍNTEGRA" if hmac.compare_digest(precinto, hash_copia) else "ALTERADA"
-
-print("Precinto del original:", precinto[:16], "...")
-print("Hash de la copia     :", hash_copia[:16], "...")
-print("La evidencia está     :", estado)
-print("\nCadena de custodia:")
-for fecha, quien, accion in custodia:
-    print(f"  {fecha:%Y-%m-%d %H:%M} · {quien} · {accion}")
+# 3) AL TERMINAR: vuelve a calcular el hash y lo compara con el precinto
+if sha256_fichero("prueba.log") == precinto:
+    print("La prueba está INTACTA: nadie la ha tocado")
+else:
+    print("¡ALERTA! La prueba ha sido modificada")
 ```
 
 ```text title="Salida"
-Precinto del original: 4a65ab9cf9767bfd ...
-Hash de la copia     : 4a65ab9cf9767bfd ...
-La evidencia está     : ÍNTEGRA
-Cadena de custodia:
-  2026-05-01 10:30 · Agente López · recoge la evidencia
-  2026-05-01 11:00 · Perito García · crea copia de trabajo
+La prueba está INTACTA: nadie la ha tocado
 ```
 
-¿Y si alguien manipula la prueba por el camino? El hash cambia y se detecta al instante:
+¿Y si alguien cambia la prueba por el camino? El hash ya no coincide y se detecta al instante:
 
-```python title="deteccion_manipulacion.py"
-# (continúa del ejemplo anterior) alguien edita la copia para cambiar la IP del atacante
-Path("copia_trabajo.log").write_text("2026-05-01 10:03 acceso root desde 1.2.3.4\n")
+```python title="forense_manipulada.py"
+from pathlib import Path
 
-hash_tras_manipular = sha256_fichero("copia_trabajo.log")
-print("¿Sigue íntegra?:", hmac.compare_digest(precinto, hash_tras_manipular))
+# El perito guardó el precinto; ahora alguien cambia la IP del atacante en la prueba
+Path("prueba.log").write_text("10:03 acceso de root desde 1.2.3.4")
+
+print("¿Sigue intacta?:", sha256_fichero("prueba.log") == precinto)
 ```
 
 ```text title="Salida"
-¿Sigue íntegra?: False
+¿Sigue intacta?: False
 ```
 
 !!! analogia "Analogía"
-    El hash de la evidencia es su **precinto digital**, como el de una caja de pruebas. Por eso se calcula **antes** de tocar nada: si al terminar sigue igual, has demostrado que no la manipulaste.
+    El hash de la prueba es su **precinto digital**, como el precinto de una caja de pruebas policial. Se calcula **antes** de tocar nada: si al final sigue igual, has demostrado que no la manipulaste.
+
+!!! info "La cadena de custodia"
+    Además del precinto, se apunta **quién** tuvo la prueba y **cuándo** (quién la recogió, quién la copió, quién la analizó). Ese registro se llama **cadena de custodia**, y es lo que da validez a la prueba ante un juez. En código se guardaría como una simple lista de anotaciones con fecha, responsable y acción.
 
 !!! reto "Reto rápido 6"
     ¿Por qué el forense calcula el hash **antes** de empezar a analizar y no después? ¿Qué pasaría con una prueba en un juicio si no lo hiciera?
@@ -932,42 +1021,49 @@ def cadena_valida(bloques: list[str], hashes: list[str]) -> bool:
 ```
 </details>
 
-**14 · 🔴 Firma RSA con `cryptography`** — dados `privada`/`publica`, `firma_rsa(privada, doc: bytes) -> bytes` y `verifica_rsa(publica, doc, firma) -> bool`.
+**14 · 🔴 Firmar y verificar desde un `.pem`** — como en los scripts de la sección 6: `firma_rsa(privada, doc: bytes) -> bytes` y `verifica_con_pem(pem_publica: bytes, doc: bytes, firma: bytes) -> bool`, donde el verificador **carga la pública de un PEM** (no recibe el objeto). Comprueba que la firma de un impostor se rechaza.
 <details class="sol"><summary>Solución</summary>
 
 ```python
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
 _PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
 
 def firma_rsa(privada, doc: bytes) -> bytes:
-    return privada.sign(doc, _PSS, hashes.SHA256())
+    return privada.sign(doc, _PSS, hashes.SHA256())           # con la PRIVADA
 
-def verifica_rsa(publica, doc: bytes, firma: bytes) -> bool:
+def verifica_con_pem(pem_publica: bytes, doc: bytes, firma: bytes) -> bool:
+    publica = serialization.load_pem_public_key(pem_publica)  # carga la pública del .pem
     try:
         publica.verify(firma, doc, _PSS, hashes.SHA256()); return True
     except InvalidSignature:
         return False
 ```
+
+La firma de un impostor (hecha con otra privada) no supera la verificación contra la pública del `.pem`.
 </details>
 
-**15 · 🔴 Buzón asimétrico** — `cifrar_para(publica_destino, mensaje: bytes) -> bytes` y `descifrar(privada_propia, cifrado: bytes) -> bytes` con OAEP. Comprueba que un mensaje cifrado para Luis **solo** lo descifra Luis.
+**15 · 🔴 Buzón asimétrico con fichero PEM** — `exportar_publica(publica) -> bytes` (la devuelve en formato PEM) y `cifrar_con_pem(pem: bytes, mensaje: bytes) -> bytes` (carga la pública del PEM y cifra). Comprueba que el mensaje lo descifra la privada correcta, y que **otra** privada lanza `ValueError`.
 <details class="sol"><summary>Solución</summary>
 
 ```python
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 _OAEP = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
 
-def cifrar_para(publica_destino, mensaje: bytes) -> bytes:
-    return publica_destino.encrypt(mensaje, _OAEP)        # con la PÚBLICA del destinatario
+def exportar_publica(publica) -> bytes:
+    return publica.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
 
-def descifrar(privada_propia, cifrado: bytes) -> bytes:
-    return privada_propia.decrypt(cifrado, _OAEP)         # con la PROPIA privada
+def cifrar_con_pem(pem: bytes, mensaje: bytes) -> bytes:
+    publica = serialization.load_pem_public_key(pem)      # recarga la pública del fichero
+    return publica.encrypt(mensaje, _OAEP)
 ```
 
-Solo la privada que corresponde a la pública usada al cifrar puede descifrar; cualquier otra lanza `ValueError`.
+Solo la privada emparejada con esa pública descifra; cualquier otra lanza `ValueError`. Y `_OAEP` tiene que tener la **misma configuración** al cifrar y al descifrar.
 </details>
 
 **16 · 🔴 ¿Cuánto le queda al certificado?** — `dias_restantes(fecha_expiracion: datetime) -> int`, usando `datetime.now(timezone.utc)`.
@@ -1276,7 +1372,7 @@ El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la t�
 
 ## Simulacro de examen tipo test
 
-> 18 preguntas de opción múltiple. Cada una trae su propio código o un caso concreto — no necesitas recordar de qué sección era, solo leerlo y razonar.
+> 20 preguntas de opción múltiple. Cada una trae su propio código o un caso concreto — no necesitas recordar de qué sección era, solo leerlo y razonar.
 
 **1.** ¿Qué imprime este código?
 
@@ -1637,3 +1733,21 @@ C) Sí, si usa su propia clave privada
 D) Solo si el mensaje mide menos de 256 bytes
 
 <details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Es la base del cifrado asimétrico: lo que se cifra con una pública **solo** lo abre la privada emparejada. Por eso repartir la clave pública no compromete la seguridad.</details>
+
+**19.** Ana cifra con `OAEP(algorithm=SHA256, label=None)`. Luis, al descifrar, crea su propio objeto OAEP. ¿Qué tiene que cumplir para que funcione?
+
+A) Tiene que ser literalmente el mismo objeto Python que usó Ana
+B) Tiene que tener la misma configuración (mismo hash y mismo `label`); el objeto puede ser otro
+C) Da igual la configuración, RSA lo resuelve solo
+D) Luis debe usar PSS en lugar de OAEP para descifrar
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> No hace falta compartir el objeto, pero sí la configuración: si Luis descifra con un OAEP de distinto hash (p. ej. SHA1) o distinto <code>label</code>, obtiene <code>ValueError</code>. Por eso conviene definir el OAEP una vez como constante y reutilizarlo.</details>
+
+**20.** Ana firma `contrato.txt` en su ordenador. Luis quiere verificar la firma **en el suyo**. ¿Qué ficheros necesita Luis que le envíe Ana?
+
+A) El contrato, la firma y la clave **privada** de Ana
+B) El contrato, la firma y la clave **pública** de Ana (su `.pem`)
+C) Solo la firma
+D) El contrato y la clave privada de Luis
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Para verificar hace falta el documento, la firma y la clave <b>pública</b> del firmante. La privada de Ana no se comparte jamás: si Luis la tuviera, podría firmar haciéndose pasar por ella.</details>
