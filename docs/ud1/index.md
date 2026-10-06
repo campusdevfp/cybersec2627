@@ -2,10 +2,10 @@
 
 > **Módulo:** CMO-314 · Ciberseguridad · **RA1** · **Duración:** 20 h · **Peso:** 15 % · **Herramienta:** Python 3 (tipado) + `cryptography`
 
-Esta es la unidad de **cimientos**. Aquí sale por primera vez el patrón que vas a repetir seis veces este curso: **entender el problema → resolverlo con código real → medir que funciona**. Vas a tocar los tres pilares de la seguridad, y las dos disciplinas que sostienen casi todo lo demás: **criptografía** (hash, cifrado, firma, certificados) y **análisis forense**. Al terminar habrás construido, línea a línea, un **verificador de integridad** de nivel profesional — el mismo principio que usan `sha256sum`, `debsums`, AIDE o Tripwire.
+Esta es la unidad de **cimientos**. Aquí sale por primera vez el patrón que vas a repetir seis veces este curso: **entender el problema → resolverlo con código real → medir que funciona**. Vas a tocar los tres pilares de la seguridad, y las dos disciplinas que sostienen casi todo lo demás: **criptografía** (hash, cifrado, firma, certificados) y **análisis forense**.
 
-!!! reto "El reto de la unidad"
-    **Detecta si unos ficheros han sido manipulados.** Vas a construir un verificador de integridad con manifiesto, auditoría y CLI. Todo lo de abajo es tu **entrenamiento** para llegar a resolverlo tú solo y demostrarlo en el examen.
+!!! tip "Cómo sacarle partido a esta unidad"
+    Cada concepto trae **código que puedes ejecutar tú**. Créate una carpeta de pruebas, copia los ejemplos y compruébalos. Al final tienes una buena tanda de **ejercicios con solución** y un **simulacro de examen**: hazlos escribiendo código de verdad, no solo leyendo.
 
 ```mermaid
 flowchart TB
@@ -17,15 +17,17 @@ flowchart TB
     C --> C3["Firma y<br/>certificados (PKI)"]
     C1 --> D["Análisis forense<br/>cadena de custodia"]
     C3 --> D
-    C1 --> P["RETO<br/>Verificador de integridad"]
+    C1 --> P["Ejercicios<br/>y examen"]
+    C2 --> P
+    C3 --> P
     D --> P
-    style P fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:3px
+    style P fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:3px
     style A fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
 ```
 
 **Qué sabrás hacer al terminar:** explicar C·I·D y ampliarlo con autenticidad/trazabilidad · calcular y comparar hashes con criterio · cifrar y descifrar de verdad (simétrico y asimétrico) con `cryptography` · firmar un documento y generar un certificado X.509 · aplicar las fases del análisis forense y la cadena de custodia · escribir Python tipado con CLI profesional, comprobado con `mypy` y `pytest`.
 
-**Cómo se trabaja (aula invertida):** lees la sección y ejecutas los ejemplos antes de clase, con el *reto rápido* intentado → en clase resuelves las actividades y avanzas el reto en parejas, con ayuda al lado.
+**Cómo se trabaja (aula invertida):** lees la sección y ejecutas los ejemplos antes de clase, con el *reto rápido* intentado → en clase resuelves las actividades en parejas, con ayuda al lado, y preparas el simulacro.
 
 !!! danger "Antes de nada: uso ético y legal"
     Vas a manejar herramientas y técnicas de seguridad. Se usan **solo** sobre tus propios sistemas o el laboratorio autorizado. Manipular sistemas ajenos sin permiso es delito (arts. 197 y 264 del Código Penal). Lee [Uso ético y legal](../recursos/uso-etico.md).
@@ -418,51 +420,64 @@ flowchart LR
 
 > La regla de oro: **se cifra con la clave pública del destinatario.** Fíjate en que la clave pública de *Ana* no interviene para nada cuando Ana **envía**: solo cuando alguien le escribe **a ella**.
 
-#### En Python: Luis publica su clave pública en un fichero
+#### En Python: 4 scripts que puedes ejecutar tú
 
-En la vida real, Luis no le pasa a Ana una variable de Python: **exporta su clave pública a un fichero `.pem`** y se lo envía (o lo pone en su web). Ana lo **carga** desde ese fichero y cifra con él. La privada, en cambio, no sale nunca de su ordenador.
+Vamos a montar el laboratorio completo con **cuatro scripts independientes**. Cada uno se puede ejecutar por separado porque las claves **se guardan en ficheros** (`.pem`): Luis genera su par una vez, Ana cifra con la pública, Luis descifra con la privada, y una espía lo intenta y fracasa. Créate una carpeta vacía y ve ejecutándolos en orden.
 
-```python title="exportar_publica.py"
+```mermaid
+flowchart LR
+    G["① generar_claves.py<br/>(Luis)"] --> F1["📄 luis_privada.pem<br/>📄 luis_publica.pem"]
+    F1 -->|"Luis reparte<br/>solo la pública"| C["② cifrar.py<br/>(Ana)"]
+    C --> M["🔒 mensaje.bin"]
+    M --> D["③ descifrar.py<br/>(Luis)"]
+    F1 --> D
+    M --> E["④ espia.py<br/>(Eva)"]
+    style F1 fill:#fef9c3,color:#854d0e
+    style M fill:#dbeafe,color:#1e3a8a
+```
+
+**① `generar_claves.py`** — Luis genera su par de claves y **guarda las dos** en ficheros. La privada se queda en su ordenador; la pública la repartirá.
+
+```python title="generar_claves.py"
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from pathlib import Path
 
-# Luis genera su par de claves (una sola vez en su vida)
-privada_luis = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-publica_luis = privada_luis.public_key()
+privada = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
-# Luis EXPORTA solo su pública a un fichero .pem para repartirla
-pem = publica_luis.public_bytes(
+# Guardar la clave PRIVADA (secreta, no se comparte)
+Path("luis_privada.pem").write_bytes(privada.private_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption(),
+))
+
+# Guardar la clave PÚBLICA (esta sí se reparte)
+Path("luis_publica.pem").write_bytes(privada.public_key().public_bytes(
     encoding=serialization.Encoding.PEM,
     format=serialization.PublicFormat.SubjectPublicKeyInfo,
-)
-Path("luis_publica.pem").write_bytes(pem)
-print(pem.decode())
+))
+
+print("Creados: luis_privada.pem (secreta) y luis_publica.pem (para repartir)")
 ```
 
-```text title="Salida (así se ve un .pem de clave pública)"
------BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmoMf6nnbfxZ1PEKCoeMP
-...  (varias líneas de texto en base64)  ...
-fQIDAQAB
------END PUBLIC KEY-----
+```text title="Salida"
+Creados: luis_privada.pem (secreta) y luis_publica.pem (para repartir)
 ```
 
-Ese fichero `luis_publica.pem` es el que Luis reparte sin miedo. Ahora **Ana lo carga** y cifra un mensaje para Luis:
+**② `cifrar.py`** — Ana solo tiene `luis_publica.pem`. Lo carga y cifra su mensaje:
 
-```python title="cifrar_desde_pem.py"
+```python title="cifrar.py"
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes, serialization
 from pathlib import Path
 
 OAEP = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
 
-# Ana CARGA la pública de Luis desde el fichero que él le pasó
 publica_luis = serialization.load_pem_public_key(Path("luis_publica.pem").read_bytes())
-
-# y cifra con ella (sin tener ni idea de la privada de Luis)
 cifrado = publica_luis.encrypt(b"Hola Luis, nos vemos a las 5", OAEP)
 Path("mensaje.bin").write_bytes(cifrado)
+
 print("Mensaje cifrado y guardado en mensaje.bin")
 ```
 
@@ -470,42 +485,44 @@ print("Mensaje cifrado y guardado en mensaje.bin")
 Mensaje cifrado y guardado en mensaje.bin
 ```
 
-Y **Luis lo descifra** con su clave privada, la única que puede:
+**③ `descifrar.py`** — Luis carga su clave **privada** del fichero y abre el mensaje:
 
 ```python title="descifrar.py"
-# (Luis, en su ordenador, con privada_luis del primer bloque)
-cifrado = Path("mensaje.bin").read_bytes()
-print("Luis lee:", privada_luis.decrypt(cifrado, OAEP).decode())
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from pathlib import Path
+
+OAEP = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+
+privada_luis = serialization.load_pem_private_key(Path("luis_privada.pem").read_bytes(), password=None)
+mensaje = privada_luis.decrypt(Path("mensaje.bin").read_bytes(), OAEP)
+
+print("Luis lee:", mensaje.decode())
 ```
 
 ```text title="Salida"
 Luis lee: Hola Luis, nos vemos a las 5
 ```
 
-#### ¿Y si un espía intercepta el mensaje?
+**④ `espia.py`** — Eva ha interceptado `mensaje.bin` y tiene `luis_publica.pem` (es pública). Aun así no puede leer nada: la pública **solo cifra**, y su propia privada no abre un mensaje dirigido a Luis.
 
-Eva captura `mensaje.bin` **y** el fichero `luis_publica.pem` (es público, lo tiene todo el mundo). Aun así no puede leer nada: la clave pública **solo cifra, no descifra**, y la privada de Eva no abre un mensaje cifrado para Luis.
+```python title="espia.py"
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import hashes, serialization
+from pathlib import Path
 
-```mermaid
-flowchart LR
-    C["🔒 mensaje.bin<br/>(para Luis)"] --> Eva["🕵️ Eva lo intercepta"]
-    PEM["📄 luis_publica.pem"] --> Eva
-    Eva -->|"con la pública<br/>de Luis"| X1["❌ la pública<br/>no descifra"]
-    Eva -->|"con su propia<br/>privada"| X2["❌ no es la<br/>privada de Luis"]
-    style X1 fill:#fee2e2,color:#991b1b
-    style X2 fill:#fee2e2,color:#991b1b
-```
+OAEP = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+cifrado = Path("mensaje.bin").read_bytes()
+publica_luis = serialization.load_pem_public_key(Path("luis_publica.pem").read_bytes())
 
-```python title="espia_fracasa.py"
-# (continúa: Eva tiene 'cifrado' y la pública de Luis cargada del .pem)
-
-# 1) Una clave PÚBLICA no tiene ni siquiera método para descifrar:
+# 1) Una clave pública ni siquiera tiene método para descifrar
 print("¿La pública puede descifrar?:", hasattr(publica_luis, "decrypt"))
 
-# 2) Eva prueba con la única privada que posee (la suya): falla
+# 2) Eva prueba con la única privada que tiene (la suya): falla
 privada_eva = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 try:
     privada_eva.decrypt(cifrado, OAEP)
+    print("Eva ha leído el mensaje (esto NO debería pasar)")
 except ValueError:
     print("Eva NO puede leer el mensaje: no tiene la privada de Luis")
 ```
@@ -587,62 +604,73 @@ flowchart LR
     style NO fill:#fee2e2,color:#991b1b
 ```
 
-Para firmar se usa el relleno **PSS** (recuerda de la sección 5.2: **PSS firma**, OAEP cifra). Como en el cifrado, lo hacemos con **dos scripts separados**: uno lo ejecuta **Ana** para firmar un contrato, y otro lo ejecuta **Luis** (en su ordenador, solo con los ficheros que Ana le envía) para comprobar que la firma es auténtica.
+Para firmar se usa el relleno **PSS** (recuerda de la sección 5.2: **PSS firma**, OAEP cifra). Montamos otro laboratorio con **cuatro scripts independientes**, igual que en el cifrado: Ana genera sus claves, firma un contrato, Luis verifica la firma, y un impostor lo intenta y fracasa. Puedes ejecutarlos tú en orden.
 
 ```mermaid
 flowchart LR
-    subgraph ANA["👩 Ana (firma.py)"]
-      D["📄 contrato.txt"] -->|"firma con su<br/>PRIVADA"| S["✍️ contrato.sig"]
-      PUB["📄 ana_publica.pem"]
-    end
-    subgraph LUIS["👨 Luis (verifica.py)"]
-      V{"verifica con la<br/>PÚBLICA de Ana"}
-    end
-    D --> V
-    S --> V
-    PUB --> V
-    V -->|coinciden| OK["✅ auténtico<br/>e intacto"]
-    V -->|no coinciden| NO["❌ falso o<br/>modificado"]
+    G["① generar_claves_ana.py"] --> K["📄 ana_privada.pem<br/>📄 ana_publica.pem"]
+    K --> F["② firmar.py<br/>(Ana)"]
+    F --> S["📄 contrato.txt<br/>✍️ contrato.sig"]
+    S --> V["③ verificar.py<br/>(Luis)"]
+    K -->|"solo la pública"| V
+    V -->|coinciden| OK["✅ auténtica"]
+    V -->|no| NO["❌ falsa o alterada"]
+    style K fill:#fef9c3,color:#854d0e
     style OK fill:#d1fae5,color:#065f46
     style NO fill:#fee2e2,color:#991b1b
 ```
 
-**Script 1 — Ana firma el contrato.** Firma el **contenido del fichero**, guarda la firma en `contrato.sig` y exporta su clave **pública** a un `.pem` para que cualquiera pueda verificar:
+**① `generar_claves_ana.py`** — Ana genera su par de claves y guarda las dos en ficheros:
 
-```python title="firma.py"
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import hashes, serialization
+```python title="generar_claves_ana.py"
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 from pathlib import Path
 
-privada_ana = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
+privada = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
-# El documento a firmar
-Path("contrato.txt").write_text("Yo, Ana, autorizo el pago de 100 euros")
+Path("ana_privada.pem").write_bytes(privada.private_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PrivateFormat.PKCS8,
+    encryption_algorithm=serialization.NoEncryption()))
 
-# Firma el CONTENIDO del fichero con la clave PRIVADA de Ana
-firma = privada_ana.sign(Path("contrato.txt").read_bytes(), PSS, hashes.SHA256())
-Path("contrato.sig").write_bytes(firma)
-
-# Exporta la PÚBLICA para que otros puedan verificar
-Path("ana_publica.pem").write_bytes(privada_ana.public_key().public_bytes(
+Path("ana_publica.pem").write_bytes(privada.public_key().public_bytes(
     encoding=serialization.Encoding.PEM,
     format=serialization.PublicFormat.SubjectPublicKeyInfo))
 
+print("Creados: ana_privada.pem (secreta) y ana_publica.pem (para repartir)")
+```
+
+```text title="Salida"
+Creados: ana_privada.pem (secreta) y ana_publica.pem (para repartir)
+```
+
+**② `firmar.py`** — Ana carga su clave **privada**, firma el contenido del contrato y guarda la firma en `contrato.sig`:
+
+```python title="firmar.py"
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from pathlib import Path
+
+PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
+privada_ana = serialization.load_pem_private_key(Path("ana_privada.pem").read_bytes(), password=None)
+
+Path("contrato.txt").write_text("Yo, Ana, autorizo el pago de 100 euros")
+firma = privada_ana.sign(Path("contrato.txt").read_bytes(), PSS, hashes.SHA256())
+Path("contrato.sig").write_bytes(firma)
+
 print(f"Firma creada: contrato.sig ({len(firma)} bytes)")
-print("Pública exportada: ana_publica.pem")
 ```
 
 ```text title="Salida"
 Firma creada: contrato.sig (256 bytes)
-Pública exportada: ana_publica.pem
 ```
 
 La firma mide siempre **256 bytes** con una clave de 2048 bits (2048 ÷ 8), da igual que el documento sea una línea o un vídeo entero: se firma el hash del documento, no el documento completo.
 
-**Script 2 — Luis verifica.** Luis solo tiene tres ficheros (`contrato.txt`, `contrato.sig` y `ana_publica.pem`); **no** tiene nada de la memoria de Ana. Carga la pública del `.pem` y comprueba:
+**③ `verificar.py`** — Luis solo tiene tres ficheros (`contrato.txt`, `contrato.sig` y `ana_publica.pem`). Carga la pública y comprueba la firma; luego altera el contrato para ver que la verificación falla:
 
-```python title="verifica.py"
+```python title="verificar.py"
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.exceptions import InvalidSignature
@@ -651,31 +679,31 @@ from pathlib import Path
 PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
 publica_ana = serialization.load_pem_public_key(Path("ana_publica.pem").read_bytes())
 
-def verificar(fichero: str, fichero_firma: str) -> bool:
+def firma_valida() -> bool:
     try:
         publica_ana.verify(
-            Path(fichero_firma).read_bytes(),   # la firma
-            Path(fichero).read_bytes(),          # el documento
+            Path("contrato.sig").read_bytes(),    # la firma
+            Path("contrato.txt").read_bytes(),     # el documento
             PSS, hashes.SHA256())
         return True
     except InvalidSignature:
         return False
 
-print("¿Firma válida?:", verificar("contrato.txt", "contrato.sig"))
+print("¿Firma válida?:", firma_valida())
 
 # Alguien altera el contrato DESPUÉS de firmarlo (cambia 100 por 900)
 Path("contrato.txt").write_text("Yo, Ana, autorizo el pago de 900 euros")
-print("Tras alterar el contrato:", verificar("contrato.txt", "contrato.sig"))
+print("Tras cambiar el importe:", firma_valida())
 ```
 
 ```text title="Salida"
 ¿Firma válida?: True
-Tras alterar el contrato: False
+Tras cambiar el importe: False
 ```
 
 Cambiar **un solo carácter** (de `100` a `900`) rompe la verificación: integridad y autenticidad en una sola operación. Y como en el cifrado, el **PSS** del que verifica debe tener la **misma configuración** que el del que firmó.
 
-**¿Y si un impostor intenta hacerse pasar por Ana?** No puede: para firmar en nombre de Ana haría falta su clave **privada**, que solo ella tiene. Una firma hecha con otra clave no supera la verificación con la pública de Ana:
+**④ `impostor.py`** — Un impostor firma el mismo contrato con **su propia** clave. Al verificar contra la pública de Ana, se rechaza:
 
 ```python title="impostor.py"
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -685,16 +713,16 @@ from pathlib import Path
 
 PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
 
-# El impostor firma el mismo contrato, pero con SU propia clave
+# El impostor firma con SU clave, no con la de Ana
 privada_impostor = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 Path("contrato.txt").write_text("Yo, Ana, autorizo el pago de 100 euros")
 firma_falsa = privada_impostor.sign(Path("contrato.txt").read_bytes(), PSS, hashes.SHA256())
 
-# Pero se verifica contra la PÚBLICA de Ana (la del .pem)
+# Se verifica contra la PÚBLICA de Ana (del .pem)
 publica_ana = serialization.load_pem_public_key(Path("ana_publica.pem").read_bytes())
 try:
     publica_ana.verify(firma_falsa, Path("contrato.txt").read_bytes(), PSS, hashes.SHA256())
-    print("Firma del impostor aceptada (MAL)")
+    print("Firma del impostor aceptada (esto NO debería pasar)")
 except InvalidSignature:
     print("Firma del impostor RECHAZADA: no tiene la privada de Ana")
 ```
@@ -879,7 +907,7 @@ def descarga_integra(contenido: str, hash_publicado: str) -> bool:
 ```
 </details>
 
-**2 · 🟢 ¿Ha cambiado el fichero?** — guardaste el hash de un `config.ini` la semana pasada. `ha_cambiado(hash_guardado: str, contenido_actual: str) -> bool`: ¿es distinto ahora? (este es, en miniatura, exactamente lo que hace `auditar()` en el reto de esta unidad).
+**2 · 🟢 ¿Ha cambiado el fichero?** — guardaste el hash de un `config.ini` la semana pasada. `ha_cambiado(hash_guardado: str, contenido_actual: str) -> bool`: ¿es distinto ahora? (es, en miniatura, cómo se comprueba si un fichero ha cambiado).
 <details class="sol"><summary>Solución</summary>
 
 ```python
@@ -1094,244 +1122,102 @@ def de_texto(s: str) -> dict[str, str]:
 ```
 </details>
 
----
-
-## 10. Reto resuelto, paso a paso — Verificador de integridad profesional
-
-Te acaban de contratar como técnico junior en una consultora de ciberseguridad. Tu primer encargo: **una herramienta de línea de comandos** que genere un manifiesto de una carpeta y audite si algo cambió — el mismo principio que `sha256sum --check`, `debsums` o un HIDS como **AIDE**/**Tripwire**. La construimos contigo, de principio a fin.
-
-```mermaid
-flowchart LR
-    G["generar"] -->|escribe| M["MANIFEST.json<br/>ruta → hash"]
-    M -->|más tarde| Au["auditar"]
-    Au -->|compara con| Fs["ficheros actuales"]
-    Fs --> R["OK / MODIFICADO<br/>NUEVO / AUSENTE"]
-```
-
-**Paso 1 — Hash de un fichero.** La pieza más pequeña: hashear leyendo por bloques, para que funcione igual con 1 KB que con 10 GB.
-
-```python title="verificador.py"
-import hashlib
-from pathlib import Path
-
-def hash_fichero(ruta: Path, algoritmo: str = "sha256") -> str:
-    h = hashlib.new(algoritmo)
-    with open(ruta, "rb") as f:
-        for bloque in iter(lambda: f.read(8192), b""):
-            h.update(bloque)
-    return h.hexdigest()
-```
-
-**Paso 2 — Manifiesto de una carpeta entera.** Recorremos con `pathlib.rglob` y hasheamos cada fichero, saltando el propio manifiesto para no auto-referenciarnos:
-
-```python title="verificador.py (continúa)"
-def generar_manifiesto(carpeta: Path, algoritmo: str = "sha256") -> dict[str, str]:
-    manifiesto: dict[str, str] = {}
-    for ruta in sorted(carpeta.rglob("*")):
-        if ruta.is_file() and ruta.name != "MANIFEST.json":
-            manifiesto[str(ruta.relative_to(carpeta))] = hash_fichero(ruta, algoritmo)
-    return manifiesto
-```
-
-**Paso 3 — Persistir en JSON.** Un manifiesto real se guarda estructurado, no como texto suelto: así es fácil de extender (algoritmo, fecha…).
-
-```python title="verificador.py (continúa)"
-import json
-from datetime import datetime, timezone
-
-def guardar(manifiesto: dict[str, str], destino: Path, algoritmo: str) -> None:
-    datos = {"generado": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-             "algoritmo": algoritmo, "ficheros": manifiesto}
-    destino.write_text(json.dumps(datos, indent=2, ensure_ascii=False), encoding="utf-8")
-
-def cargar(origen: Path) -> dict[str, str]:
-    return dict(json.loads(origen.read_text(encoding="utf-8"))["ficheros"])
-```
-
-**Paso 4 — Auditar.** El corazón de la herramienta: comparar lo guardado con lo actual, en tiempo constante.
-
-```python title="verificador.py (continúa)"
-import hmac
-
-def auditar(previo: dict[str, str], actual: dict[str, str]) -> dict[str, str]:
-    resultado: dict[str, str] = {}
-    for nombre, h in previo.items():
-        if nombre not in actual:
-            resultado[nombre] = "AUSENTE"
-        elif hmac.compare_digest(h, actual[nombre]):
-            resultado[nombre] = "OK"
-        else:
-            resultado[nombre] = "MODIFICADO"
-    for nombre in actual:
-        if nombre not in previo:
-            resultado[nombre] = "NUEVO"
-    return resultado
-```
-
-**Paso 5 — CLI profesional con `argparse`.** Nada de leer `sys.argv` a mano: `argparse` da ayuda automática (`-h`), validación de opciones y aspecto de herramienta real.
-
-```python title="verificador.py (continúa)"
-import argparse
-
-def main() -> None:
-    ap = argparse.ArgumentParser(
-        prog="verificador",
-        description="Genera y audita un manifiesto de integridad de una carpeta.")
-    ap.add_argument("accion", choices=["generar", "auditar"])
-    ap.add_argument("carpeta", type=Path, help="carpeta a proteger")
-    ap.add_argument("--algoritmo", default="sha256",
-                    choices=["sha256", "sha3_256", "blake2b"])
-    args = ap.parse_args()
-
-    manifiesto_path = args.carpeta / "MANIFEST.json"
-    if args.accion == "generar":
-        guardar(generar_manifiesto(args.carpeta, args.algoritmo), manifiesto_path, args.algoritmo)
-        print(f"Manifiesto creado en {manifiesto_path}")
-    else:
-        previo = cargar(manifiesto_path)
-        actual = generar_manifiesto(args.carpeta, args.algoritmo)
-        for nombre, estado in sorted(auditar(previo, actual).items()):
-            print(f"[{estado:10}] {nombre}")
-
-if __name__ == "__main__":
-    main()
-```
-
-**Paso 6 — Pruébalo como cadena de custodia (Docker, sin `sudo`).**
-
-```yaml title="docker-compose.yml"
-services:
-  demo:
-    image: python:3.12-alpine
-    volumes: ["./datos:/datos", "./verificador.py:/verificador.py"]
-    working_dir: /datos
-    command: >
-      sh -c "echo 'binario de la app'     > app.bin;
-             echo 'config=produccion'     > app.conf;
-             python /verificador.py generar .;
-             echo '--- alguien altera config.conf ---';
-             echo 'config=HACKEADA'        > app.conf;
-             echo 'malware.sh'             > intruso.sh;
-             python /verificador.py auditar ."
-```
-
-```bash title="Ejecutar"
-mkdir -p datos && docker compose run --rm demo
-```
-
-```text title="Salida esperada"
-Manifiesto creado en datos/MANIFEST.json
---- alguien altera config.conf ---
-[MODIFICADO] app.conf
-[NUEVO     ] intruso.sh
-[OK        ] app.bin
-```
-
-<details class="sol"><summary>📄 verificador.py completo (los 5 pasos juntos, para comparar)</summary>
+**18 · 🔴 Crear y guardar un par de claves** — `crear_par(nombre: str) -> tuple[str, str]`: genera un par RSA, guarda la privada en `<nombre>_priv.pem` y la pública en `<nombre>_pub.pem`, y devuelve las dos rutas. Comprueba que los ficheros empiezan por `-----BEGIN PRIVATE KEY-----` y `-----BEGIN PUBLIC KEY-----`.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-import argparse, hashlib, hmac, json
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 from pathlib import Path
-from datetime import datetime, timezone
 
-def hash_fichero(ruta: Path, algoritmo: str = "sha256") -> str:
-    h = hashlib.new(algoritmo)
-    with open(ruta, "rb") as f:
-        for bloque in iter(lambda: f.read(8192), b""):
-            h.update(bloque)
-    return h.hexdigest()
-
-def generar_manifiesto(carpeta: Path, algoritmo: str = "sha256") -> dict[str, str]:
-    m: dict[str, str] = {}
-    for ruta in sorted(carpeta.rglob("*")):
-        if ruta.is_file() and ruta.name != "MANIFEST.json":
-            m[str(ruta.relative_to(carpeta))] = hash_fichero(ruta, algoritmo)
-    return m
-
-def guardar(manifiesto: dict[str, str], destino: Path, algoritmo: str) -> None:
-    datos = {"generado": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-             "algoritmo": algoritmo, "ficheros": manifiesto}
-    destino.write_text(json.dumps(datos, indent=2, ensure_ascii=False), encoding="utf-8")
-
-def cargar(origen: Path) -> dict[str, str]:
-    return dict(json.loads(origen.read_text(encoding="utf-8"))["ficheros"])
-
-def auditar(previo: dict[str, str], actual: dict[str, str]) -> dict[str, str]:
-    r: dict[str, str] = {}
-    for n, h in previo.items():
-        r[n] = "AUSENTE" if n not in actual else ("OK" if hmac.compare_digest(h, actual[n]) else "MODIFICADO")
-    for n in actual:
-        if n not in previo:
-            r[n] = "NUEVO"
-    return r
-
-def main() -> None:
-    ap = argparse.ArgumentParser(prog="verificador", description="Manifiesto de integridad")
-    ap.add_argument("accion", choices=["generar", "auditar"])
-    ap.add_argument("carpeta", type=Path)
-    ap.add_argument("--algoritmo", default="sha256", choices=["sha256", "sha3_256", "blake2b"])
-    args = ap.parse_args()
-    ruta_man = args.carpeta / "MANIFEST.json"
-    if args.accion == "generar":
-        guardar(generar_manifiesto(args.carpeta, args.algoritmo), ruta_man, args.algoritmo)
-        print(f"Manifiesto creado en {ruta_man}")
-    else:
-        previo = cargar(ruta_man)
-        actual = generar_manifiesto(args.carpeta, args.algoritmo)
-        for n, e in sorted(auditar(previo, actual).items()):
-            print(f"[{e:10}] {n}")
-
-if __name__ == "__main__":
-    main()
+def crear_par(nombre: str) -> tuple[str, str]:
+    pv = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    ruta_priv, ruta_pub = f"{nombre}_priv.pem", f"{nombre}_pub.pem"
+    Path(ruta_priv).write_bytes(pv.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    Path(ruta_pub).write_bytes(pv.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))
+    return ruta_priv, ruta_pub
 ```
 </details>
 
----
+**19 · 🔴 Cifrar y descifrar usando ficheros PEM** — `cifrar_a_fichero(ruta_pub, mensaje, ruta_salida)` carga la pública del `.pem` y guarda el cifrado; `descifrar_de_fichero(ruta_priv, ruta_cifrado) -> bytes` carga la privada y devuelve el mensaje. Pruébalo con el par del ejercicio 18.
+<details class="sol"><summary>Solución</summary>
 
-## 11. Reto para ti (propuesto, sin solución)
+```python
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from pathlib import Path
+_OAEP = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
 
-### 🛡️ Centinela de integridad — un HIDS mínimo en Docker
+def cifrar_a_fichero(ruta_pub: str, mensaje: bytes, ruta_salida: str) -> None:
+    pub = serialization.load_pem_public_key(Path(ruta_pub).read_bytes())
+    Path(ruta_salida).write_bytes(pub.encrypt(mensaje, _OAEP))
 
-Un **HIDS** (*Host Intrusion Detection System*) vigila que los ficheros de un sistema no cambien sin permiso. Constrúyelo **partiendo de tu `verificador.py`**.
-
-```mermaid
-flowchart TB
-    subgraph "Contenedor: objetivo"
-    F["Ficheros vigilados"]
-    end
-    subgraph "Contenedor: centinela (tu código)"
-    Ge["1. genera manifiesto"] --> Bu["2. bucle cada 5s"]
-    Bu --> Au["3. audita"]
-    Au -->|cambio detectado| Lo["4. log con timestamp"]
-    Au -->|sin cambios| Bu
-    end
-    F -.->|volumen compartido| Ge
-    F -.->|volumen compartido| Au
+def descifrar_de_fichero(ruta_priv: str, ruta_cifrado: str) -> bytes:
+    pv = serialization.load_pem_private_key(Path(ruta_priv).read_bytes(), password=None)
+    return pv.decrypt(Path(ruta_cifrado).read_bytes(), _OAEP)
 ```
+</details>
 
-**Objetivo.** Un contenedor "objetivo" tiene una carpeta con ficheros. Tu **centinela** (otro contenedor con tu Python) genera el manifiesto **una vez** y luego, **en bucle cada 5 segundos**, reaudita y **registra en un log** cualquier cambio con marca de tiempo, distinguiendo `MODIFICADO`, `NUEVO` y `AUSENTE`.
+**20 · 🔴 ¿Tengo la clave correcta?** — `puede_descifrar(ruta_priv, ruta_cifrado) -> bool`: devuelve `True` si esa privada abre el fichero cifrado, y `False` (capturando `ValueError`) si no. Comprueba que la privada del destinatario da `True` y la de otra persona da `False`.
+<details class="sol"><summary>Solución</summary>
 
-**Requisitos**
+```python
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from pathlib import Path
+_OAEP = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
 
-- `docker-compose.yml` con dos servicios que comparten un volumen: uno que va tocando ficheros (simula cambios con un `sh` que escribe de vez en cuando) y el **centinela** (tu programa).
-- El centinela **no** reescribe el manifiesto tras detectar un cambio (si lo hiciera, no volvería a alertar de lo mismo).
-- CLI con `argparse`: `python centinela.py <carpeta> --intervalo 5`.
-- Log con formato `2026-05-01T10:00:05+00:00  [MODIFICADO] app.conf`.
-- Código **tipado** (`mypy` limpio), reutilizando funciones de tu `verificador.py`.
-- Nada de `sudo`: todo dentro de `docker compose up`.
+def puede_descifrar(ruta_priv: str, ruta_cifrado: str) -> bool:
+    pv = serialization.load_pem_private_key(Path(ruta_priv).read_bytes(), password=None)
+    try:
+        pv.decrypt(Path(ruta_cifrado).read_bytes(), _OAEP)
+        return True
+    except ValueError:
+        return False
+```
+</details>
 
-**Criterios de aceptación**
+**21 · 🔴 Firmar un fichero y verificar desde PEM** — `firmar_fichero(ruta_priv, ruta_doc) -> bytes` y `firma_ok(ruta_pub, ruta_doc, firma) -> bool`. Comprueba que la firma es válida, y que si cambias el documento pasa a ser `False`.
+<details class="sol"><summary>Solución</summary>
 
-1. Al arrancar, crea el manifiesto y no alerta de nada.
-2. Cuando un fichero cambia, aparece **una sola** línea de alerta con su marca de tiempo (no se repite en cada vuelta del bucle).
-3. Si se crea o se borra un fichero, lo marca como `NUEVO` o `AUSENTE`.
-4. Se puede parar y volver a arrancar sin perder el manifiesto (persístelo en el volumen).
+```python
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.exceptions import InvalidSignature
+from pathlib import Path
+_PSS = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
 
-**Pistas** (no solución): reutiliza `generar_manifiesto`, `auditar`, `guardar` y `cargar` tal cual · para no repetir alertas, guarda en memoria el **último estado conocido** de cada fichero y compara antes de loguear · bucle `while True: ...; time.sleep(args.intervalo)` · para el log, `logging.basicConfig(filename=..., level=logging.INFO)`.
+def firmar_fichero(ruta_priv: str, ruta_doc: str) -> bytes:
+    pv = serialization.load_pem_private_key(Path(ruta_priv).read_bytes(), password=None)
+    return pv.sign(Path(ruta_doc).read_bytes(), _PSS, hashes.SHA256())
 
-**Si te sobra tiempo:** añade un modo `--formato texto` que además escriba un `MANIFEST.sha256` estilo `sha256sum` · firma el `MANIFEST.json` con RSA (§6) para que nadie pueda falsificarlo sin que se note · investiga `Pillow` (`Image.open(ruta)._getexif()`) para extraer metadatos EXIF de una fotografía como evidencia forense.
+def firma_ok(ruta_pub: str, ruta_doc: str, firma: bytes) -> bool:
+    pub = serialization.load_pem_public_key(Path(ruta_pub).read_bytes())
+    try:
+        pub.verify(firma, Path(ruta_doc).read_bytes(), _PSS, hashes.SHA256())
+        return True
+    except InvalidSignature:
+        return False
+```
+</details>
 
-> Entrega el `docker-compose.yml` y tu código. Esto es justo el tipo de reto que resolverás en el **test práctico**.
+**22 · 🔴 Precinto forense de un fichero** — `precintar(ruta) -> str` devuelve el hash SHA-256 del fichero, e `intacto(ruta, precinto) -> bool` comprueba si sigue igual (con `hmac.compare_digest`). Comprueba que tras modificar el fichero devuelve `False`.
+<details class="sol"><summary>Solución</summary>
+
+```python
+import hashlib, hmac
+from pathlib import Path
+
+def precintar(ruta: str) -> str:
+    return hashlib.sha256(Path(ruta).read_bytes()).hexdigest()
+
+def intacto(ruta: str, precinto: str) -> bool:
+    return hmac.compare_digest(precintar(ruta), precinto)
+```
+</details>
+
 
 ---
 
@@ -1364,7 +1250,7 @@ flowchart TB
 El instrumento principal es un **test práctico**: resuelves en Python un reto parecido al de esta unidad y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún ejercicio práctico).
 
 !!! reto "La nota, sin sorpresas"
-    **Nota = (tests superados ÷ total) × 10.** Se aprueba con 5. Es la misma mecánica del reto de esta unidad, así que llegas entrenado.
+    **Nota = (aciertos ÷ nº de preguntas) × 10.** Los fallos no restan. Se aprueba con 5.
 
 El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `hashlib`), pasar `mypy` y documentar el código.
 
@@ -1372,7 +1258,7 @@ El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la t�
 
 ## Simulacro de examen tipo test
 
-> 20 preguntas de opción múltiple. Cada una trae su propio código o un caso concreto — no necesitas recordar de qué sección era, solo leerlo y razonar.
+> 26 preguntas de opción múltiple. Cada una trae su propio código o un caso concreto — no necesitas recordar de qué sección era, solo leerlo y razonar.
 
 **1.** ¿Qué imprime este código?
 
@@ -1678,7 +1564,7 @@ D) `54.0`
 
 <details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>0.9 × 6 = 5.4</code>, redondeado a 2 decimales sigue siendo <code>5.4</code>.</details>
 
-**15.** *(Sobre el reto de la unidad)* Un fichero de configuración cambia de valor, y aparece un fichero nuevo. Con las funciones del verificador de integridad:
+**15.** Un sistema guarda un **manifiesto** `{fichero: hash}` y luego lo compara con el estado actual. Con esta función `auditar`:
 
 ```python
 manifiesto = {"app.conf": "hash_de_puerto=8080", "app.bin": "hash_binario"}
@@ -1694,9 +1580,9 @@ B) `{'app.conf': 'MODIFICADO', 'app.bin': 'OK', 'nuevo.txt': 'NUEVO'}`
 C) `{'app.conf': 'AUSENTE', 'app.bin': 'OK'}`
 D) `{'app.conf': 'MODIFICADO', 'app.bin': 'MODIFICADO', 'nuevo.txt': 'NUEVO'}`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>app.conf</code> cambió de valor (hash distinto) → <code>MODIFICADO</code>. <code>app.bin</code> sigue igual → <code>OK</code>. <code>nuevo.txt</code> no estaba en el manifiesto original → <code>NUEVO</code>. Es exactamente el mecanismo que usa tu <code>verificador.py</code> para detectar manipulaciones.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>app.conf</code> cambió de valor (hash distinto) → <code>MODIFICADO</code>. <code>app.bin</code> sigue igual → <code>OK</code>. <code>nuevo.txt</code> no estaba en el manifiesto original → <code>NUEVO</code>. Es el mecanismo básico para detectar manipulaciones en un conjunto de ficheros.</details>
 
-**16.** *(Sobre el reto de la unidad)* ¿Qué ocurre al ejecutar este código?
+**16.** ¿Qué ocurre al ejecutar este código?
 
 ```python
 import argparse
@@ -1714,7 +1600,7 @@ B) `argparse` rechaza la ejecución, porque `"md5"` no está entre los `choices`
 C) Imprime `"sha256"`, ignorando el valor inválido
 D) Lanza `TypeError` en tiempo de ejecución
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Al declarar <code>choices=[...]</code>, <code>argparse</code> valida el valor <b>antes</b> de que tu código lo use, y termina el programa con un mensaje de error si no está en la lista — así el <code>verificador.py</code> nunca llega a intentar hashear con un algoritmo roto como MD5.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Al declarar <code>choices=[...]</code>, <code>argparse</code> valida el valor <b>antes</b> de que tu código lo use, y termina el programa con un mensaje de error si no está en la lista — así un programa de integridad nunca llega a usar un algoritmo roto como MD5.</details>
 
 **17.** En RSA con la librería `cryptography`, usas dos tipos de "relleno": **OAEP** y **PSS**. ¿Para qué sirve cada uno?
 
@@ -1751,3 +1637,67 @@ C) Solo la firma
 D) El contrato y la clave privada de Luis
 
 <details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Para verificar hace falta el documento, la firma y la clave <b>pública</b> del firmante. La privada de Ana no se comparte jamás: si Luis la tuviera, podría firmar haciéndose pasar por ella.</details>
+
+**21.** ¿Qué cabecera tiene un fichero `.pem` que contiene una clave **privada**?
+
+A) `-----BEGIN PUBLIC KEY-----`
+B) `-----BEGIN PRIVATE KEY-----`
+C) `-----BEGIN CERTIFICATE-----`
+D) `-----BEGIN RSA-----`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La pública empieza por <code>BEGIN PUBLIC KEY</code> y la privada por <code>BEGIN PRIVATE KEY</code>. Nunca confundas los ficheros: la privada no se comparte.</details>
+
+**22.** Luis genera su par de claves y guarda `luis_privada.pem` y `luis_publica.pem`. ¿Cuál de los dos ficheros puede enviar a Ana para que le escriba mensajes cifrados?
+
+A) La privada
+B) La pública
+C) Los dos
+D) Ninguno, tiene que darle la contraseña
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Ana cifra con la <b>pública</b> de Luis. La privada se queda siempre en el ordenador de Luis; es la única que descifra.</details>
+
+**23.** ¿Qué imprime este código?
+
+```python
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization
+from pathlib import Path
+
+OAEP = padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+publica = serialization.load_pem_public_key(Path("luis_publica.pem").read_bytes())
+print(hasattr(publica, "decrypt"))
+```
+
+A) `True`
+B) `False`
+C) Lanza una excepción al cargar el `.pem`
+D) `None`
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Una clave pública solo sabe cifrar y verificar firmas: ni siquiera tiene método <code>decrypt</code>. Por eso tener la pública no sirve para leer mensajes ajenos.</details>
+
+**24.** Al cargar una clave privada desde un `.pem` sin contraseña, ¿qué argumento hay que pasar?
+
+A) `serialization.load_pem_private_key(datos)`
+B) `serialization.load_pem_private_key(datos, password=None)`
+C) `serialization.load_pem_private_key(datos, "")`
+D) No se puede cargar sin contraseña
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La función exige el parámetro <code>password</code>; si la clave no está protegida con contraseña, se pasa <code>password=None</code>.</details>
+
+**25.** Ana firma `contrato.txt`. Luis verifica y da `True`. Entonces alguien edita una coma de `contrato.txt`. Si Luis vuelve a verificar **sin** firmar de nuevo, ¿qué obtiene?
+
+A) `True`, una coma no cuenta
+B) `False`, cualquier cambio en el documento invalida la firma
+C) Lanza una excepción
+D) `True`, porque la firma ya se guardó
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La firma se calcula sobre el hash del documento; cualquier cambio, por mínimo que sea, hace que el hash no coincida y la verificación falle.</details>
+
+**26.** Un impostor firma `contrato.txt` con **su propia** clave privada y se lo manda a Luis. Luis verifica con la clave **pública de Ana**. ¿Qué pasa?
+
+A) La firma se acepta, el documento no cambió
+B) La firma se rechaza: no se hizo con la privada de Ana
+C) Luis no puede verificar sin la clave del impostor
+D) Se acepta si el texto es idéntico al original
+
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Una firma solo supera la verificación con la clave pública que corresponde a la privada que firmó. Como no es la de Ana, se rechaza — es lo que impide suplantar a alguien.</details>
