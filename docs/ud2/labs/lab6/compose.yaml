@@ -1,5 +1,0 @@
-services:
-  defensa:
-    build: .
-    security_opt:
-      - no-new-privileges:true

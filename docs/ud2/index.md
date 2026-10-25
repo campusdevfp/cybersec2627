@@ -1,773 +1,317 @@
-# Unidad 2 · Seguridad activa: auditoría, monitorización y defensa
+# Unidad 2 · Seguridad activa: auditoría y detección
 
 | | |
 |---|---|
 | **Resultado de aprendizaje** | RA2 · Implanta mecanismos de seguridad activa |
 | **Trimestre** | 1.º — se evalúa con **examen tipo test** |
 | **Duración** | 16 horas |
-| **Herramientas** | Python 3 · `psutil` · `scapy` · `watchdog` · Docker |
+| **Herramientas** | Python 3 · `scapy` · Docker Compose |
 
-Esta unidad va de **defender un sistema que está en marcha**: vigilar lo que ocurre dentro (procesos, memoria, conexiones), analizar el tráfico que entra y sale, leer los registros en busca de patrones sospechosos, detectar cambios en los ficheros y, con todo ello, **decidir** una respuesta. No se trata de memorizar definiciones, sino de **ejecutar** herramientas reales y entender qué dice cada resultado.
+Esta unidad trata de **defender un sistema en marcha**: entender cómo se audita una red (qué equipos y servicios hay, si son vulnerables) y cómo se **detecta** un ataque leyendo lo que deja en los registros. Lo harás con **dos laboratorios** cortos y guiados paso a paso: primero te pones del lado del **auditor** (descubres y escaneas), y luego del lado del **defensor** (detectas en los logs lo que el auditor hizo). Son las dos caras de la misma moneda.
 
-Cada bloque sigue la misma estructura: una explicación técnica breve, ejemplos de código comentados, y **laboratorios completamente resueltos** que puedes levantar y ejecutar. La evaluación es un **examen tipo test**; al final tienes un simulacro calcado al examen.
+La evaluación es un **examen tipo test**; al final tienes un simulacro con el mismo formato.
 
-!!! info "Cómo está organizada"
-    Seis bloques independientes. Los bloques 2, 3, 4, 5 y 6 son prácticos y cada uno trae su laboratorio con todos los ficheros. El bloque 1 es la base conceptual.
+## Cómo está organizada
 
 ```mermaid
 flowchart LR
-    B1["① Fundamentos<br/>de seguridad activa"] --> B2["② Auditoría<br/>del sistema · psutil"]
-    B2 --> B3["③ Tráfico de red<br/>Scapy"]
-    B3 --> B4["④ Análisis de<br/>registros · re"]
-    B4 --> B5["⑤ Vigilancia de<br/>archivos · watchdog"]
-    B5 --> B6["⑥ Detección,<br/>alertas y respuesta"]
-    B6 --> T["📝 Simulacro<br/>de test"]
+    B1["Teoría breve<br/>seguridad activa"] --> L2["🧪 Lab 1<br/>Auditoría de red"]
+    L2 --> L3["🧪 Lab 2<br/>Monitorización y detección"]
+    L3 --> T["📝 Simulacro de test"]
+    style L2 fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:2px
+    style L3 fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:2px
     style T fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
 ```
 
-## 0 · Preparación del entorno (común a todos los bloques)
+## Preparación del entorno
 
-Trabajarás con un **entorno virtual** de Python y, en algunos laboratorios, con **Docker**. Prepara esto una sola vez.
+Necesitas **Python 3** y **Docker** (con Docker Compose). Comprueba que están:
 
-**Entorno virtual y dependencias.** Crea una carpeta `ut2` y dentro un fichero `requirements.txt`:
-
-```text title="requirements.txt"
-psutil==5.9.8
-scapy==2.5.0
-watchdog==4.0.0
-```
-
-```bash title="Terminal — crear el entorno"
-mkdir ut2 && cd ut2
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-**Docker.** Comprueba que está disponible (lo usarás en varios laboratorios):
-
-```bash title="Terminal"
+```bash
+python --version          # 3.10 o superior
 docker --version
 docker compose version
 ```
 
-!!! warning "Principio de mínimo privilegio en los contenedores"
-    Ningún laboratorio usa el modo `privileged`, ni monta el socket de Docker del anfitrión, ni expone puertos innecesarios. Cada contenedor recibe **solo** los permisos que necesita. Cuando una práctica requiere capacidades especiales (por ejemplo, capturar tráfico), se indican de forma explícita y acotada.
+Los dos laboratorios traen todos sus ficheros en las carpetas `labs/lab1/` y `labs/lab2/` del repositorio. Para el código Python que ejecutes fuera de Docker, crea un entorno virtual con una sola dependencia:
 
----
+```text title="requirements.txt"
+scapy==2.5.0
+```
 
-# Bloque 1 · Fundamentos de seguridad activa
+```bash
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-> **Objetivos didácticos:** distinguir seguridad activa de pasiva; relacionar amenaza, vulnerabilidad y riesgo; conocer los mecanismos de prevención, detección y respuesta (antivirus, firewall, IDS/IPS, actualizaciones, control de acceso, mínimo privilegio, defensa en profundidad).
-> **Duración estimada:** 2 h.
+!!! info "Solo una dependencia externa"
+    En esta unidad lo único que se instala con `pip` es **scapy** (para el mini-IDS del Lab 2). Todo lo demás — sockets, expresiones regulares, conteo, ficheros — es de la **biblioteca estándar** de Python, que ya viene incluida.
 
-## 1.1 Seguridad activa frente a seguridad pasiva
+!!! danger "Norma de uso"
+    Todo esto se practica **solo** dentro de los contenedores del laboratorio o en tu propia máquina. Escanear o auditar equipos ajenos sin permiso es delito. Ver [Uso ético y legal](../recursos/uso-etico.md).
 
-La **seguridad activa** agrupa las medidas que **previenen o detienen** un incidente *mientras el sistema funciona*: el antivirus que bloquea un fichero malicioso, el firewall que corta una conexión, el sistema que detecta y responde a un ataque. La **seguridad pasiva** son las medidas que **reducen el daño una vez que el incidente ya ha ocurrido**: las copias de seguridad, los sistemas redundantes, un SAI que mantiene la corriente.
+## Teoría breve: seguridad activa
+
+La **seguridad activa** son las medidas que **previenen o detienen** un incidente *mientras el sistema funciona* (un firewall que corta una conexión, un antivirus que bloquea un fichero, un sistema que detecta un ataque). Se distingue de la **seguridad pasiva**, que **reduce el daño una vez ocurrido** (copias de seguridad, redundancia, un SAI).
 
 | | Seguridad activa | Seguridad pasiva |
 |---|---|---|
 | Cuándo actúa | **Antes y durante** el incidente | **Después** del incidente |
-| Objetivo | Evitar o detener el daño | Minimizar y recuperarse del daño |
-| Ejemplos | Antivirus, firewall, IDS/IPS, control de acceso | Copias de seguridad, redundancia, SAI |
+| Ejemplos | Firewall, antivirus, IDS/IPS | Copias de seguridad, redundancia, SAI |
 
-Esta unidad se centra en la **activa**: vigilar, detectar y responder.
+Tres conceptos que conviene no confundir:
 
-## 1.2 Amenaza, vulnerabilidad y riesgo
+- **Amenaza:** lo que podría causar daño (un atacante, un malware). No la controlas.
+- **Vulnerabilidad:** la debilidad que la amenaza aprovecha (un servicio sin actualizar). **Sí** la controlas.
+- **Riesgo:** la probabilidad de que una amenaza explote una vulnerabilidad, por su impacto.
 
-Son tres conceptos distintos que conviene no confundir:
+Y los mecanismos de defensa que aparecen en los laboratorios:
 
-- **Amenaza:** lo que *podría* causar daño (un atacante, un malware, un fallo humano). No la controlas.
-- **Vulnerabilidad:** la *debilidad* que la amenaza aprovecha (un servicio sin actualizar, una contraseña débil). **Sí** la controlas.
-- **Riesgo:** la *probabilidad* de que una amenaza explote una vulnerabilidad, por el *impacto* que tendría.
+| Mecanismo | Qué hace |
+|---|---|
+| **Escáner / auditoría** | Descubre qué equipos y servicios hay, y si son vulnerables (Lab 1) |
+| **IDS** (*Intrusion Detection System*) | **Detecta** actividad sospechosa en los registros y **avisa** (Lab 2) |
+| **IPS** | Detecta **y además bloquea** el ataque |
+| **NVD** (*National Vulnerability Database*) | Base pública de vulnerabilidades conocidas (los **CVE**) |
 
-> Reducir el riesgo consiste, sobre todo, en **eliminar vulnerabilidades**: es la parte sobre la que puedes actuar.
+Dos diferencias que caen en el test: un **IDS** solo avisa, un **IPS** avisa y bloquea; y un **CVE** es el identificador público de una vulnerabilidad concreta (por ejemplo, `CVE-2021-23017`).
+## 🧪 Lab 1 · Auditoría de la red del laboratorio
 
-## 1.3 Mecanismos de defensa
+**Objetivo.** Ponerte del lado del **auditor**: descubrir qué servicios tiene abiertos un servidor, averiguar su versión (**banner grabbing**) y cruzarla con una base de vulnerabilidades (la **NVD**) para generar un **informe de auditoría automático**.
 
-| Mecanismo | Qué hace | Tipo |
-|---|---|---|
-| **Antivirus / EDR** | Detecta y bloquea software malicioso | Prevención + detección |
-| **Firewall (cortafuegos)** | Filtra el tráfico de red según reglas | Prevención |
-| **IDS** (*Intrusion Detection System*) | **Detecta** actividad sospechosa y **avisa** | Detección |
-| **IPS** (*Intrusion Prevention System*) | Detecta **y además bloquea** el ataque | Detección + respuesta |
-| **Actualizaciones de seguridad** | Cierran vulnerabilidades conocidas | Prevención |
-| **Control de acceso** | Limita quién puede hacer qué | Prevención |
+**Qué monta el laboratorio.** Dos contenedores en la misma red: un **servidor** (nginx con una versión concreta) y el **auditor** (tu script), que lo escanea.
 
-Dos diferencias que caen mucho en el examen:
+!!! tip "Ficheros del laboratorio"
+    Están en `labs/lab1/`: `auditor.py`, `Dockerfile` y `compose.yaml`. No tienes que copiar nada.
 
-- **IDS vs IPS:** el IDS solo **avisa**; el IPS **avisa y corta**. Un IDS es como una cámara de seguridad; un IPS, como una cámara conectada a una puerta que se cierra sola.
-- **NIDS vs HIDS:** un **NIDS** vigila la *red* (el tráfico); un **HIDS** vigila un *equipo* concreto (sus procesos, sus ficheros). En esta unidad construirás piezas de ambos.
+### Paso 1 · Mira el objetivo y el auditor
 
-## 1.4 Dos principios que lo sostienen todo
+El `compose.yaml` define el servidor a auditar y el auditor:
 
-**Mínimo privilegio.** Cada usuario, proceso o contenedor recibe **solo** los permisos que necesita para su función, ni uno más. Si un proceso con permisos mínimos es comprometido, el daño queda acotado. Es la razón por la que los contenedores de esta unidad no se ejecutan como `privileged`.
-
-**Defensa en profundidad.** No se confía en una única barrera, sino en **varias capas** independientes: firewall + antivirus + monitorización + copias. Si una capa falla, las demás siguen protegiendo. Ninguna herramienta de esta unidad es "la solución"; cada una es **una capa**.
-
-!!! note "Lo esencial del bloque 1 para el test"
-    Activa = prevenir/detener (antes/durante) · pasiva = recuperar (después). IDS avisa, IPS avisa y bloquea. NIDS vigila la red, HIDS vigila un equipo. Mínimo privilegio = solo los permisos necesarios. Defensa en profundidad = varias capas.
-
----
-
-# Bloque 2 · Auditoría y monitorización del sistema con `psutil`
-
-> **Objetivos didácticos:** consultar procesos, CPU, memoria, usuarios y conexiones con `psutil`; entender qué se puede ver sin privilegios y cómo interpretar los resultados sin asumir que lo desconocido es malicioso.
-> **Duración estimada:** 3 h.
-
-## 2.1 Qué es `psutil` y qué permite ver
-
-`psutil` (*process and system utilities*) es una librería que da acceso, desde Python, a información del sistema operativo: procesos en ejecución, uso de CPU y memoria, usuarios conectados y conexiones de red. Es multiplataforma (Linux, Windows, macOS) y es la base de muchas herramientas de monitorización.
-
-**Primer ejemplo — una foto rápida del sistema:**
-
-```python title="sistema.py"
-import psutil
-import platform
-
-print("Sistema operativo:", platform.system(), platform.release())
-print("Uso de CPU:", psutil.cpu_percent(interval=0.3), "%")
-
-mem = psutil.virtual_memory()
-print(f"Memoria: {mem.percent}% usada "
-      f"({mem.used // (1024**2)} MB de {mem.total // (1024**2)} MB)")
-```
-
-```text title="Salida (los números varían según tu máquina)"
-Sistema operativo: Linux 6.1.0
-Uso de CPU: 4.0 %
-Memoria: 42.3% usada (3380 MB de 7985 MB)
-```
-
-- `cpu_percent(interval=0.3)` mide durante 0,3 s y devuelve el porcentaje de uso. Sin intervalo, la primera llamada devuelve `0.0`.
-- `virtual_memory()` devuelve un objeto con `.percent`, `.used`, `.total`… en **bytes** (por eso dividimos entre `1024**2` para pasar a MB).
-
-## 2.2 Listar procesos
-
-`process_iter(...)` recorre todos los procesos. Se le indica qué campos interesan para que sea eficiente. Cada proceso puede desaparecer mientras lo lees o estar protegido, así que **siempre** se captura la excepción.
-
-```python title="procesos.py"
-import psutil
-
-def top_procesos_por_memoria(n: int = 5) -> list[tuple[float, int, str]]:
-    procesos = []
-    for p in psutil.process_iter(["pid", "name", "memory_percent"]):
-        try:
-            mem = p.info["memory_percent"] or 0.0
-            procesos.append((mem, p.info["pid"], p.info["name"]))
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            # El proceso murió o no tenemos permiso: lo ignoramos sin romper
-            continue
-    return sorted(procesos, reverse=True)[:n]
-
-for mem_pct, pid, nombre in top_procesos_por_memoria(3):
-    print(f"PID {pid:6}  {nombre:22}  {mem_pct:.1f}% memoria")
-```
-
-```text title="Salida (ejemplo)"
-PID     56  rclone-filestore        0.9% memoria
-PID    101  python3                 0.3% memoria
-PID      1  process_api             0.1% memoria
-```
-
-!!! warning "Un proceso desconocido NO es automáticamente malicioso"
-    Ver un proceso con un nombre que no reconoces es **normal**: el sistema ejecuta decenas de procesos legítimos. La monitorización te da **datos**, no veredictos. Antes de alarmarte, comprueba la ruta del ejecutable, el usuario que lo lanza y si tiene conexiones de red; y contrástalo. Asumir que "lo que no conozco es un virus" genera falsos positivos y hace perder el tiempo.
-
-## 2.3 Conexiones de red y usuarios
-
-```python title="red_usuarios.py"
-import psutil
-
-print("=== Usuarios con sesión abierta ===")
-for u in psutil.users():
-    print(f"  {u.name}  (terminal: {u.terminal})")
-
-print("\n=== Conexiones de red establecidas ===")
-try:
-    for c in psutil.net_connections(kind="inet"):
-        if c.status == "ESTABLISHED" and c.raddr:
-            print(f"  {c.laddr.ip}:{c.laddr.port}  <->  {c.raddr.ip}:{c.raddr.port}")
-except psutil.AccessDenied:
-    print("  AccessDenied: para ver TODAS las conexiones hacen falta privilegios.")
-```
-
-```text title="Salida (ejemplo)"
-=== Usuarios con sesión abierta ===
-  ivan  (terminal: pts/0)
-
-=== Conexiones de red establecidas ===
-  10.0.0.5:60680  <->  93.184.216.34:443
-```
-
-## 2.4 Límites al ejecutar sin privilegios
-
-Esto es clave para interpretar lo que ves, **sobre todo dentro de un contenedor**:
-
-- Sin privilegios de administrador, `psutil` ve **tus** procesos y los que el sistema te deja ver, pero puede devolver `AccessDenied` al consultar detalles de procesos de otros usuarios.
-- **Dentro de un contenedor Docker**, por aislamiento, normalmente solo ves los procesos **de ese contenedor**, no los del equipo anfitrión ni los de otros contenedores. Esto es una característica de seguridad, no un fallo.
-- `net_connections()` puede requerir privilegios para listar **todas** las conexiones del sistema.
-
-> **Conclusión práctica:** si quieres auditar el *contenedor*, ejecútalo dentro del contenedor. Si quieres auditar el *equipo anfitrión*, ejecuta el script directamente en el sistema operativo (fuera de Docker). No son lo mismo.
-
-## 2.5 🧪 Laboratorio 2 · Auditoría de un contenedor con `psutil`
-
-**Objetivo.** Ejecutar un auditor de sistema dentro de un contenedor con privilegios mínimos y comprobar qué información ofrece sobre su propio entorno.
-
-**Conceptos que enseña.** Lectura de procesos/memoria/conexiones; aislamiento de contenedores; mínimo privilegio; interpretación prudente de los datos.
-
-!!! tip "Ficheros listos para usar"
-    No tienes que copiar el código a mano: todos los ficheros de este laboratorio están en la carpeta **`labs/lab2/`** del repositorio del curso. Entra en ella y sigue las instrucciones de ejecución.
-
-**Ficheros del laboratorio** (en `labs/lab2/`):
-
-```python title="lab2/auditor.py"
-import psutil
-import platform
-
-def informe() -> None:
-    print("=== INFORME DE AUDITORÍA DEL SISTEMA ===")
-    print("SO:", platform.system(), platform.release())
-    print("CPU:", psutil.cpu_percent(interval=0.3), "%")
-
-    mem = psutil.virtual_memory()
-    print(f"Memoria: {mem.percent}% ({mem.used // (1024**2)} MB / {mem.total // (1024**2)} MB)")
-
-    print("\n-- Procesos visibles (top 5 por memoria) --")
-    procesos = []
-    for p in psutil.process_iter(["pid", "name", "memory_percent"]):
-        try:
-            procesos.append((p.info["memory_percent"] or 0.0, p.info["pid"], p.info["name"]))
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            continue
-    for mem_pct, pid, nombre in sorted(procesos, reverse=True)[:5]:
-        print(f"  PID {pid:6}  {nombre:22}  {mem_pct:.1f}%")
-
-    print(f"\nTotal de procesos visibles: {len(procesos)}")
-    print("(Dentro de un contenedor, estos son los procesos DE ESE contenedor.)")
-
-if __name__ == "__main__":
-    informe()
-```
-
-```text title="lab2/requirements.txt"
-psutil==5.9.8
-```
-
-```dockerfile title="lab2/Dockerfile"
-FROM python:3.12-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY auditor.py .
-# Usuario sin privilegios (mínimo privilegio)
-RUN useradd --create-home auditor
-USER auditor
-CMD ["python", "auditor.py"]
-```
-
-```yaml title="lab2/compose.yaml"
+```yaml title="labs/lab1/compose.yaml"
 services:
+  # Objetivo de la auditoría: un servidor web con una versión concreta de nginx
+  servidor:
+    image: nginx:1.18.0
+    networks:
+      - laboratorio
+
+  # El auditor escanea al servidor por su nombre de red
   auditor:
     build: .
-    # Sin privilegios especiales, sin puertos, sin volúmenes del host
-    read_only: true
+    depends_on:
+      - servidor
+    networks:
+      - laboratorio
     security_opt:
       - no-new-privileges:true
+
+networks:
+  laboratorio:
 ```
 
-**Cómo levantarlo y ejecutarlo:**
+### Paso 2 · Entiende el auditor
 
-```bash title="Terminal (dentro de lab2/)"
+El auditor hace tres cosas: **escanear** puertos, **leer el banner** (la versión que anuncia el servicio) y **cruzarlo** con la NVD.
+
+```python title="labs/lab1/auditor.py"
+import socket
+import json
+
+OBJETIVO = "servidor"          # nombre del contenedor objetivo en la red Docker
+PUERTOS = [22, 23, 80, 443, 3306, 8080]
+
+# "NVD local": versiones vulnerables conocidas (extracto, para el laboratorio)
+NVD_LOCAL = {
+    "nginx/1.18.0": "CVE-2021-23017 (resolver, gravedad alta)",
+    "Apache/2.4.49": "CVE-2021-41773 (path traversal, crítico)",
+    "OpenSSH_7.4": "CVE-2018-15473 (enumeración de usuarios)",
+    "vsftpd/2.3.4": "CVE-2011-2523 (puerta trasera, crítico)",
+}
+
+def escanear(host, puerto):
+    """Devuelve (abierto, banner) para un puerto."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(1.0)
+    try:
+        if s.connect_ex((host, puerto)) != 0:
+            return False, ""
+        # Banner grabbing: pedimos algo y leemos lo que el servicio anuncia
+        try:
+            s.send(b"GET / HTTP/1.0\r\n\r\n")
+            respuesta = s.recv(2048).decode(errors="ignore")
+        except Exception:
+            respuesta = ""
+        banner = ""
+        for linea in respuesta.splitlines():
+            if linea.lower().startswith("server:"):
+                banner = linea.split(":", 1)[1].strip()
+        return True, banner
+    finally:
+        s.close()
+
+def auditar():
+    hallazgos = []
+    print(f"Auditando {OBJETIVO}...\n")
+    for puerto in PUERTOS:
+        abierto, banner = escanear(OBJETIVO, puerto)
+        if abierto:
+            cve = NVD_LOCAL.get(banner, "")
+            estado = f"VULNERABLE: {cve}" if cve else "sin vulnerabilidades conocidas"
+            print(f"  [ABIERTO] puerto {puerto:5}  {banner or '(sin banner)':20}  {estado}")
+            hallazgos.append({"puerto": puerto, "banner": banner, "vulnerabilidad": cve})
+    with open("informe_auditoria.json", "w", encoding="utf-8") as f:
+        json.dump(hallazgos, f, indent=2, ensure_ascii=False)
+    vulnerables = [h for h in hallazgos if h["vulnerabilidad"]]
+    print(f"\nResumen: {len(hallazgos)} servicios abiertos, {len(vulnerables)} vulnerables.")
+    print("Informe guardado en informe_auditoria.json")
+
+if __name__ == "__main__":
+    auditar()
+```
+
+- **`connect_ex`** devuelve `0` si el puerto está abierto (sin lanzar error).
+- **Banner grabbing**: al pedir `GET / HTTP/1.0`, el servidor responde con una cabecera `Server:` que delata su versión exacta.
+- **Cruce con la NVD**: si esa versión está en la base de vulnerabilidades, se marca con su **CVE**.
+
+### Paso 3 · Levanta y ejecuta
+
+```bash title="Terminal (dentro de labs/lab1/)"
 docker compose build
 docker compose run --rm auditor
 ```
 
-**Salida esperada** (los números varían):
-
-```text
-=== INFORME DE AUDITORÍA DEL SISTEMA ===
-SO: Linux 6.1.0
-CPU: 0.0 %
-Memoria: 3.1% (120 MB / 3997 MB)
-
--- Procesos visibles (top 5 por memoria) --
-  PID      1  python                  0.4%
-
-Total de procesos visibles: 1
-(Dentro de un contenedor, estos son los procesos DE ESE contenedor.)
-```
-
-**Explicación del resultado.** El contenedor ve **un solo proceso** (el propio `python`), porque está aislado: no ve los procesos del anfitrión. La memoria total que reporta es la del anfitrión (el kernel es compartido), pero los procesos son los suyos. Esto demuestra el **aislamiento** y por qué, para auditar el equipo real, hay que ejecutar el script fuera de Docker.
-
-**Procedimiento alternativo (auditar el anfitrión).** Si necesitas auditar tu propio equipo, ejecuta el script directamente, sin contenedor:
-
-```bash title="Terminal (en el anfitrión, con el venv activado)"
-python lab2/auditor.py
-```
-
-Ahí verás **todos** los procesos de tu sesión (y más, si lo ejecutas con privilegios de administrador).
-
-**Errores habituales.**
-
-| Síntoma | Causa | Solución |
-|---|---|---|
-| `AccessDenied` al leer un proceso | Proceso de otro usuario / protegido | Captúralo y continúa (ya lo hace el código) |
-| El contenedor solo ve 1 proceso | Es lo normal: aislamiento | No es un error; para ver el host, ejecuta fuera de Docker |
-| `cpu_percent` devuelve `0.0` | Llamada sin `interval` | Usa `interval=0.3` como en el ejemplo |
-
-## 🔍 Comprueba tú mismo (Lab 2)
-
-Ahora te toca a ti experimentar con el auditor. Haz estas pruebas y responde; las soluciones están en los desplegables, pero intenta contestar **antes** de abrirlos.
-
-**Experimento 1.** Abre `auditor.py` y fíjate en la línea `psutil.cpu_percent(interval=0.3)`. Crea un fichero de prueba y ejecuta esto:
-
-```python title="prueba_cpu.py"
-import psutil
-print("Primera llamada SIN interval:", psutil.cpu_percent())
-print("Llamada CON interval:", psutil.cpu_percent(interval=0.3))
-```
-
-- **P1.** ¿Qué valor da la primera llamada *sin* `interval`? ¿Por qué?
-
-<details class="sol"><summary>Respuesta</summary>Da <code>0.0</code>. Sin <code>interval</code>, la primera llamada no tiene un instante anterior con el que comparar, así que no puede calcular el porcentaje todavía. Por eso en el auditor usamos <code>interval=0.3</code>.</details>
-
-**Experimento 2.** Ejecuta el auditor **dos veces**: una dentro del contenedor (`docker compose run --rm auditor`) y otra directamente en tu máquina (`python auditor.py`).
-
-- **P2.** ¿En cuál de las dos ves más procesos? ¿Qué lo explica?
-
-<details class="sol"><summary>Respuesta</summary>En tu máquina ves muchos más. Dentro del contenedor solo se ven los procesos <b>de ese contenedor</b> (normalmente 1), porque está <b>aislado</b>. Para auditar el equipo real hay que ejecutar el script fuera de Docker.</details>
-
-**Experimento 3.** En `auditor.py`, el bucle captura `NoSuchProcess` y `AccessDenied`. Quita temporalmente ese `try/except` y vuelve a ejecutar varias veces.
-
-- **P3.** ¿Qué puede pasar? ¿Por qué el código original los captura?
-
-<details class="sol"><summary>Respuesta</summary>El programa puede romperse: un proceso puede terminar entre que se obtiene la lista y se lee su info (<code>NoSuchProcess</code>), o pertenecer a otro usuario y estar protegido (<code>AccessDenied</code>). Capturar esas excepciones hace que el auditor siga funcionando.</details>
-
-!!! tip "➡️ Esto cae en el test"
-    Las preguntas P1, P2 y P3 son exactamente del tipo que verás en el simulacro (bloque 2): el `0.0` de `cpu_percent`, el aislamiento del contenedor y por qué se capturan las excepciones. Si sabes explicarlas con tus palabras, ese bloque lo tienes.
-
-!!! note "Lo esencial del bloque 2 para el test"
-    `psutil` lee procesos, CPU, memoria, conexiones y usuarios. `cpu_percent` necesita `interval`. Siempre se capturan `NoSuchProcess`/`AccessDenied`. Un contenedor ve **solo sus** procesos (aislamiento). Un proceso desconocido **no** es automáticamente malicioso.
----
-
-# Bloque 3 · Análisis de tráfico de red con Scapy
-
-> **Objetivos didácticos:** entender qué es un paquete y sus capas; identificar IP, TCP, UDP, ICMP y DNS; leer ficheros PCAP, filtrar paquetes, extraer orígenes/destinos y contar comunicaciones con Scapy. Conocer las limitaciones de la captura en vivo (permisos, Docker) frente al análisis de una captura ya hecha.
-> **Duración estimada:** 3,5 h.
-
-## 3.1 Qué es un paquete y sus capas
-
-Cuando dos equipos se comunican por red, la información viaja en **paquetes**. Cada paquete está formado por **capas**, como una cebolla: cada capa añade su propia cabecera con su información.
-
-```mermaid
-flowchart LR
-    E["Ethernet<br/>(MAC origen/destino)"] --> I["IP<br/>(IP origen/destino)"]
-    I --> T["TCP/UDP<br/>(puertos)"]
-    T --> D["Datos<br/>(HTTP, DNS...)"]
-```
-
-| Capa | Qué información lleva | Ejemplo |
-|---|---|---|
-| **Ethernet** | Direcciones MAC (hardware) | `00:11:22:...` |
-| **IP** | Direcciones IP origen y destino | `10.0.0.5 → 10.0.0.1` |
-| **TCP / UDP** | Puertos (qué servicio) | puerto 80 (HTTP), 443 (HTTPS) |
-| **ICMP** | Mensajes de control (ping) | "echo request" |
-| **DNS** | Resolución de nombres | `ejemplo.local → 10.0.0.1` |
-
-**Diferencias que importan:**
-
-- **TCP** establece conexión (con el saludo SYN → SYN-ACK → ACK) y garantiza la entrega: web, SSH, correo. **UDP** no establece conexión, es más rápido y sin garantías: DNS, streaming.
-- **ICMP** no transporta datos de usuario: son mensajes de control (el `ping` usa ICMP).
-- Las **banderas (flags) TCP** indican el estado: `S` (SYN, inicio), `SA` (SYN-ACK, respuesta), `A` (ACK, confirmación). Muchos `S` sin completar el saludo pueden indicar un **escaneo de puertos**.
-
-## 3.2 Scapy: crear y leer paquetes
-
-**Scapy** es una librería de Python para construir, enviar, capturar y analizar paquetes de red. En esta unidad la usamos **sin Wireshark**: todo el análisis se hace con código.
-
-Los paquetes se construyen apilando capas con el operador `/`:
-
-```python title="construir.py"
-from scapy.all import IP, TCP
-
-# Un paquete IP que contiene un segmento TCP hacia el puerto 80
-paquete = IP(src="10.0.0.5", dst="10.0.0.1") / TCP(dport=80, flags="S")
-
-print(paquete.summary())          # resumen en una línea
-print("IP origen:", paquete[IP].src)
-print("Puerto destino:", paquete[TCP].dport)
-```
-
-```text title="Salida"
-IP / TCP 10.0.0.5:ftp_data > 10.0.0.1:http S
-IP origen: 10.0.0.5
-Puerto destino: 80
-```
-
-- `paquete[IP]` accede a la capa IP; `paquete[TCP]` a la capa TCP.
-- `paquete.haslayer(TCP)` indica si el paquete tiene esa capa (lo usaremos para filtrar).
-
-## 3.3 Trabajar con ficheros PCAP
-
-Un **PCAP** (*packet capture*) es un fichero que guarda paquetes capturados. Es el formato estándar y lo que vas a analizar: es **reproducible** (siempre da el mismo resultado) y **seguro** (no capturas tráfico real de nadie). Se escribe con `wrpcap` y se lee con `rdpcap`.
-
-En el laboratorio 3 lo generarás tú mismo (con `generar_pcap.py`), así que **no necesitas descargar ninguna captura externa**. Una vez creado el fichero, leerlo es tan simple como esto:
-
-```python title="leer_pcap.py (ejemplo; requiere haber generado trafico.pcap antes)"
-from scapy.all import rdpcap, IP
-
-paquetes = rdpcap("trafico.pcap")      # devuelve una lista de paquetes
-print("Paquetes en el fichero:", len(paquetes))
-
-for p in paquetes[:3]:                  # los 3 primeros
-    if p.haslayer(IP):
-        print(f"{p[IP].src} -> {p[IP].dst}")
-```
-
-## 3.4 🧪 Laboratorio 3 · Analizar una captura de laboratorio
-
-**Objetivo.** Generar un fichero PCAP de laboratorio (sin capturar tráfico real) y analizarlo: contar protocolos, listar conversaciones, extraer puertos y consultas DNS.
-
-**Conceptos que enseña.** Capas de red; lectura de PCAP; filtrado por protocolo; extracción de IP/puertos; recuento de comunicaciones.
-
-!!! tip "Ficheros listos para usar"
-    No tienes que copiar el código a mano: todos los ficheros de este laboratorio están en la carpeta **`labs/lab3/`** del repositorio del curso. Entra en ella y sigue las instrucciones de ejecución.
-
-**Ficheros del laboratorio** (en `labs/lab3/`):
-
-```python title="lab3/generar_pcap.py"
-from scapy.all import Ether, IP, TCP, UDP, ICMP, DNS, DNSQR, wrpcap
-
-# Tráfico de laboratorio: un saludo TCP, una consulta DNS, un ping,
-# y una IP que toca varios puertos (patrón de escaneo).
-paquetes = [
-    Ether()/IP(src="10.0.0.5", dst="10.0.0.1")/TCP(sport=44321, dport=80, flags="S"),
-    Ether()/IP(src="10.0.0.1", dst="10.0.0.5")/TCP(sport=80, dport=44321, flags="SA"),
-    Ether()/IP(src="10.0.0.5", dst="10.0.0.1")/TCP(sport=44321, dport=80, flags="A"),
-    Ether()/IP(src="10.0.0.5", dst="8.8.8.8")/UDP(sport=5353, dport=53)/DNS(rd=1, qd=DNSQR(qname="ejemplo.local")),
-    Ether()/IP(src="10.0.0.9", dst="10.0.0.1")/ICMP(),
-    Ether()/IP(src="10.0.0.9", dst="10.0.0.1")/TCP(sport=51000, dport=22, flags="S"),
-    Ether()/IP(src="10.0.0.9", dst="10.0.0.1")/TCP(sport=51001, dport=23, flags="S"),
-    Ether()/IP(src="10.0.0.9", dst="10.0.0.1")/TCP(sport=51002, dport=445, flags="S"),
-]
-wrpcap("trafico.pcap", paquetes)
-print(f"Creado trafico.pcap con {len(paquetes)} paquetes")
-```
-
-```python title="lab3/analizar.py"
-from scapy.all import rdpcap, IP, TCP, UDP, ICMP, DNS
-from collections import Counter
-
-def analizar(ruta: str) -> None:
-    paquetes = rdpcap(ruta)
-    print(f"Paquetes leídos: {len(paquetes)}\n")
-
-    protocolos: Counter[str] = Counter()
-    conversaciones: Counter[tuple[str, str]] = Counter()
-    puertos_tcp: Counter[int] = Counter()
-    consultas_dns: list[str] = []
-
-    for p in paquetes:
-        if p.haslayer(TCP):
-            protocolos["TCP"] += 1
-            puertos_tcp[p[TCP].dport] += 1
-        elif p.haslayer(UDP):
-            protocolos["UDP"] += 1
-        elif p.haslayer(ICMP):
-            protocolos["ICMP"] += 1
-        if p.haslayer(IP):
-            conversaciones[(p[IP].src, p[IP].dst)] += 1
-        if p.haslayer(DNS) and p[DNS].qd is not None:
-            consultas_dns.append(p[DNS].qd.qname.decode())
-
-    print("Protocolos:", dict(protocolos))
-    print("\nConversaciones (origen -> destino):")
-    for (src, dst), n in conversaciones.most_common():
-        print(f"  {src:12} -> {dst:12}  {n}")
-    print("\nPuertos destino TCP más contactados:")
-    for puerto, n in puertos_tcp.most_common(5):
-        print(f"  puerto {puerto:5}  {n} intento(s)")
-    print("\nConsultas DNS:")
-    for q in consultas_dns:
-        print(f"  {q}")
-
-if __name__ == "__main__":
-    analizar("trafico.pcap")
-```
-
-```text title="lab3/requirements.txt"
-scapy==2.5.0
-```
-
-```dockerfile title="lab3/Dockerfile"
-FROM python:3.12-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY generar_pcap.py analizar.py .
-# Analizar un PCAP NO requiere privilegios de red: usuario sin privilegios
-RUN useradd --create-home analista
-USER analista
-CMD ["sh", "-c", "python generar_pcap.py && python analizar.py"]
-```
-
-```yaml title="lab3/compose.yaml"
-services:
-  analista:
-    build: .
-    read_only: false      # necesita escribir trafico.pcap en /app
-    security_opt:
-      - no-new-privileges:true
-```
-
-**Ejecución:**
-
-```bash title="Terminal (dentro de lab3/)"
-docker compose build
-docker compose run --rm analista
-```
-
 **Salida esperada:**
 
 ```text
-Creado trafico.pcap con 8 paquetes
-Paquetes leídos: 8
+Auditando servidor...
 
-Protocolos: {'TCP': 6, 'UDP': 1, 'ICMP': 1}
+  [ABIERTO] puerto    80  nginx/1.18.0          VULNERABLE: CVE-2021-23017 (resolver, gravedad alta)
 
-Conversaciones (origen -> destino):
-  10.0.0.9     -> 10.0.0.1      4
-  10.0.0.5     -> 10.0.0.1      2
-  10.0.0.1     -> 10.0.0.5      1
-  10.0.0.5     -> 8.8.8.8       1
-
-Puertos destino TCP más contactados:
-  puerto    80  2 intento(s)
-  puerto 44321  1 intento(s)
-  puerto    22  1 intento(s)
-  puerto    23  1 intento(s)
-  puerto   445  1 intento(s)
-
-Consultas DNS:
-  ejemplo.local.
+Resumen: 1 servicios abiertos, 1 vulnerables.
+Informe guardado en informe_auditoria.json
 ```
 
-**Explicación del resultado.** La IP `10.0.0.9` aparece como la más activa, tocando **cuatro** destinos distintos en el mismo host, incluidos los puertos 22 (SSH), 23 (Telnet) y 445 (SMB), todos con bandera `S` (SYN) sin completar el saludo: es el **patrón típico de un escaneo de puertos**. `10.0.0.5`, en cambio, completa un saludo normal al puerto 80 y hace una consulta DNS legítima. Analizar el PCAP nos ha permitido **distinguir** un comportamiento sospechoso de uno normal, sin tocar la red real.
+El auditor ha descubierto el servicio web, ha leído que es `nginx/1.18.0` y, al cruzarlo con la NVD, ha encontrado que esa versión tiene una vulnerabilidad conocida. El **informe** queda en `informe_auditoria.json`.
 
-## 3.5 Captura en vivo: requisitos y límites (importante)
+### Paso 4 · Apaga el laboratorio
 
-Analizar un PCAP ya existente es seguro y reproducible. **Capturar** tráfico en tiempo real es muy distinto y tiene requisitos estrictos:
-
-- **Permisos.** Capturar requiere privilegios especiales sobre la interfaz de red (en Linux, la *capability* `CAP_NET_RAW`). Un usuario normal no puede hacerlo.
-- **Qué se ve.** Una interfaz solo ve, por defecto, **su propio** tráfico y el de difusión. No ves "todo el tráfico de la red" salvo configuraciones especiales (puerto espejo en el switch, modo promiscuo…).
-- **Docker.** Un contenedor **no** observa automáticamente el tráfico de los demás contenedores por compartir una red Docker: el conmutador virtual entrega a cada uno solo lo suyo. Para capturar en un contenedor haría falta otorgarle explícitamente `cap_add: [NET_RAW, NET_ADMIN]`, lo que **rompe el mínimo privilegio** y por eso **no** se hace en estos laboratorios.
-
-> **Regla de la unidad:** priorizamos **PCAP preparados y análisis reproducible**. La captura en vivo se explica, pero no se fuerza dentro de Docker, porque requeriría privilegios que contradicen el diseño seguro del laboratorio.
-
-Si quieres ver una captura en vivo de forma controlada, hazlo **en tu propia máquina**, sobre `localhost`, y con privilegios, generando tú el tráfico:
-
-```python title="captura_local.py — solo en tu máquina, NO en Docker"
-# Requiere privilegios: en Linux, ejecutar con sudo.
-# Captura 5 paquetes de la interfaz de loopback (tu propio tráfico local).
-from scapy.all import sniff
-
-paquetes = sniff(iface="lo", count=5, timeout=10)
-paquetes.summary()
+```bash title="Terminal"
+docker compose down
 ```
 
-**Errores habituales.**
+!!! success "Lo que has hecho"
+    Una auditoría real en miniatura: descubrir → identificar versión → cruzar con vulnerabilidades → informe. Es exactamente lo que hacen herramientas como **nmap** + **Nessus/OpenVAS**, pero programado por ti.
 
-| Síntoma | Causa | Solución |
-|---|---|---|
-| `PermissionError` al usar `sniff` | Captura sin privilegios | Ejecuta con `sudo` (solo en tu máquina, no en Docker) |
-| El contenedor no ve tráfico de otros | Aislamiento de red: es lo normal | Analiza un PCAP; no des por hecho que verás tráfico ajeno |
-| `qname` da error al decodificar | El paquete no tiene capa DNS | Comprueba `p.haslayer(DNS)` y `p[DNS].qd is not None` |
+> **Si te sobra tiempo:** añade a `PUERTOS` el 443 y, en el auditor, lee también la cabecera `Strict-Transport-Security` para comprobar si la web fuerza HTTPS. Es otra comprobación típica de auditoría.
 
-## 🔍 Comprueba tú mismo (Lab 3)
+## 🧪 Lab 2 · Monitorización y detección
 
-**Experimento 1.** Abre `generar_pcap.py` y **añade un paquete más**: una IP nueva, `10.0.0.9`, intentando conectarse también al puerto 3389 (escritorio remoto). Añade esta línea a la lista `paquetes`:
+**Objetivo.** Ahora te pones del lado del **defensor**. En el Lab 1 escaneaste y tanteaste un servidor; esas acciones **dejan rastro** en los registros. Aquí vas a **detectarlas** leyendo los logs y analizando el tráfico. Verás las **dos caras** de la misma acción.
 
-```python
-Ether()/IP(src="10.0.0.9", dst="10.0.0.1")/TCP(sport=51003, dport=3389, flags="S"),
+!!! tip "Ficheros del laboratorio"
+    Están en `labs/lab2/`: `auth.log`, `web.log`, `detector.py`, `generar_captura.py`, `ids_red.py`, `Dockerfile` y `compose.yaml`.
+
+### Paso 1 · Los registros que dejó el atacante
+
+La IP `10.0.0.66` (el auditor del Lab 1) aparece en dos registros. En `auth.log`, intentando adivinar contraseñas:
+
+```text title="labs/lab2/auth.log"
+Failed password for root from 10.0.0.66 port 51000
+Failed password for root from 10.0.0.66 port 51002
+Failed password for admin from 10.0.0.66 port 51004
+Failed password for admin from 10.0.0.66 port 51006
+Accepted password for ana from 10.0.0.5 port 60000
 ```
 
-Vuelve a ejecutar `generar_pcap.py` y `analizar.py`.
+Y en `web.log`, probando rutas que no existen (buscando páginas de administración, backups…):
 
-- **P1.** ¿Cuántos puertos distintos toca ahora `10.0.0.9`? ¿Refuerza eso la sospecha de escaneo?
-
-<details class="sol"><summary>Respuesta</summary>Ahora toca <b>cinco</b> (22, 23, 445, y el 3389 que acabas de añadir, además del patrón previo). Cuantos más puertos distintos toca una misma IP con SYN sin completar conexión, más claro es el <b>escaneo de puertos</b>.</details>
-
-**Experimento 2.** En `analizar.py`, fíjate en los filtros `p.haslayer(TCP)`, `p.haslayer(UDP)`. Prueba en un fichero aparte:
-
-```python title="prueba_capas.py"
-from scapy.all import IP, TCP, UDP
-paquete = IP()/UDP(dport=53)       # un paquete UDP (típico de DNS)
-print("¿Tiene capa TCP?:", paquete.haslayer(TCP))
-print("¿Tiene capa UDP?:", paquete.haslayer(UDP))
+```text title="labs/lab2/web.log"
+10.0.0.66 - GET /index.html 200
+10.0.0.66 - GET /admin 404
+10.0.0.66 - GET /.env 404
+10.0.0.66 - GET /wp-login.php 404
+10.0.0.66 - GET /backup.zip 404
+10.0.0.5 - GET /index.html 200
+10.0.0.5 - GET /productos 200
 ```
 
-- **P2.** ¿Qué imprime? ¿Por qué `haslayer` es la clave para clasificar protocolos?
+### Paso 2 · El detector de logs
 
-<details class="sol"><summary>Respuesta</summary>Imprime <code>False</code> y <code>True</code>: el paquete tiene capa UDP pero no TCP. <code>haslayer</code> permite preguntar a cada paquete qué capas tiene y así contarlo en el protocolo correcto.</details>
+Lee ambos registros, cuenta por IP y lanza una **alerta** si se supera un umbral. Es un **mini-IDS**.
 
-**Experimento 3.** Intenta analizar un fichero que **no existe**: cambia `analizar("trafico.pcap")` por `analizar("no_existe.pcap")`.
-
-- **P3.** ¿Qué pasa? ¿Y por qué en estos laboratorios usamos PCAP generados en vez de capturar en vivo?
-
-<details class="sol"><summary>Respuesta</summary>Da un error de fichero no encontrado (hay que generar el PCAP antes). Usamos PCAP generados porque son <b>reproducibles</b> y <b>seguros</b>; capturar en vivo requeriría privilegios de red (<code>CAP_NET_RAW</code>) que rompen el mínimo privilegio del contenedor, y además un contenedor no ve el tráfico de otros por compartir red Docker.</details>
-
-!!! tip "➡️ Esto cae en el test"
-    P1 (muchos SYN = escaneo), P2 (`haslayer` TCP/UDP) y P3 (por qué no se captura en vivo en Docker) son tres preguntas del bloque 3 del simulacro. Este experimento te las deja preparadas.
-
-!!! note "Lo esencial del bloque 3 para el test"
-    Paquete = capas (Ethernet/IP/TCP-UDP/datos). TCP tiene saludo (S/SA/A) y garantías; UDP no. PCAP = captura guardada; `rdpcap` la lee, `wrpcap` la escribe. `haslayer()` filtra. Muchos SYN a puertos distintos = escaneo. Capturar en vivo necesita privilegios (`CAP_NET_RAW`) y no ves el tráfico ajeno por compartir red Docker.
----
-
-# Bloque 4 · Análisis de registros de seguridad
-
-> **Objetivos didácticos:** leer registros con `pathlib`, extraer información con `re`, contar eventos con `collections` y detectar patrones sospechosos (fallos de autenticación repetidos). Establecer umbrales e interpretar resultados evitando falsos positivos.
-> **Duración estimada:** 3 h.
-
-## 4.1 Qué es un registro (log) y por qué importa
-
-Un **registro** o *log* es un fichero de texto donde el sistema y los servicios anotan lo que va ocurriendo: inicios de sesión, errores, conexiones. En Linux, el registro de autenticación suele estar en `/var/log/auth.log`. Analizarlos permite **detectar** comportamientos anómalos, como muchos intentos de login fallidos seguidos.
-
-El patrón de un ataque de **fuerza bruta** por SSH deja líneas como:
-
-```text
-Failed password for root from 203.0.113.9 port 51000
-```
-
-Si una misma IP acumula muchas de estas, es un **indicio** que merece revisión.
-
-## 4.2 Las tres herramientas: `pathlib`, `re` y `collections`
-
-- **`pathlib`** lee el fichero de forma sencilla: `Path("auth.log").read_text()`.
-- **`re`** (expresiones regulares) extrae los datos que interesan de cada línea.
-- **`collections.Counter`** cuenta de forma cómoda.
-
-```python title="contar_fallos.py"
+```python title="labs/lab2/detector.py"
 import re
 from collections import Counter
 
-PATRON = re.compile(r"Failed password for \S+ from (\d+\.\d+\.\d+\.\d+)")
+UMBRAL = 3
 
-lineas = [
-    "Failed password for root from 203.0.113.9 port 51000",
-    "Failed password for admin from 203.0.113.9 port 51004",
-    "Accepted password for ana from 10.0.0.5 port 60000",
-]
+def leer(ruta):
+    with open(ruta, encoding="utf-8") as f:
+        return f.read().splitlines()
 
+# 1) auth.log: contar fallos de login por IP
 fallos = Counter()
-for linea in lineas:
-    m = PATRON.search(linea)
-    if m:                       # solo cuenta las líneas de FALLO
+for linea in leer("auth.log"):
+    m = re.search(r"Failed password for \S+ from (\d+\.\d+\.\d+\.\d+)", linea)
+    if m:
         fallos[m.group(1)] += 1
 
-print(dict(fallos))
+# 2) web.log: contar errores 404 por IP (rastreo de rutas que no existen)
+rutas_404 = Counter()
+for linea in leer("web.log"):
+    m = re.search(r"(\d+\.\d+\.\d+\.\d+).* 404$", linea)
+    if m:
+        rutas_404[m.group(1)] += 1
+
+print("Fallos de login por IP:", dict(fallos))
+print("Errores 404 por IP:    ", dict(rutas_404))
+
+# 3) mini-IDS: una IP es sospechosa si supera el umbral en login O en rutas
+print("\n--- ALERTAS ---")
+hay = False
+for ip in sorted(set(fallos) | set(rutas_404)):
+    motivos = []
+    if fallos[ip] >= UMBRAL:
+        motivos.append(f"fuerza bruta ({fallos[ip]} fallos de login)")
+    if rutas_404[ip] >= UMBRAL:
+        motivos.append(f"rastreo de rutas ({rutas_404[ip]} rutas inexistentes)")
+    if motivos:
+        hay = True
+        print(f"  [ALERTA] {ip}: " + " + ".join(motivos))
+if not hay:
+    print("  (ninguna)")
 ```
 
-```text title="Salida"
-{'203.0.113.9': 2}
+### Paso 3 · El mini-IDS de red (con Scapy)
+
+El escaneo de puertos del Lab 1 también deja rastro en el **tráfico**. `generar_captura.py` recrea ese tráfico en un fichero PCAP, e `ids_red.py` lo analiza: una IP que toca **muchos puertos distintos** está escaneando.
+
+```python title="labs/lab2/ids_red.py"
+from scapy.all import rdpcap, IP, TCP
+
+UMBRAL_PUERTOS = 5
+
+paquetes = rdpcap("captura.pcap")
+
+# Una IP que envía SYN a muchos puertos distintos está escaneando.
+puertos_por_ip = {}
+for p in paquetes:
+    if p.haslayer(TCP) and p[TCP].flags == "S":
+        puertos_por_ip.setdefault(p[IP].src, set()).add(p[TCP].dport)
+
+print("--- Mini-IDS de red (escaneo de puertos) ---")
+for ip, puertos in puertos_por_ip.items():
+    if len(puertos) >= UMBRAL_PUERTOS:
+        print(f"  [ALERTA] {ip}: escaneo de puertos ({len(puertos)} puertos distintos)")
+    else:
+        print(f"  {ip}: {len(puertos)} puerto(s) contactado(s), normal")
 ```
 
-El `if m:` es esencial: `re.search` devuelve `None` si la línea no encaja (por ejemplo, la de `Accepted`), y así no la contamos.
+### Paso 4 · Levanta y ejecuta
 
-## 4.3 Umbrales y falsos positivos
-
-¿A partir de cuántos fallos consideramos sospechosa una IP? Eso es el **umbral**. Elegirlo bien es un equilibrio:
-
-- Un umbral **muy bajo** (p. ej., 2) genera **falsos positivos**: un usuario que se equivoca dos veces al escribir su contraseña no es un atacante.
-- Un umbral **muy alto** deja pasar ataques lentos.
-
-> **Principio fundamental:** superar un umbral indica un **patrón compatible** con un ataque, **no** demuestra que haya ocurrido uno. Un pico de fallos puede ser un script mal configurado, un usuario despistado o un sistema de copias con credenciales caducadas. La detección **señala para investigar**, no condena.
-
-## 4.4 🧪 Laboratorio 4 · Detector de fuerza bruta en logs
-
-**Objetivo.** Leer un registro de autenticación, contar los fallos por IP, aplicar un umbral y señalar las IP a revisar, sin afirmar que haya un ataque confirmado.
-
-**Conceptos que enseña.** Lectura de ficheros; extracción con regex; recuento; umbrales; interpretación prudente.
-
-!!! tip "Ficheros listos para usar"
-    No tienes que copiar el código a mano: todos los ficheros de este laboratorio están en la carpeta **`labs/lab4/`** del repositorio del curso. Entra en ella y sigue las instrucciones de ejecución.
-
-**Ficheros del laboratorio** (en `labs/lab4/`):
-
-```text title="lab4/auth.log"
-2026-05-01T08:00:01 sshd: Failed password for root from 203.0.113.9 port 51000
-2026-05-01T08:00:03 sshd: Failed password for root from 203.0.113.9 port 51002
-2026-05-01T08:00:05 sshd: Failed password for admin from 203.0.113.9 port 51004
-2026-05-01T08:00:07 sshd: Failed password for root from 198.51.100.7 port 40000
-2026-05-01T08:00:12 sshd: Failed password for root from 203.0.113.9 port 51006
-2026-05-01T08:00:30 sshd: Accepted password for ana from 10.0.0.5 port 60000
-2026-05-01T08:01:00 sshd: Failed password for guest from 203.0.113.9 port 51008
-```
-
-```python title="lab4/detectar.py"
-import re
-from collections import Counter
-from pathlib import Path
-
-PATRON_FALLO = re.compile(
-    r"Failed password for (?P<usuario>\S+) from (?P<ip>\d+\.\d+\.\d+\.\d+)")
-
-def analizar_log(ruta: Path, umbral: int = 3) -> None:
-    texto = ruta.read_text(encoding="utf-8")
-
-    fallos_por_ip: Counter[str] = Counter()
-    usuarios_por_ip: dict[str, set[str]] = {}
-
-    for linea in texto.splitlines():
-        m = PATRON_FALLO.search(linea)
-        if m:
-            ip = m.group("ip")
-            fallos_por_ip[ip] += 1
-            usuarios_por_ip.setdefault(ip, set()).add(m.group("usuario"))
-
-    print("=== Fallos de autenticación por IP ===")
-    for ip, n in fallos_por_ip.most_common():
-        usuarios = ", ".join(sorted(usuarios_por_ip[ip]))
-        print(f"  {ip:16} {n} fallos  (usuarios: {usuarios})")
-
-    print(f"\n=== IPs que superan el umbral ({umbral}) ===")
-    hay_alertas = False
-    for ip, n in fallos_por_ip.items():
-        if n >= umbral:
-            hay_alertas = True
-            print(f"  [REVISAR] {ip}: {n} fallos con "
-                  f"{len(usuarios_por_ip[ip])} usuario(s) distinto(s)")
-    if not hay_alertas:
-        print("  (ninguna)")
-
-    print("\nNota: un umbral superado es un PATRÓN sospechoso que hay que verificar,")
-    print("no una prueba de ataque por sí solo.")
-
-if __name__ == "__main__":
-    analizar_log(Path("auth.log"), umbral=3)
-```
-
-```dockerfile title="lab4/Dockerfile"
-FROM python:3.12-slim
-WORKDIR /app
-COPY detectar.py auth.log .
-RUN useradd --create-home analista
-USER analista
-CMD ["python", "detectar.py"]
-```
-
-```yaml title="lab4/compose.yaml"
-services:
-  analista:
-    build: .
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
-```
-
-> Este laboratorio **no** necesita dependencias externas (`re`, `collections` y `pathlib` son de la biblioteca estándar), por eso no hay `requirements.txt`.
-
-**Ejecución:**
-
-```bash title="Terminal (dentro de lab4/)"
+```bash title="Terminal (dentro de labs/lab2/)"
 docker compose build
 docker compose run --rm analista
 ```
@@ -775,799 +319,258 @@ docker compose run --rm analista
 **Salida esperada:**
 
 ```text
-=== Fallos de autenticación por IP ===
-  203.0.113.9      5 fallos  (usuarios: admin, guest, root)
-  198.51.100.7     1 fallos  (usuarios: root)
+Fallos de login por IP: {'10.0.0.66': 4}
+Errores 404 por IP:     {'10.0.0.66': 4}
 
-=== IPs que superan el umbral (3) ===
-  [REVISAR] 203.0.113.9: 5 fallos con 3 usuario(s) distinto(s)
+--- ALERTAS ---
+  [ALERTA] 10.0.0.66: fuerza bruta (4 fallos de login) + rastreo de rutas (4 rutas inexistentes)
 
-Nota: un umbral superado es un PATRÓN sospechoso que hay que verificar,
-no una prueba de ataque por sí solo.
+captura.pcap creada con 7 paquetes
+--- Mini-IDS de red (escaneo de puertos) ---
+  [ALERTA] 10.0.0.66: escaneo de puertos (6 puertos distintos)
+  10.0.0.5: 1 puerto(s) contactado(s), normal
 ```
 
-**Explicación del resultado.** La IP `203.0.113.9` acumula 5 fallos contra 3 usuarios distintos (`root`, `admin`, `guest`): probar varios usuarios desde una misma IP es característico de fuerza bruta. `198.51.100.7` solo tiene 1 fallo, por debajo del umbral, así que **no** se marca — evitamos un falso positivo. La línea `Accepted` de `ana` no se cuenta porque el patrón solo captura `Failed`.
+### Paso 5 · Apaga el laboratorio
 
-**Errores habituales.**
-
-| Síntoma | Causa | Solución |
-|---|---|---|
-| Cuenta también los `Accepted` | Patrón demasiado amplio | El regex solo debe capturar `Failed password` |
-| `AttributeError: NoneType` | Usar `m.group()` sin comprobar `if m:` | Comprueba siempre que hubo coincidencia |
-| No detecta nada | Umbral demasiado alto | Ajusta el umbral al volumen real de tu log |
-
-## 🔍 Comprueba tú mismo (Lab 4)
-
-**Experimento 1.** El detector usa `umbral=3`. Ejecútalo cambiando el umbral: primero `umbral=2`, luego `umbral=5`. (Edita la última línea de `detectar.py`.)
-
-- **P1.** ¿Qué IPs se marcan con cada umbral? ¿Qué pasa si el umbral es demasiado bajo? ¿Y demasiado alto?
-
-<details class="sol"><summary>Respuesta</summary>Con un umbral <b>bajo</b> se marcan más IPs, incluidas las que solo fallaron un par de veces por despiste: aparecen <b>falsos positivos</b>. Con un umbral <b>alto</b>, un atacante lento puede pasar desapercibido. El umbral es un equilibrio entre ambos riesgos.</details>
-
-**Experimento 2.** Añade al final de `auth.log` una línea de acceso **correcto** desde la IP atacante:
-
-```text
-2026-05-01T08:02:00 sshd: Accepted password for root from 203.0.113.9 port 51010
+```bash title="Terminal"
+docker compose down
 ```
 
-Vuelve a ejecutar.
+!!! success "Las dos caras de la moneda"
+    La misma IP (`10.0.0.66`) que en el Lab 1 era *tu auditor*, aquí aparece como *el atacante detectado*: por fuerza bruta en `auth.log`, por rastreo de rutas en `web.log` y por escaneo de puertos en el tráfico. **Atacar y detectar son la misma acción vista desde los dos lados.**
 
-- **P2.** ¿Cambia el número de *fallos* contados para esa IP? ¿Por qué?
+> **Nota sobre falsos positivos.** Superar un umbral es un **patrón sospechoso que hay que verificar**, no una prueba de ataque: podría ser un script mal configurado. Un umbral muy bajo genera falsas alarmas; uno muy alto deja pasar ataques lentos.
+## Actividades
 
-<details class="sol"><summary>Respuesta</summary>No cambia: el patrón solo captura líneas <code>Failed password</code>, así que la línea <code>Accepted</code> se ignora al contar fallos. (Ahora bien, en un caso real, un acceso <i>correcto</i> tras muchos fallos sería una señal aún más grave: quizá el atacante acertó.)</details>
+> Practica con lo visto en la unidad. Usa solo lo que ya conoces: **variables**, **operadores**, condicionales **`if` / `elif` / `else`** y acceso a **diccionarios**. No necesitas escribir bucles ni definir funciones. Intenta cada una **antes** de abrir la solución.
 
-**Experimento 3.** En `detectar.py`, localiza el `if m:` que sigue a `PATRON_FALLO.search(linea)`. Quítalo (deja el cuerpo) y ejecuta.
-
-- **P3.** ¿Qué error aparece y por qué?
-
-<details class="sol"><summary>Respuesta</summary>Aparece <code>AttributeError: 'NoneType' object has no attribute 'group'</code>. Cuando una línea no encaja, <code>search</code> devuelve <code>None</code>, y al hacer <code>None.group()</code> se rompe. Por eso <b>siempre</b> se comprueba <code>if m:</code> antes de usar el resultado.</details>
-
-!!! tip "➡️ Esto cae en el test"
-    P1 (umbrales y falsos positivos), P2 (el patrón solo cuenta `Failed`) y P3 (el `if m:` tras `re.search`) son preguntas directas del bloque 4 del simulacro.
-
-!!! note "Lo esencial del bloque 4 para el test"
-    `pathlib` lee, `re` extrae, `Counter` cuenta. `re.search` devuelve `None` si no encaja → comprobar `if m:`. El umbral equilibra falsos positivos y ataques no detectados. Superar un umbral = patrón a **investigar**, no prueba de ataque.
-
----
-
-# Bloque 5 · Protección del sistema y vigilancia de archivos
-
-> **Objetivos didácticos:** entender permisos, mínimo privilegio, actualizaciones, firewall y copias como capas de protección; usar `watchdog` para detectar creación, modificación, renombrado y borrado de ficheros en un directorio. Conocer los límites de la vigilancia de archivos.
-> **Duración estimada:** 2,5 h.
-
-## 5.1 Las capas de protección del sistema
-
-Proteger un sistema en marcha combina varias medidas, cada una una **capa** (defensa en profundidad):
-
-| Medida | Qué aporta |
-|---|---|
-| **Permisos y mínimo privilegio** | Cada usuario/proceso accede solo a lo necesario |
-| **Actualizaciones** | Cierran vulnerabilidades conocidas |
-| **Firewall** | Filtra el tráfico de red |
-| **Copias de seguridad** | Permiten recuperarse (seguridad pasiva) |
-| **Vigilancia de archivos** | Detecta cambios no esperados en ficheros clave |
-
-La **vigilancia de archivos** avisa cuando algo modifica, crea o borra ficheros que no deberían cambiar (por ejemplo, los de configuración del sistema). Es una técnica de tipo **HIDS** (vigila un equipo concreto).
-
-## 5.2 `watchdog`: reaccionar a cambios en ficheros
-
-`watchdog` observa un directorio y **ejecuta código** cuando ocurre un evento: creación, modificación, borrado o renombrado. Se define un *manejador* (una clase que hereda de `FileSystemEventHandler`) con un método por tipo de evento.
-
-```python title="eventos.py"
-from watchdog.events import FileSystemEventHandler
-
-class MiManejador(FileSystemEventHandler):
-    def on_created(self, event):    # se crea un fichero o carpeta
-        print("CREADO:", event.src_path)
-    def on_modified(self, event):   # se modifica
-        print("MODIFICADO:", event.src_path)
-    def on_deleted(self, event):    # se borra
-        print("BORRADO:", event.src_path)
-    def on_moved(self, event):      # se renombra o mueve
-        print("MOVIDO:", event.src_path, "->", event.dest_path)
-```
-
-Un `Observer` conecta ese manejador con una carpeta y se queda escuchando en segundo plano.
-
-!!! warning "La vigilancia de archivos NO sustituye a un antivirus"
-    `watchdog` te dice que *algo cambió*, pero no *si ese cambio es malicioso*. Una actualización legítima también modifica ficheros. Es una capa de **detección de cambios**, útil combinada con otras (un antivirus analiza el contenido; aquí solo observamos eventos). Tampoco detecta cambios si el fichero se modifica mientras el vigilante no está en marcha.
-
-## 5.3 🧪 Laboratorio 5 · Vigilante de un directorio
-
-**Objetivo.** Vigilar una carpeta y registrar en tiempo real los cuatro tipos de evento (creación, modificación, renombrado, borrado).
-
-**Conceptos que enseña.** Manejadores de eventos de ficheros; observación en segundo plano; HIDS básico; límites de la técnica.
-
-!!! tip "Ficheros listos para usar"
-    No tienes que copiar el código a mano: todos los ficheros de este laboratorio están en la carpeta **`labs/lab5/`** del repositorio del curso. Entra en ella y sigue las instrucciones de ejecución.
-
-**Ficheros del laboratorio** (en `labs/lab5/`):
-
-```python title="lab5/vigilar.py"
-import sys
-import time
-from pathlib import Path
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-
-class VigilanteDeArchivos(FileSystemEventHandler):
-    def _marca(self, tipo: str, ruta: str) -> None:
-        print(f"{time.strftime('%H:%M:%S')}  [{tipo:11}] {ruta}", flush=True)
-
-    def on_created(self, event):
-        if not event.is_directory:
-            self._marca("CREADO", event.src_path)
-
-    def on_modified(self, event):
-        if not event.is_directory:
-            self._marca("MODIFICADO", event.src_path)
-
-    def on_deleted(self, event):
-        if not event.is_directory:
-            self._marca("BORRADO", event.src_path)
-
-    def on_moved(self, event):
-        self._marca("RENOMBRADO", f"{event.src_path} -> {event.dest_path}")
-
-def vigilar(carpeta: str, segundos: int) -> None:
-    Path(carpeta).mkdir(parents=True, exist_ok=True)
-    observador = Observer()
-    observador.schedule(VigilanteDeArchivos(), carpeta, recursive=True)
-    observador.start()
-    print(f"Vigilando {carpeta} durante {segundos}s...", flush=True)
-    try:
-        time.sleep(segundos)
-    finally:
-        observador.stop()
-        observador.join()
-    print("Vigilancia terminada.", flush=True)
-
-if __name__ == "__main__":
-    carpeta = sys.argv[1] if len(sys.argv) > 1 else "vigilada"
-    segundos = int(sys.argv[2]) if len(sys.argv) > 2 else 30
-    vigilar(carpeta, segundos)
-```
-
-```python title="lab5/provocar.py"
-# Genera eventos sobre la carpeta vigilada, para la demostración.
-import time
-from pathlib import Path
-
-carpeta = Path("vigilada")
-carpeta.mkdir(exist_ok=True)
-time.sleep(1)
-(carpeta / "documento.txt").write_text("contenido inicial"); time.sleep(0.5)
-(carpeta / "documento.txt").write_text("contenido modificado"); time.sleep(0.5)
-(carpeta / "documento.txt").rename(carpeta / "renombrado.txt"); time.sleep(0.5)
-(carpeta / "renombrado.txt").unlink()
-print("Eventos provocados.")
-```
-
-```text title="lab5/requirements.txt"
-watchdog==4.0.0
-```
-
-```dockerfile title="lab5/Dockerfile"
-FROM python:3.12-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY vigilar.py provocar.py .
-RUN useradd --create-home vigilante && mkdir -p /app/vigilada && chown vigilante /app/vigilada
-USER vigilante
-# Lanza el vigilante 8s y, en paralelo, provoca los eventos
-CMD ["sh", "-c", "python vigilar.py vigilada 8 & sleep 1 && python provocar.py && wait"]
-```
-
-```yaml title="lab5/compose.yaml"
-services:
-  vigilante:
-    build: .
-    security_opt:
-      - no-new-privileges:true
-```
-
-**Ejecución:**
-
-```bash title="Terminal (dentro de lab5/)"
-docker compose build
-docker compose run --rm vigilante
-```
-
-**Salida esperada** (las horas varían):
-
-```text
-Vigilando vigilada durante 8s...
-07:01:40  [CREADO     ] vigilada/documento.txt
-07:01:40  [MODIFICADO ] vigilada/documento.txt
-07:01:41  [RENOMBRADO ] vigilada/documento.txt -> vigilada/renombrado.txt
-07:01:41  [BORRADO    ] vigilada/renombrado.txt
-Eventos provocados.
-Vigilancia terminada.
-```
-
-**Explicación del resultado.** El vigilante detecta en tiempo real cada operación: la creación del fichero, su modificación, el renombrado (un único evento `on_moved` con origen y destino) y el borrado. Es exactamente lo que haría un HIDS vigilando `/etc` para avisar si alguien altera la configuración. Puede aparecer más de un `MODIFICADO` por operación, porque el sistema de ficheros emite varios eventos internos al escribir — es normal.
-
-**Errores habituales.**
-
-| Síntoma | Causa | Solución |
-|---|---|---|
-| No detecta nada | La carpeta vigilada no existe o es otra | `mkdir` la carpeta y vigila la ruta correcta |
-| Varios `MODIFICADO` por un cambio | El SO emite varios eventos al escribir | Es normal; se puede "desduplicar" por tiempo si molesta |
-| El vigilante termina enseguida | Se acabó el tiempo de `time.sleep` | Aumenta los segundos o déjalo en un bucle |
-
-## 🔍 Comprueba tú mismo (Lab 5)
-
-**Experimento 1.** Con el vigilante en marcha, abre **otra terminal** y crea tú mismo un fichero en la carpeta vigilada, luego edítalo y bórralo:
-
-```bash
-echo "hola" > vigilada/mi_prueba.txt
-echo "cambio" >> vigilada/mi_prueba.txt
-rm vigilada/mi_prueba.txt
-```
-
-- **P1.** ¿Qué tipos de evento aparecen? ¿Coinciden con tus acciones?
-
-<details class="sol"><summary>Respuesta</summary>Aparecen <code>CREADO</code>, <code>MODIFICADO</code> (puede salir más de uno) y <code>BORRADO</code>. watchdog reacciona en tiempo real a cada operación sobre el sistema de ficheros.</details>
-
-**Experimento 2.** Renombra un fichero mientras el vigilante está activo:
-
-```bash
-echo "x" > vigilada/antes.txt
-mv vigilada/antes.txt vigilada/despues.txt
-```
-
-- **P2.** ¿Cuántos eventos genera el renombrado y de qué tipo?
-
-<details class="sol"><summary>Respuesta</summary>Genera un único evento <code>RENOMBRADO</code> (<code>on_moved</code>), que incluye la ruta de origen y la de destino. No son dos eventos separados de borrado + creación.</details>
-
-**Experimento 3.** Para el vigilante (deja que termine). **Ahora, con el vigilante apagado**, crea un fichero en la carpeta. Vuelve a arrancar el vigilante.
-
-- **P3.** ¿Detecta el fichero que creaste mientras estaba apagado? ¿Qué limitación muestra esto?
-
-<details class="sol"><summary>Respuesta</summary>No lo detecta: watchdog solo ve los eventos que ocurren <b>mientras está en marcha</b>. Lo que pase con el vigilante apagado se pierde. Por eso la vigilancia de archivos es una capa más, no una garantía total, y <b>no sustituye a un antivirus</b> (que además analiza el contenido).</details>
-
-!!! tip "➡️ Esto cae en el test"
-    P1/P2 (los eventos de watchdog, el renombrado como `on_moved`) y P3 (no detecta cambios con el vigilante apagado, no sustituye al antivirus) son preguntas del bloque 5 del simulacro.
-
-!!! note "Lo esencial del bloque 5 para el test"
-    `watchdog` detecta CREADO/MODIFICADO/BORRADO/MOVIDO con un `FileSystemEventHandler` + `Observer`. Es una técnica HIDS. **No** sustituye a un antivirus: avisa de que *algo cambió*, no de si es malicioso, y no ve cambios hechos mientras no estaba activo.
-
----
-
-# Bloque 6 · Detección, alertas y respuesta defensiva
-
-> **Objetivos didácticos:** correlacionar evidencias de varias fuentes (sistema, red, logs, archivos); aplicar reglas de detección y niveles de gravedad; registrar alertas con `logging` y `json`; razonar decisiones defensivas evitando falsos positivos.
-> **Duración estimada:** 2 h.
-
-## 6.1 De la observación a la decisión
-
-En los bloques anteriores has recogido **evidencias** por separado: procesos (psutil), tráfico (Scapy), fallos de login (logs), cambios de ficheros (watchdog). La defensa real consiste en **juntarlas** y decidir. Una sola evidencia puede ser ruido; **varias que apuntan a lo mismo** son una señal fuerte.
-
-> Ejemplo: una IP con muchos fallos de login *y además* escaneando puertos *y además* asociada a un cambio en `/etc/passwd` es mucho más preocupante que cualquiera de esas tres cosas por separado. Eso es **correlación**.
-
-## 6.2 Reglas, gravedad y registro
-
-- **Regla de detección:** una condición que, si se cumple, genera una alerta (p. ej., "≥ 3 fallos de la misma IP").
-- **Nivel de gravedad:** `BAJA`, `MEDIA`, `ALTA`, `CRITICA`. Ayuda a priorizar: no todo merece la misma reacción.
-- **Registro de alertas:** se guardan con `logging` (para verlas en tiempo real) y en formato `json` (para que otra herramienta las procese).
-
-**Falsos positivos.** Igual que en los logs, una regla puede saltar sin que haya ataque. Por eso una buena alerta incluye el **porqué** (qué evidencia la disparó), para que una persona pueda verificarla rápido.
-
-## 6.3 Medidas correctoras (respuesta)
-
-Cuando una alerta se confirma, la respuesta defensiva puede ser: **bloquear** la IP en el firewall, **aislar** el equipo afectado de la red, **forzar** el cambio de credenciales, **restaurar** ficheros desde copia y **documentar** el incidente. La automatización (un IPS) puede aplicar algunas de inmediato; otras requieren decisión humana.
-
-## 6.4 🧪 Laboratorio 6 · Correlacionar evidencias y generar alertas
-
-**Objetivo.** Partir de una lista de evidencias de distintas fuentes, aplicar reglas de detección con niveles de gravedad, correlacionar y registrar las alertas con `logging` y `json`.
-
-**Conceptos que enseña.** Correlación de fuentes; reglas; gravedad; registro estructurado; justificación de decisiones.
-
-!!! tip "Ficheros listos para usar"
-    No tienes que copiar el código a mano: todos los ficheros de este laboratorio están en la carpeta **`labs/lab6/`** del repositorio del curso. Entra en ella y sigue las instrucciones de ejecución.
-
-**Ficheros del laboratorio** (en `labs/lab6/`):
-
-La idea es sencilla: **cuantas más fuentes distintas señalan a la misma IP, más grave es**. Una IP que solo aparece en un sitio puede ser ruido; una que aparece en los logs, en la red y en los ficheros a la vez es una amenaza seria.
-
-```python title="lab6/correlacionar.py"
-import json
-import logging
-
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-log = logging.getLogger("defensa")
-
-# Evidencias que han recogido los laboratorios anteriores, ya resumidas.
-# Cada una indica: de qué fuente viene, a qué IP señala y qué se observó.
-evidencias = [
-    {"fuente": "logs",     "ip": "203.0.113.9", "hecho": "5 fallos de login"},
-    {"fuente": "red",      "ip": "203.0.113.9", "hecho": "escaneo de 4 puertos"},
-    {"fuente": "archivos", "ip": "203.0.113.9", "hecho": "modificó /etc/passwd"},
-    {"fuente": "red",      "ip": "10.0.0.5",    "hecho": "1 conexión al puerto 80"},
-]
-
-# 1) Agrupamos las evidencias por IP.
-senales_por_ip: dict[str, list[dict]] = {}
-for e in evidencias:
-    senales_por_ip.setdefault(e["ip"], []).append(e)
-
-# 2) Regla de correlación: más evidencias = más gravedad.
-def gravedad(n_evidencias: int) -> str:
-    if n_evidencias >= 3:
-        return "CRITICA"
-    if n_evidencias == 2:
-        return "ALTA"
-    return "BAJA"
-
-# 3) Generamos una alerta por IP y avisamos de las graves.
-alertas = []
-for ip, lista in senales_por_ip.items():
-    nivel = gravedad(len(lista))
-    alerta = {"ip": ip, "gravedad": nivel, "evidencias": [e["hecho"] for e in lista]}
-    alertas.append(alerta)
-    if nivel in ("ALTA", "CRITICA"):
-        log.warning("%s en %s -> %s", nivel, ip, ", ".join(alerta["evidencias"]))
-
-# 4) Guardamos el informe en JSON para que otra herramienta pueda procesarlo.
-with open("informe.json", "w", encoding="utf-8") as f:
-    json.dump(alertas, f, indent=2, ensure_ascii=False)
-
-print(f"\n{len(alertas)} IPs analizadas. Informe guardado en informe.json")
-```
-
-```dockerfile title="lab6/Dockerfile"
-FROM python:3.12-slim
-WORKDIR /app
-COPY correlacionar.py .
-RUN useradd --create-home defensa && chown defensa /app
-USER defensa
-CMD ["python", "correlacionar.py"]
-```
-
-```yaml title="lab6/compose.yaml"
-services:
-  defensa:
-    build: .
-    security_opt:
-      - no-new-privileges:true
-```
-
-> Usa solo la biblioteca estándar (`json`, `logging`), así que no necesita `requirements.txt`.
-
-**Ejecución:**
-
-```bash title="Terminal (dentro de labs/lab6/)"
-docker compose build
-docker compose run --rm defensa
-```
-
-**Salida esperada:**
-
-```text
-WARNING: CRITICA en 203.0.113.9 -> 5 fallos de login, escaneo de 4 puertos, modificó /etc/passwd
-
-2 IPs analizadas. Informe guardado en informe.json
-```
-
-Y el fichero `informe.json` que genera:
-
-```json title="informe.json"
-[
-  {
-    "ip": "203.0.113.9",
-    "gravedad": "CRITICA",
-    "evidencias": [
-      "5 fallos de login",
-      "escaneo de 4 puertos",
-      "modificó /etc/passwd"
-    ]
-  },
-  {
-    "ip": "10.0.0.5",
-    "gravedad": "BAJA",
-    "evidencias": [
-      "1 conexión al puerto 80"
-    ]
-  }
-]
-```
-
-**Explicación del resultado.** La IP `203.0.113.9` aparece en **tres** fuentes distintas (logs, red y archivos), así que la correlación la marca como **CRÍTICA**: tres señales que coinciden son mucho más fiables que una sola. La IP `10.0.0.5`, con una única evidencia normal, se queda en **BAJA** y no genera aviso — así evitamos el falso positivo. El informe queda en JSON para que otra herramienta (o tú, en el examen) lo procese.
-
-**Decisión defensiva justificada.** Ante la alerta CRÍTICA, la respuesta proporcionada sería: bloquear `203.0.113.9` en el firewall, revisar si algún login tuvo éxito desde esa IP, y restaurar `/etc/passwd` desde copia verificando su integridad. No se bloquea a `10.0.0.5` porque su actividad es normal.
-
-**Errores habituales.**
-
-| Síntoma | Causa | Solución |
-|---|---|---|
-| El JSON sale con caracteres `\uXXXX` | Falta `ensure_ascii=False` | Añádelo en `json.dump`/`json.dumps` |
-| No aparece la alerta CRÍTICA | La IP no está en dos reglas | La correlación necesita coincidencia en fuerza bruta **y** escaneo |
-| `logging` no muestra nada | Nivel por encima de `WARNING` | `basicConfig(level=logging.INFO)` |
-
-## 🔍 Comprueba tú mismo (Lab 6)
-
-**Experimento 1.** En `correlacionar.py`, la IP `203.0.113.9` aparece en 3 fuentes (logs, red, archivos). **Borra** la evidencia de `archivos` (la línea del `/etc/passwd`) y vuelve a ejecutar.
-
-- **P1.** ¿Qué gravedad tiene ahora esa IP? ¿Por qué ha bajado?
-
-<details class="sol"><summary>Respuesta</summary>Baja de <code>CRITICA</code> a <code>ALTA</code>, porque ahora solo coinciden <b>2</b> evidencias en vez de 3. La regla es: cuantas más fuentes distintas señalan a la misma IP, mayor es la gravedad.</details>
-
-**Experimento 2.** Añade a la lista `evidencias` una segunda evidencia sobre `10.0.0.5` (por ejemplo, de la fuente `logs`):
+**1 · 🟢 ¿Activa o pasiva?** Tienes `medida = "firewall"`. Escribe un `if` que imprima `"ACTIVA"` si la medida es `"firewall"`, `"antivirus"` o `"ids"`, y `"PASIVA"` en otro caso.
+<details class="sol"><summary>Solución</summary>
 
 ```python
-{"fuente": "logs", "ip": "10.0.0.5", "hecho": "2 fallos de login"},
+medida = "firewall"
+if medida in ("firewall", "antivirus", "ids"):
+    print("ACTIVA")
+else:
+    print("PASIVA")
 ```
+</details>
 
-- **P2.** ¿Cambia la gravedad de `10.0.0.5`? ¿Genera ahora un aviso?
+**2 · 🟢 ¿Puerto abierto?** `connect_ex` devuelve `0` cuando un puerto está abierto. Dado `resultado = 0`, imprime `"ABIERTO"` si es 0 y `"cerrado"` en otro caso.
+<details class="sol"><summary>Solución</summary>
 
-<details class="sol"><summary>Respuesta</summary>Sube de <code>BAJA</code> a <code>ALTA</code> (ahora tiene 2 evidencias) y, como la regla avisa de ALTA y CRÍTICA, aparece un <code>WARNING</code> para esa IP. Una sola evidencia era ruido; dos que coinciden ya es una señal.</details>
+```python
+resultado = 0
+if resultado == 0:
+    print("ABIERTO")
+else:
+    print("cerrado")
+```
+</details>
 
-**Experimento 3.** Abre el fichero `informe.json` que genera el programa.
+**3 · 🟡 ¿Supera el umbral?** Tienes `fallos = 4` y `umbral = 3`. Imprime `"ALERTA"` si los fallos llegan o superan el umbral, y `"normal"` si no.
+<details class="sol"><summary>Solución</summary>
 
-- **P3.** ¿Para qué sirve guardar las alertas en JSON además de mostrarlas con `logging`?
+```python
+fallos = 4
+umbral = 3
+if fallos >= umbral:
+    print("ALERTA")
+else:
+    print("normal")
+```
+</details>
 
-<details class="sol"><summary>Respuesta</summary><code>logging</code> muestra las alertas <b>en tiempo real</b> para que las veas al momento; el <code>informe.json</code> las deja en un formato <b>estructurado</b> que otra herramienta (un SIEM, un script, o tú en el examen) puede leer y procesar después.</details>
+**4 · 🟡 ¿Versión vulnerable?** Tienes un diccionario `nvd = {"nginx/1.18.0": "CVE-2021-23017"}` y una variable `banner = "nginx/1.18.0"`. Imprime el CVE si el banner está en la NVD, y `"sin vulnerabilidades conocidas"` si no.
+<details class="sol"><summary>Solución</summary>
 
-!!! tip "➡️ Esto cae en el test"
-    P1 (más evidencias coincidentes = más gravedad), P2 (correlación de señales) y P3 (`logging` en vivo vs `json` procesable) son preguntas del bloque 6 del simulacro.
+```python
+nvd = {"nginx/1.18.0": "CVE-2021-23017"}
+banner = "nginx/1.18.0"
+if banner in nvd:
+    print(nvd[banner])
+else:
+    print("sin vulnerabilidades conocidas")
+```
+</details>
 
-!!! note "Lo esencial del bloque 6 para el test"
-    Correlacionar = juntar evidencias de varias fuentes; varias señales a la vez pesan más que una. Reglas → gravedad (BAJA/MEDIA/ALTA/CRÍTICA). `logging` registra en vivo, `json` deja las alertas procesables. Una alerta no confirma el ataque: hay que verificar y justificar la respuesta.
----
+**5 · 🟠 Clasificar una alerta.** Tienes `tipo = "404"` (el código de una petición web). Imprime `"rastreo de rutas"` si es `"404"`, `"acceso normal"` si es `"200"`, y `"otro"` en cualquier otro caso.
+<details class="sol"><summary>Solución</summary>
 
-# Resumen para el examen
+```python
+tipo = "404"
+if tipo == "404":
+    print("rastreo de rutas")
+elif tipo == "200":
+    print("acceso normal")
+else:
+    print("otro")
+```
+</details>
 
-| Bloque | Qué debes dominar |
-|---|---|
-| 1 · Fundamentos | Activa vs pasiva · amenaza/vulnerabilidad/riesgo · IDS vs IPS · NIDS vs HIDS · mínimo privilegio · defensa en profundidad |
-| 2 · `psutil` | Leer CPU/memoria/procesos/conexiones · `cpu_percent` necesita `interval` · capturar `AccessDenied` · aislamiento de contenedores · proceso desconocido ≠ malicioso |
-| 3 · Scapy | Capas (Ethernet/IP/TCP-UDP) · TCP con saludo vs UDP · PCAP (`rdpcap`/`wrpcap`) · `haslayer` · muchos SYN = escaneo · captura en vivo necesita privilegios |
-| 4 · Logs | `pathlib`+`re`+`Counter` · `if m:` tras `re.search` · umbrales y falsos positivos · patrón ≠ prueba de ataque |
-| 5 · `watchdog` | 4 eventos (creado/modificado/borrado/movido) · HIDS · no sustituye al antivirus |
-| 6 · Defensa | Correlación de fuentes · reglas y gravedad · `logging`+`json` · justificar la respuesta |
+### Ejercicios propuestos (sin solución)
 
-# Cómo se evalúa esta unidad
+Ahora tú solo, con las mismas reglas (variables, `if`, sin bucles ni funciones):
 
-La UD1 y la UD2 forman el **1.er trimestre**, que se evalúa con un **examen tipo test**: preguntas de opción múltiple con una sola respuesta correcta, del mismo estilo que el simulacro de abajo.
+**P1 · 🟢** Dada `herramienta = "IDS"`, imprime `"solo avisa"` si es `"IDS"` y `"avisa y bloquea"` si es `"IPS"`.
+
+**P2 · 🟡** Tienes `puertos_distintos = 6` y `umbral = 5`. Imprime `"escaneo de puertos"` si se alcanza el umbral, y `"normal"` si no.
+
+**P3 · 🟠** Dado un diccionario `alerta = {"ip": "10.0.0.66", "motivo": "fuerza bruta"}`, imprime la IP y el motivo solo si el motivo es `"fuerza bruta"` o `"escaneo"`.
+
+## Cómo se evalúa esta unidad (RA2)
+
+La UT1 y la UT2 forman el **1.er trimestre**, que se evalúa con un **examen tipo test** (preguntas de opción múltiple como las del simulacro).
 
 !!! tip "La nota, sin sorpresas"
     **Nota = (aciertos ÷ nº de preguntas) × 10.** Los fallos no restan. Se aprueba con 5.
 
-**Distribución de preguntas por bloque** (propuesta para un examen de 30 preguntas, equilibrada por peso e importancia):
+Los laboratorios no puntúan: son tu forma de entender la materia y de llegar preparado al test.
 
-| Bloque | Preguntas | Enfoque |
-|---|:--:|---|
-| 1 · Fundamentos de seguridad activa | 5 | Conceptos: activa/pasiva, IDS/IPS, principios |
-| 2 · Auditoría con `psutil` | 5 | Interpretación de código y de resultados |
-| 3 · Tráfico de red con Scapy | 6 | Protocolos, capas, lectura de PCAP, escaneo |
-| 4 · Análisis de logs | 5 | Regex, recuento, umbrales, falsos positivos |
-| 5 · Vigilancia de archivos | 4 | Eventos de `watchdog`, límites de la técnica |
-| 6 · Detección y respuesta | 5 | Correlación, gravedad, decisiones defensivas |
-| **Total** | **30** | |
+## Simulacro de examen tipo test
 
----
+> 15 preguntas de opción múltiple, **una sola respuesta correcta**. Hazlo sin mirar y corrige con las soluciones desplegables.
 
-# Simulacro de examen tipo test
+**1.** ¿Cuál es una medida de seguridad **activa**?
 
-> 30 preguntas de opción múltiple, una sola respuesta correcta, repartidas por bloques como en el examen real. Hazlo sin mirar los apuntes y corrige al final con las soluciones desplegables.
+- A) Una copia de seguridad diaria
+- B) Un firewall que filtra el tráfico entrante
+- C) Un SAI que mantiene la corriente
+- D) Un sistema de servidores redundantes
 
-## Bloque 1 · Fundamentos (preguntas 1–5)
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El firewall previene/detiene el incidente mientras ocurre (activa). Copias, SAI y redundancia reducen el daño después (pasiva).</details>
 
-**1.** ¿Cuál de estas es una medida de seguridad **activa**?
+**2.** La diferencia entre un **IDS** y un **IPS** es que:
 
-A) Una copia de seguridad diaria
-B) Un firewall que filtra el tráfico entrante
-C) Un SAI que mantiene la corriente en un apagón
-D) Un sistema de servidores redundantes
+- A) El IDS es software y el IPS hardware
+- B) El IDS detecta y avisa; el IPS detecta y además bloquea
+- C) El IDS vigila la red y el IPS un equipo
+- D) Son lo mismo
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El firewall previene/detiene el incidente mientras ocurre (activa). Las copias, el SAI y la redundancia reducen el daño <i>después</i> (pasiva).</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> IDS = detección y aviso; IPS = detección + bloqueo.</details>
 
-**2.** La diferencia fundamental entre un **IDS** y un **IPS** es que:
+**3.** En análisis de riesgos, un servicio SSH **sin actualizar** con un fallo conocido es una:
 
-A) El IDS es software y el IPS es hardware
-B) El IDS detecta y avisa; el IPS detecta y además bloquea el ataque
-C) El IDS vigila la red y el IPS vigila un equipo
-D) No hay diferencia, son sinónimos
+- A) Amenaza
+- B) Vulnerabilidad
+- C) Salvaguarda
+- D) Copia de seguridad
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> IDS = detección y aviso; IPS = detección + prevención (bloqueo). Lo de vigilar red/equipo es la diferencia NIDS/HIDS, que es otra cosa.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La vulnerabilidad es la debilidad que se puede explotar; la amenaza es quien la aprovecharía.</details>
 
-**3.** Un servidor tiene un servicio SSH sin actualizar con un fallo conocido. En los términos del bloque 1, el fallo del servicio es:
+**4.** ¿Qué es un **CVE**?
 
-A) Una amenaza
-B) Un riesgo
-C) Una vulnerabilidad
-D) Un impacto
+- A) Un antivirus
+- B) El identificador público de una vulnerabilidad conocida
+- C) Un tipo de cortafuegos
+- D) Un protocolo de red
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> La vulnerabilidad es la debilidad (servicio sin parchear). La amenaza es quien la aprovecharía; el riesgo es la probabilidad × impacto de que eso ocurra.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Un CVE (p. ej. CVE-2021-23017) identifica de forma única una vulnerabilidad registrada en la NVD.</details>
 
-**4.** El principio de **mínimo privilegio** aplicado a un contenedor Docker significa que:
+**5.** El **banner grabbing** consiste en:
 
-A) El contenedor debe ejecutarse siempre como root para funcionar
-B) El contenedor recibe solo los permisos que necesita, nada más
-C) El contenedor debe tener acceso al socket Docker del anfitrión
-D) El contenedor debe exponer todos sus puertos por si acaso
+- A) Borrar los registros de un servidor
+- B) Leer la información (versión del servicio) que un puerto abierto anuncia
+- C) Cifrar el tráfico de red
+- D) Bloquear una IP
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Mínimo privilegio = solo lo necesario. Por eso los laboratorios usan usuario sin privilegios, sin `privileged`, sin socket del host y sin puertos innecesarios.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Al conectarse a un servicio, este suele anunciar su software y versión (p. ej. <code>Server: nginx/1.18.0</code>), lo que permite buscar sus vulnerabilidades.</details>
 
-**5.** "No confiar en una sola barrera, sino en varias capas independientes" describe:
+**6.** En el escáner, `connect_ex((host, puerto))` devuelve **0**. ¿Qué significa?
 
-A) El mínimo privilegio
-B) La defensa en profundidad
-C) La seguridad pasiva
-D) Un IPS
+- A) El puerto está cerrado
+- B) El puerto está abierto
+- C) Hubo un error de red
+- D) El host no existe
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Defensa en profundidad: varias capas (firewall + antivirus + monitorización + copias) para que, si una falla, las demás protejan.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>connect_ex</code> devuelve <code>0</code> cuando la conexión tiene éxito, es decir, el puerto está abierto (y no lanza excepción).</details>
 
-## Bloque 2 · `psutil` (preguntas 6–10)
+**7.** ¿Para qué sirve la **NVD** (National Vulnerability Database)?
 
-**6.** ¿Qué imprime la **primera** llamada de este código?
+- A) Para almacenar contraseñas
+- B) Para consultar qué vulnerabilidades conocidas afecta a una versión de software
+- C) Para cifrar ficheros
+- D) Para generar tráfico de red
 
-```python
-import psutil
-print(psutil.cpu_percent())
-```
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La NVD es la base pública de vulnerabilidades (CVE); cruzar la versión detectada con ella dice si el software es vulnerable.</details>
 
-A) El uso real de CPU en ese instante
-B) `0.0`, porque sin `interval` la primera medida no tiene referencia
-C) Lanza una excepción
-D) El número de núcleos
+**8.** En `auth.log`, muchas líneas `Failed password` desde la misma IP indican:
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Sin `interval`, la primera llamada devuelve `0.0`. Para medir bien se usa `cpu_percent(interval=0.3)`.</details>
+- A) Un acceso correcto
+- B) Un intento de fuerza bruta
+- C) Una copia de seguridad
+- D) Tráfico cifrado
 
-**7.** ¿Por qué este bucle captura las excepciones?
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Repetir intentos fallidos de login desde una IP es el patrón de la fuerza bruta.</details>
 
-```python
-for p in psutil.process_iter(["pid", "name"]):
-    try:
-        print(p.info["name"])
-    except (psutil.NoSuchProcess, psutil.AccessDenied):
-        continue
-```
+**9.** En un log web, muchos códigos **404** desde la misma IP sugieren:
 
-A) Porque `process_iter` siempre falla
-B) Porque un proceso puede desaparecer mientras se lee, o estar protegido
-C) Porque Python obliga a capturar toda excepción
-D) Para que el programa vaya más rápido
+- A) Que la web funciona perfectamente
+- B) Un rastreo de rutas (el atacante prueba páginas que no existen)
+- C) Un acceso autorizado
+- D) Un error del navegador del administrador
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Entre que se obtiene la lista y se lee cada proceso, este puede haber terminado (`NoSuchProcess`) o pertenecer a otro usuario (`AccessDenied`). Capturarlas evita que el programa se rompa.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Probar muchas rutas inexistentes (/admin, /.env, /backup.zip…) es típico de quien busca puntos de entrada.</details>
 
-**8.** Ejecutas un script con `psutil` **dentro de un contenedor** y solo ves 1 proceso. ¿Qué ocurre?
-
-A) El contenedor está roto
-B) `psutil` no funciona en Docker
-C) Es lo normal: el contenedor está aislado y solo ve sus propios procesos
-D) Faltan privilegios de red
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> El aislamiento de contenedores hace que solo veas los procesos de ese contenedor, no los del anfitrión. Para auditar el host, hay que ejecutar fuera de Docker.</details>
-
-**9.** Tu auditor detecta un proceso con un nombre que no reconoces. Lo correcto es:
-
-A) Asumir que es malware y matarlo inmediatamente
-B) Investigar (ruta, usuario, conexiones) antes de concluir nada
-C) Reiniciar el servidor
-D) Ignorarlo siempre
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Un proceso desconocido no es automáticamente malicioso; el sistema ejecuta muchos procesos legítimos. La monitorización da datos, no veredictos.</details>
-
-**10.** `psutil.virtual_memory().used` devuelve el valor en:
-
-A) Megabytes
-B) Porcentaje
-C) Bytes
-D) Gigabytes
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> En bytes; por eso en los ejemplos se divide entre <code>1024**2</code> para pasar a MB. El porcentaje está en <code>.percent</code>.</details>
-
-## Bloque 3 · Scapy (preguntas 11–16)
-
-**11.** ¿Qué diferencia principal hay entre **TCP** y **UDP**?
-
-A) TCP es para vídeo y UDP para web
-B) TCP establece conexión (saludo) y garantiza la entrega; UDP no
-C) UDP es más seguro que TCP
-D) TCP no usa puertos
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> TCP hace el saludo (SYN/SYN-ACK/ACK) y garantiza la entrega (web, SSH); UDP es sin conexión y sin garantías, más rápido (DNS, streaming).</details>
-
-**12.** ¿Qué imprime este código?
+**10.** ¿Qué imprime este código?
 
 ```python
-from scapy.all import IP, TCP, UDP
-p = IP()/TCP(dport=80)
-print(p.haslayer(TCP), p.haslayer(UDP))
-```
-
-A) `True True`
-B) `True False`
-C) `False False`
-D) Lanza una excepción
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El paquete tiene capa TCP pero no UDP. (Scapy puede devolver <code>1</code>/<code>0</code>, equivalentes a <code>True</code>/<code>False</code>.)</details>
-
-**13.** Para analizar un fichero PCAP ya existente, se usa:
-
-A) `sniff()`
-B) `wrpcap()`
-C) `rdpcap()`
-D) `send()`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> <code>rdpcap</code> lee un PCAP; <code>wrpcap</code> lo escribe; <code>sniff</code> captura en vivo (requiere privilegios); <code>send</code> envía paquetes.</details>
-
-**14.** En una captura ves una IP que envía paquetes TCP con bandera `S` (SYN) a los puertos 22, 23, 80 y 445 del mismo host, sin completar ninguna conexión. ¿Qué sugiere?
-
-A) Una navegación web normal
-B) Una consulta DNS
-C) Un escaneo de puertos
-D) Una descarga de ficheros
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Muchos SYN a puertos distintos sin completar el saludo es el patrón típico de un escaneo de puertos (fase de reconocimiento).</details>
-
-**15.** ¿Por qué estos laboratorios **no** capturan tráfico en vivo dentro de Docker?
-
-A) Scapy no funciona en contenedores
-B) Requeriría privilegios de red (`CAP_NET_RAW`) que rompen el mínimo privilegio
-C) Docker no tiene red
-D) El PCAP es ilegal
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Capturar en vivo necesita capacidades especiales sobre la interfaz; dárselas al contenedor contradice el diseño de mínimo privilegio. Por eso se prioriza analizar PCAP preparados.</details>
-
-**16.** Dos contenedores comparten una red Docker. ¿El contenedor A ve automáticamente **todo** el tráfico del contenedor B?
-
-A) Sí, por compartir la red
-B) No: el conmutador virtual entrega a cada uno solo su tráfico
-C) Solo si usan UDP
-D) Solo los fines de semana
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Compartir red no significa ver el tráfico ajeno; cada contenedor recibe solo lo suyo y la difusión. Capturar el de otro requeriría configuración y privilegios especiales.</details>
-
-## Bloque 4 · Logs (preguntas 17–21)
-
-**17.** ¿Qué imprime este código?
-
-```python
-import re
 from collections import Counter
-PATRON = re.compile(r"Failed password for \S+ from (\d+\.\d+\.\d+\.\d+)")
-lineas = [
-    "Failed password for root from 1.2.3.4 port 1",
-    "Accepted password for ana from 5.6.7.8 port 2",
-    "Failed password for admin from 1.2.3.4 port 3",
-]
-print(dict(Counter(m.group(1) for l in lineas if (m := PATRON.search(l)))))
+fallos = Counter()
+for ip in ["1.1.1.1", "1.1.1.1", "2.2.2.2"]:
+    fallos[ip] += 1
+print(dict(fallos))
 ```
 
-A) `{'1.2.3.4': 2, '5.6.7.8': 1}`
-B) `{'1.2.3.4': 2}`
-C) `{'1.2.3.4': 1, '5.6.7.8': 1}`
-D) `{}`
+- A) `{'1.1.1.1': 1, '2.2.2.2': 1}`
+- B) `{'1.1.1.1': 2, '2.2.2.2': 1}`
+- C) `{'1.1.1.1': 3}`
+- D) `{}`
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El patrón solo captura líneas <code>Failed password</code>; la de <code>Accepted</code> no encaja y se descarta. La IP <code>1.2.3.4</code> aparece en dos fallos.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>Counter</code> cuenta repeticiones: <code>1.1.1.1</code> aparece dos veces y <code>2.2.2.2</code> una.</details>
 
-**18.** ¿Por qué es imprescindible el `if m:` tras `re.search`?
+**11.** En el mini-IDS de red, una IP que envía SYN a **muchos puertos distintos** indica:
 
-A) Para que el código sea más corto
-B) Porque `search` devuelve `None` si no hay coincidencia, y usar `None.group()` falla
-C) Porque `re` lo exige
-D) Para contar también las líneas vacías
+- A) Una descarga normal
+- B) Un escaneo de puertos
+- C) Una consulta DNS
+- D) Un acceso HTTPS
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Si la línea no encaja, <code>search</code> devuelve <code>None</code>; acceder a <code>.group()</code> sobre <code>None</code> lanza <code>AttributeError</code>.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Tocar muchos puertos distintos en poco tiempo es la huella del escaneo de puertos (reconocimiento).</details>
 
-**19.** Un **umbral demasiado bajo** para marcar IPs sospechosas provoca sobre todo:
+**12.** ¿Por qué el detector usa un **umbral** antes de lanzar una alerta?
 
-A) Que no se detecte ningún ataque
-B) Muchos falsos positivos (se marcan usuarios que solo se equivocaron)
-C) Que el programa vaya más lento
-D) Un error de sintaxis
+- A) Para que el programa vaya más rápido
+- B) Para no alertar por uno o dos intentos normales (evitar falsos positivos)
+- C) Porque Python lo exige
+- D) Para cifrar los logs
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Con el umbral muy bajo, un despiste normal (dos contraseñas mal) dispara la alerta: falso positivo. Muy alto, en cambio, deja pasar ataques.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El umbral separa el ruido normal (un despiste) de un patrón de ataque, reduciendo los falsos positivos.</details>
 
-**20.** Tu detector marca una IP con 8 fallos de login. ¿Qué conclusión es la correcta?
+**13.** Que una IP supere el umbral de fallos, ¿demuestra que hay un ataque?
 
-A) Es seguro que esa IP es un atacante
-B) Es un patrón sospechoso que hay que verificar, no una prueba de ataque
-C) Hay que bloquearla sin más comprobaciones
-D) El log está corrupto
+- A) Sí, es una prueba definitiva
+- B) No: es un patrón sospechoso que hay que verificar
+- C) Sí, hay que bloquearla sin comprobar nada
+- D) No significa nada
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Superar el umbral indica un patrón compatible con un ataque; puede ser también un script mal configurado o credenciales caducadas. Se investiga antes de concluir.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Un umbral superado señala para investigar; podría ser también un script mal configurado o credenciales caducadas.</details>
 
-**21.** ¿Qué devuelve `Counter(["a", "a", "b"]).most_common(1)`?
+**14.** En el laboratorio, la IP `10.0.0.66` aparece como auditor (Lab 1) y como atacante detectado (Lab 2). ¿Qué ilustra esto?
 
-A) `['a']`
-B) `[('a', 2)]`
-C) `{'a': 2}`
-D) `2`
+- A) Que hay dos atacantes distintos
+- B) Que atacar y detectar son la misma acción vista desde los dos lados
+- C) Que el laboratorio tiene un error
+- D) Que la IP cambió de dueño
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>most_common(n)</code> devuelve una lista de tuplas <code>(elemento, veces)</code>, de mayor a menor.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Lo que el auditor hace (escanear, tantear logins, probar rutas) es justo lo que el defensor detecta en los registros.</details>
 
-## Bloque 5 · `watchdog` (preguntas 22–25)
+**15.** ¿Qué diferencia a un **IDS** de un **firewall**?
 
-**22.** ¿Cuál de estos eventos **no** gestiona `watchdog` con un método propio?
+- A) El firewall detecta y el IDS bloquea
+- B) El firewall filtra el tráfico según reglas; el IDS observa y avisa de actividad sospechosa
+- C) Son lo mismo
+- D) El IDS solo funciona en Windows
 
-A) `on_created` (creación)
-B) `on_modified` (modificación)
-C) `on_encrypted` (cifrado)
-D) `on_deleted` (borrado)
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: C.</b> Los eventos son creación, modificación, borrado y movido/renombrado (<code>on_moved</code>). No existe <code>on_encrypted</code>: watchdog observa cambios en el sistema de ficheros, no analiza contenido.</details>
-
-**23.** Cuando se **renombra** un fichero, `watchdog` dispara:
-
-A) `on_created` y `on_deleted`
-B) `on_moved`, con ruta de origen y de destino
-C) `on_modified`
-D) Nada
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El renombrado/movido es un único evento <code>on_moved</code> que trae <code>src_path</code> y <code>dest_path</code>.</details>
-
-**24.** La vigilancia de archivos con `watchdog`:
-
-A) Sustituye por completo a un antivirus
-B) Avisa de que algo cambió, pero no dice si el cambio es malicioso
-C) Analiza el contenido de los ficheros en busca de virus
-D) Solo funciona en Windows
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Es una capa de detección de cambios (tipo HIDS). No juzga si el cambio es legítimo (una actualización también modifica ficheros) ni analiza contenido.</details>
-
-**25.** Si un fichero se modifica **mientras el vigilante no está en marcha**, `watchdog`:
-
-A) Lo detecta igualmente al arrancar
-B) No lo detecta: solo ve eventos mientras está activo
-C) Reconstruye el historial completo
-D) Avisa al administrador por correo
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>watchdog</code> reacciona a eventos en tiempo real; lo que ocurre con el observador apagado no se detecta. Es una de sus limitaciones.</details>
-
-## Bloque 6 · Detección y respuesta (preguntas 26–30)
-
-**26.** **Correlacionar** evidencias significa:
-
-A) Guardar cada evidencia en un fichero distinto
-B) Juntar señales de varias fuentes para obtener una conclusión más fiable
-C) Borrar las evidencias antiguas
-D) Cifrar las alertas
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Una sola evidencia puede ser ruido; varias que apuntan a lo mismo (misma IP en logs y en red, y un cambio de fichero) son una señal mucho más fuerte.</details>
-
-**27.** En el laboratorio 6, ¿qué hace que una IP pase a gravedad **CRÍTICA**?
-
-A) Tener un solo fallo de login
-B) Que coincidan en ella varias evidencias de fuentes distintas (logs, red y archivos)
-C) Hacer una consulta DNS
-D) Conectarse al puerto 80
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La correlación eleva la gravedad cuanta más coincidencia hay: 3 o más evidencias de fuentes distintas sobre la misma IP la marcan como CRÍTICA. Una sola evidencia puede ser ruido.</details>
-
-**28.** ¿Qué imprime este fragmento del correlador?
-
-```python
-senales = {}
-for ev in [{"ip": "1.1.1.1"}, {"ip": "1.1.1.1"}, {"ip": "2.2.2.2"}]:
-    senales.setdefault(ev["ip"], []).append(ev)
-print({ip: len(lista) for ip, lista in senales.items()})
-```
-
-A) `{'1.1.1.1': 2, '2.2.2.2': 1}`
-B) `{'1.1.1.1': 1, '2.2.2.2': 1}`
-C) `{'1.1.1.1': 3}`
-D) `{}`
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: A.</b> <code>setdefault</code> crea la lista la primera vez y la reutiliza después, así que <code>1.1.1.1</code> acumula 2 evidencias y <code>2.2.2.2</code> una. Es como el correlador cuenta señales por IP.</details>
-
-**29.** Se usa `logging` **y** `json` para las alertas porque:
-
-A) Son lo mismo con distinto nombre
-B) `logging` las muestra en tiempo real y `json` las deja en un formato que otra herramienta puede procesar
-C) `json` es obligatorio en Python
-D) Para que ocupen más espacio
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>logging</code> es para ver las alertas mientras ocurren; <code>json</code> las guarda estructuradas para que un SIEM u otro programa las lea después.</details>
-
-**30.** Tras una alerta CRÍTICA confirmada por correlación, ¿cuál es una respuesta defensiva **adecuada**?
-
-A) No hacer nada hasta el día siguiente
-B) Bloquear la IP en el firewall, revisar accesos logrados y restaurar los ficheros afectados desde copia
-C) Apagar todos los servidores de la empresa
-D) Borrar los logs para que no se vea el incidente
-
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> La respuesta proporcionada y justificada: contener (bloquear IP), investigar el alcance (¿entró?) y recuperar (restaurar desde copia verificada). Borrar logs o apagarlo todo no son respuestas proporcionadas.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> El firewall decide qué pasa (prevención); el IDS vigila lo que ocurre y avisa (detección).</details>

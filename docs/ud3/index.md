@@ -20,9 +20,9 @@ flowchart LR
     style S fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
 ```
 
-# Parte 1 · Teoría
+## Parte 1 · Teoría
 
-## 1.1 Seguridad perimetral: Internet, red interna y DMZ
+### 1.1 Seguridad perimetral: Internet, red interna y DMZ
 
 Imagina una empresa como un edificio. **Internet** es la calle; la **red interna (LAN)** son las oficinas privadas donde está lo valioso (bases de datos, ficheros); y la **DMZ** (*zona desmilitarizada*) es como la **recepción**: una zona intermedia donde se atiende al público sin dejarle entrar en las oficinas.
 
@@ -40,7 +40,7 @@ La regla de oro: **desde Internet nunca se llega directamente a la red interna**
 - **Cortafuegos (firewall):** el portero que decide qué tráfico pasa, según reglas.
 - **Segmentación de redes:** dividir la red en zonas aisladas, de modo que un problema en una no contamine las demás. Es lo que harás con las dos redes Docker del laboratorio.
 
-## 1.2 Protocolos seguros: HTTP/HTTPS, TLS y SSH
+### 1.2 Protocolos seguros: HTTP/HTTPS, TLS y SSH
 
 | Protocolo | Para qué | ¿Cifrado? |
 |---|---|---|
@@ -56,7 +56,7 @@ La regla de oro: **desde Internet nunca se llega directamente a la red interna**
 ssh usuario@servidor        # abre una sesión remota cifrada
 ```
 
-## 1.3 VPN: una red privada sobre una pública
+### 1.3 VPN: una red privada sobre una pública
 
 Una **VPN** (*Virtual Private Network*) crea un **túnel cifrado** entre tu equipo y la red de la empresa a través de Internet. Es como tener un cable privado hasta la oficina, aunque estés en casa: todo lo que viaja por el túnel va cifrado y, para la red de la empresa, es como si estuvieras dentro.
 
@@ -69,7 +69,7 @@ flowchart LR
 
 Elementos de una VPN: el **túnel** (el canal cifrado), las **claves** (para cifrar y autenticar los extremos) y las **rutas** (qué tráfico va por el túnel y cuál no). Ejemplos reales: WireGuard, OpenVPN, IPsec.
 
-## 1.4 Acceso remoto: pasarelas, autenticación, autorización y control de acceso
+### 1.4 Acceso remoto: pasarelas, autenticación, autorización y control de acceso
 
 Cuando alguien accede desde fuera, el acceso pasa por una **pasarela** (*gateway*): un único punto de entrada que concentra los controles. En el laboratorio, esa pasarela será **Nginx**. Sobre ella se aplican las **tres A (AAA)**:
 
@@ -79,13 +79,13 @@ Cuando alguien accede desde fuera, el acceso pasa por una **pasarela** (*gateway
 | **Autorización** | ¿Qué puedes hacer? | Sin token válido → `401` (denegado) |
 | **Auditoría** (*accounting*) | ¿Qué hiciste y cuándo? | Los registros de Nginx y de la API |
 
-## 1.5 Autenticación centralizada: RADIUS
+### 1.5 Autenticación centralizada: RADIUS
 
 En una empresa con muchos usuarios y servicios, no tiene sentido que cada servicio tenga su propia lista de contraseñas. **RADIUS** es un protocolo que **centraliza** la autenticación: los servicios preguntan a un servidor RADIUS "¿este usuario y contraseña son válidos?", y él responde. Así hay **una sola** fuente de identidades (altas, bajas y cambios en un único sitio). Se usa mucho en wifi corporativas y VPN. No lo montaremos, pero debes reconocer **qué problema resuelve**: evitar tener las credenciales repartidas por todos lados.
 
 !!! note "Lo esencial de la teoría para el test"
     DMZ = zona intermedia; Internet nunca llega directo a la LAN. HTTPS = HTTP + TLS (cifrado + identidad). SSH = terminal remota cifrada (sustituye a Telnet). VPN = túnel cifrado (túnel + claves + rutas). Pasarela = punto único de entrada. AAA = autenticación/autorización/auditoría. RADIUS = autenticación centralizada.
-# Parte 2 · Laboratorio: acceso seguro a una intranet
+## Parte 2 · Laboratorio: acceso seguro a una intranet
 
 Vas a montar la intranet de una empresa pequeña: una **API privada** (FastAPI) con datos de empleados, protegida detrás de una **pasarela Nginx** con **HTTPS**. La API **nunca** se expone directamente a Internet: solo se llega a ella a través de la pasarela. Comprobarás el aislamiento, los códigos HTTP y el cifrado, y automatizarás las pruebas con Python.
 
@@ -116,7 +116,7 @@ flowchart LR
         └── Dockerfile
     ```
 
-## Paso 1 · Los servicios y las redes (Docker Compose)
+### Paso 1 · Los servicios y las redes (Docker Compose)
 
 El `compose.yaml` define **dos servicios** y, sobre todo, **dos redes**, que es donde está la seguridad:
 
@@ -154,7 +154,7 @@ networks:
 
 **Lo importante:** la API **no tiene `ports`**. Eso significa que desde tu ordenador (el host) **no existe** una forma de llamarla directamente: solo es alcanzable desde dentro de la red `interna`, donde también está Nginx. La pasarela es el único puente.
 
-## Paso 2 · La API con FastAPI
+### Paso 2 · La API con FastAPI
 
 **FastAPI** es un framework de Python para crear APIs web rápidamente. La nuestra tiene tres *endpoints* y exige un **token** para los datos sensibles:
 
@@ -194,7 +194,7 @@ def obtener(id: int, x_token: str = Header(default="")):
 - `/salud` es público: sirve para comprobar que el servicio vive.
 - `/empleados` y `/empleados/{id}` exigen la cabecera `X-Token`. Sin ella, devuelven **401** (no autorizado): esto es la **autenticación** de las AAA.
 
-## Paso 3 · Generar el certificado de laboratorio
+### Paso 3 · Generar el certificado de laboratorio
 
 HTTPS necesita un certificado. Como es un laboratorio, creamos uno **autofirmado** (válido para pruebas, no para producción). El script usa `openssl`:
 
@@ -215,7 +215,7 @@ Ejecútalo una vez antes de levantar los contenedores:
 sh generar_certificado.sh
 ```
 
-## Paso 4 · Nginx como pasarela (sin exponer la API)
+### Paso 4 · Nginx como pasarela (sin exponer la API)
 
 Nginx recibe las peticiones de fuera y las **reenvía** a la API por la red interna. Además, obliga a usar HTTPS: si alguien entra por HTTP (puerto 80), lo redirige a HTTPS (443).
 
@@ -254,7 +254,7 @@ Fíjate en `proxy_pass http://api:8000`: Nginx llama a la API por su **nombre de
 docker compose up --build -d
 ```
 
-## Paso 5 · Probar los endpoints con `curl` y ver los códigos HTTP
+### Paso 5 · Probar los endpoints con `curl` y ver los códigos HTTP
 
 Ahora comprueba el comportamiento desde fuera. La opción `-k` le dice a `curl` que acepte el certificado autofirmado (solo en laboratorio); `-i` muestra la cabecera con el código HTTP.
 
@@ -283,7 +283,7 @@ curl -i http://localhost:8080/salud
 | `/empleados/99` | `404` | El recurso no existe |
 | `http://...` (puerto 80) | `301` | Se fuerza el uso de HTTPS |
 
-## Paso 6 · Comprobar el aislamiento entre redes
+### Paso 6 · Comprobar el aislamiento entre redes
 
 Aquí se ve por qué la arquitectura es segura. Intenta llamar a la API **directamente**, saltándote la pasarela:
 
@@ -309,7 +309,7 @@ docker compose exec nginx wget -qO- http://api:8000/salud
 
 Esto es la **segmentación de redes** en acción: la API está en una zona aislada (`internal: true`, sin salida a Internet) y solo la pasarela, que hace de puente controlado, puede llegar a ella.
 
-## Paso 7 · SSH y VPN: demostración de acceso remoto
+### Paso 7 · SSH y VPN: demostración de acceso remoto
 
 La pasarela web protege el acceso a la *aplicación*. Para administrar el *servidor* se usa **SSH**, y para meter todo tu equipo *dentro* de la red de la empresa, una **VPN**.
 
@@ -323,7 +323,7 @@ Todo lo que escribes y recibes va cifrado. Nadie que capture el tráfico (recuer
 
 **VPN** (idea): si levantaras un servidor WireGuard en la DMZ, tu portátil establecería un túnel cifrado y entraría en la red `interna` como si estuviera físicamente en la oficina — entonces **sí** podrías llamar a `http://api:8000` directamente, porque estarías *dentro*. La VPN te convierte en un miembro más de la red interna, de forma segura.
 
-## Paso 8 · Automatizar las pruebas con Python
+### Paso 8 · Automatizar las pruebas con Python
 
 Hacer las pruebas a mano con `curl` está bien para aprender, pero en la práctica se **automatizan**. Este script repite todas las comprobaciones y genera un informe:
 
@@ -412,7 +412,7 @@ docker compose down
 | La API responde en `localhost:8000` | Publicaste su puerto por error | La API **no** debe tener `ports` en el compose |
 | `502 Bad Gateway` en Nginx | La API aún no había arrancado | Espera unos segundos o revisa `depends_on` |
 | `pruebas.py` falla al conectar | El laboratorio no está levantado | `docker compose up --build -d` primero |
-## 🔍 Comprueba tú mismo
+### 🔍 Comprueba tú mismo
 
 Has montado el laboratorio siguiendo los pasos. Ahora toca **entenderlo de verdad** experimentando y respondiendo. Intenta contestar antes de abrir cada solución.
 
@@ -477,9 +477,9 @@ docker compose exec nginx wget -qO- http://api:8000/salud
 !!! tip "➡️ Todo esto cae en el test"
     Cada pregunta de arriba corresponde a una del simulacro: el aislamiento (P1, P5), los códigos HTTP 401/404/301 (P2, P3), el certificado autofirmado y el `-k` (P4), y la VPN (P6). Si has hecho los experimentos y entiendes las respuestas, el test de esta unidad lo tienes dominado.
 
-# Parte 3 · Resumen y evaluación
+## Parte 3 · Resumen y evaluación
 
-## Resumen para el examen
+### Resumen para el examen
 
 | Tema | Idea clave |
 |---|---|
@@ -494,7 +494,7 @@ docker compose exec nginx wget -qO- http://api:8000/salud
 | RADIUS | Autenticación centralizada: una sola fuente de identidades |
 | Códigos HTTP | 200 OK · 301 redirección · 401 no autorizado · 404 no encontrado |
 
-## Cómo se evalúa esta unidad
+### Cómo se evalúa esta unidad
 
 La UT3 se evalúa con un **examen tipo test** de opción múltiple, una sola respuesta correcta.
 
@@ -503,7 +503,7 @@ La UT3 se evalúa con un **examen tipo test** de opción múltiple, una sola res
 
 El laboratorio no puntúa directamente, pero montarlo es la mejor preparación: casi todas las preguntas salen de lo que has visto construyéndolo.
 
-# Simulacro de examen tipo test
+## Simulacro de examen tipo test
 
 > 20 preguntas de opción múltiple sobre la unidad. Una sola respuesta correcta. Hazlo sin mirar y corrige al final.
 

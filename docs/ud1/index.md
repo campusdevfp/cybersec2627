@@ -1221,38 +1221,12 @@ def intacto(ruta: str, precinto: str) -> bool:
 
 ---
 
-## Autoevaluación rápida (conceptos)
-
-<details><summary>1. ¿Qué garantiza la <b>integridad</b>?</summary>Que la información no se altera sin autorización.</details>
-<details><summary>2. ¿Se puede recuperar un dato a partir de su hash?</summary>No: la función hash es unidireccional.</details>
-<details><summary>3. ¿Con qué clave cifras un mensaje para que solo lo lea Ana?</summary>Con la clave <b>pública</b> de Ana.</details>
-<details><summary>4. ¿Por qué MD5 no sirve para integridad seria?</summary>Está roto: se pueden encontrar colisiones.</details>
-<details><summary>5. ¿Por qué se trabaja sobre una copia en forense?</summary>Para no alterar el original y preservar la cadena de custodia.</details>
-
-## Glosario
-
-| Término | Definición |
-|---|---|
-| **C·I·D** | Confidencialidad, integridad y disponibilidad. |
-| **Hash** | Huella de longitud fija de un dato; unidireccional y determinista. |
-| **Efecto avalancha** | Un cambio mínimo altera casi todo el hash. |
-| **HMAC** | Hash con clave secreta: autentica un mensaje, no solo lo hashea. |
-| **Cifrado simétrico / asimétrico** | Una clave compartida / par pública-privada. |
-| **OAEP / PSS** | Rellenos de RSA: OAEP para **cifrar**, PSS para **firmar**. |
-| **Cifrado autenticado (AEAD)** | Cifrado que además detecta si el texto cifrado fue manipulado. |
-| **Firma electrónica** | Hash cifrado con la clave privada; prueba autoría e integridad. |
-| **Certificado / CA / PKI** | Vínculo clave-identidad / quien lo firma / la infraestructura completa. |
-| **Cadena de custodia** | Garantía de que una evidencia no se ha alterado. |
-| **HIDS** | Sistema que detecta cambios no autorizados en los ficheros de un host. |
-
 ## Cómo se evalúa esta unidad (RA1)
 
-El instrumento principal es un **test práctico**: resuelves en Python un reto parecido al de esta unidad y se corrige **solo con su batería de tests** (queda abierto, como complemento, algún ejercicio práctico).
+La UT1 y la UT2 forman el **1.er trimestre**, que se evalúa con un **examen tipo test** (preguntas de opción múltiple como las del simulacro).
 
-!!! reto "La nota, sin sorpresas"
+!!! tip "La nota, sin sorpresas"
     **Nota = (aciertos ÷ nº de preguntas) × 10.** Los fallos no restan. Se aprueba con 5.
-
-El informe además te marca, **sin puntuar**, tres buenas prácticas: usar la técnica del RA (aquí, `hashlib`), pasar `mypy` y documentar el código.
 
 ---
 

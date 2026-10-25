@@ -1,6 +1,0 @@
-services:
-  analista:
-    build: .
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
