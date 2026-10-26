@@ -1,5 +1,19 @@
 services:
-  analista:
+  # Objetivo de la auditoría: un servidor web con una versión concreta de nginx
+  servidor:
+    image: nginx:1.18.0
+    networks:
+      - laboratorio
+
+  # El auditor escanea al servidor por su nombre de red
+  auditor:
     build: .
+    depends_on:
+      - servidor
+    networks:
+      - laboratorio
     security_opt:
       - no-new-privileges:true
+
+networks:
+  laboratorio:

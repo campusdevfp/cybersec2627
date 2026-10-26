@@ -5,7 +5,7 @@
 | **Resultado de aprendizaje** | RA2 · Implanta mecanismos de seguridad activa |
 | **Trimestre** | 1.º — se evalúa con **examen tipo test** |
 | **Duración** | 16 horas |
-| **Herramientas** | Python 3 · `scapy` · Docker Compose |
+| **Herramientas** | Python 3 · `psutil` · `scapy` · Docker Compose |
 
 Esta unidad trata de **defender un sistema en marcha**: entender cómo se audita una red (qué equipos y servicios hay, si son vulnerables) y cómo se **detecta** un ataque leyendo lo que deja en los registros. Lo harás con **dos laboratorios** cortos y guiados paso a paso: primero te pones del lado del **auditor** (descubres y escaneas), y luego del lado del **defensor** (detectas en los logs lo que el auditor hizo). Son las dos caras de la misma moneda.
 
@@ -15,9 +15,11 @@ La evaluación es un **examen tipo test**; al final tienes un simulacro con el m
 
 ```mermaid
 flowchart LR
-    B1["Teoría breve<br/>seguridad activa"] --> L2["🧪 Lab 1<br/>Auditoría de red"]
-    L2 --> L3["🧪 Lab 2<br/>Monitorización y detección"]
+    B1["Teoría breve<br/>seguridad activa"] --> L1["🧪 Lab 1<br/>Auditoría del sistema"]
+    L1 --> L2["🧪 Lab 2<br/>Auditoría de red"]
+    L2 --> L3["🧪 Lab 3<br/>Monitorización y detección"]
     L3 --> T["📝 Simulacro de test"]
+    style L1 fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:2px
     style L2 fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:2px
     style L3 fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:2px
     style T fill:#dbeafe,color:#1e3a8a,stroke:#3b82f6,stroke-width:2px
@@ -33,9 +35,10 @@ docker --version
 docker compose version
 ```
 
-Los dos laboratorios traen todos sus ficheros en las carpetas `labs/lab1/` y `labs/lab2/` del repositorio. Para el código Python que ejecutes fuera de Docker, crea un entorno virtual con una sola dependencia:
+Los dos laboratorios traen todos sus ficheros en las carpetas `labs/lab2/` y `labs/lab3/` del repositorio. Para el código Python que ejecutes fuera de Docker, crea un entorno virtual con una sola dependencia:
 
 ```text title="requirements.txt"
+psutil==5.9.8
 scapy==2.5.0
 ```
 
@@ -46,7 +49,7 @@ pip install -r requirements.txt
 ```
 
 !!! info "Solo una dependencia externa"
-    En esta unidad lo único que se instala con `pip` es **scapy** (para el mini-IDS del Lab 2). Todo lo demás — sockets, expresiones regulares, conteo, ficheros — es de la **biblioteca estándar** de Python, que ya viene incluida.
+    En esta unidad se instalan con `pip` dos librerías: **psutil** (para auditar el propio sistema) y **scapy** (para el mini-IDS del Lab 2). Todo lo demás — sockets, expresiones regulares, conteo, ficheros — es de la **biblioteca estándar** de Python, que ya viene incluida.
 
 !!! danger "Norma de uso"
     Todo esto se practica **solo** dentro de los contenedores del laboratorio o en tu propia máquina. Escanear o auditar equipos ajenos sin permiso es delito. Ver [Uso ético y legal](../recursos/uso-etico.md).
@@ -76,20 +79,104 @@ Y los mecanismos de defensa que aparecen en los laboratorios:
 | **NVD** (*National Vulnerability Database*) | Base pública de vulnerabilidades conocidas (los **CVE**) |
 
 Dos diferencias que caen en el test: un **IDS** solo avisa, un **IPS** avisa y bloquea; y un **CVE** es el identificador público de una vulnerabilidad concreta (por ejemplo, `CVE-2021-23017`).
-## 🧪 Lab 1 · Auditoría de la red del laboratorio
+## 🧪 Lab 1 · Auditoría del propio sistema
+
+**Objetivo.** Empezar por lo más cercano: **mirar tu propia máquina**. Antes de vigilar una red, un administrador audita el equipo: cuánta CPU y memoria se usan, qué procesos corren. Lo harás con **`psutil`**, la librería estándar para esto.
+
+!!! tip "Ficheros del laboratorio"
+    Están en `labs/lab1/`: `auditor_sistema.py`, `Dockerfile`, `compose.yaml` y `requirements.txt`.
+
+### Paso 1 · El auditor del sistema
+
+```python title="labs/lab1/auditor_sistema.py"
+import psutil
+import platform
+
+print("=== Auditoría del sistema ===")
+print("SO:", platform.system(), platform.release())
+print("CPU:", psutil.cpu_percent(interval=0.3), "%")
+
+mem = psutil.virtual_memory()
+print(f"Memoria: {mem.percent}% usada ({mem.used // (1024**2)} MB de {mem.total // (1024**2)} MB)")
+
+print("\n-- Procesos que más memoria usan --")
+procesos = []
+for p in psutil.process_iter(["pid", "name", "memory_percent"]):
+    try:
+        procesos.append((p.info["memory_percent"] or 0.0, p.info["pid"], p.info["name"]))
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        continue
+for mem_pct, pid, nombre in sorted(procesos, reverse=True)[:3]:
+    print(f"  PID {pid:6}  {nombre:20}  {mem_pct:.1f}%")
+
+print(f"\nTotal de procesos visibles: {len(procesos)}")
+print("(Dentro de un contenedor, estos son los procesos DE ESE contenedor.)")
+```
+
+Tres detalles importantes:
+
+- **`cpu_percent(interval=0.3)`** mide durante 0,3 s. Sin `interval`, la primera llamada devolvería `0.0` (no tiene un instante anterior con el que comparar).
+- **`virtual_memory()`** da los valores en **bytes**; por eso dividimos entre `1024**2` para pasar a MB.
+- El bucle **captura `NoSuchProcess` y `AccessDenied`**: un proceso puede terminar mientras lo leemos, o estar protegido. Sin ese `try/except`, el programa se rompería.
+
+### Paso 2 · Levanta y ejecuta
+
+```bash title="Terminal (dentro de labs/lab1/)"
+docker compose build
+docker compose run --rm auditor
+```
+
+**Salida esperada** (los números varían según tu máquina):
+
+```text
+=== Auditoría del sistema ===
+SO: Linux 6.1.0
+CPU: 0.0 %
+Memoria: 3.1% usada (120 MB de 3997 MB)
+
+-- Procesos que más memoria usan --
+  PID      1  python                0.4%
+
+Total de procesos visibles: 1
+(Dentro de un contenedor, estos son los procesos DE ESE contenedor.)
+```
+
+### Paso 3 · Compara dentro y fuera del contenedor
+
+Ejecuta ahora el mismo script **directamente en tu máquina** (sin Docker, con el entorno virtual activado):
+
+```bash title="Terminal"
+python labs/lab1/auditor_sistema.py
+```
+
+Verás **muchos más procesos**. ¿Por qué? Porque un contenedor está **aislado**: solo ve *sus propios* procesos, no los del equipo anfitrión. Para auditar la máquina real hay que ejecutar el script fuera de Docker.
+
+!!! warning "Un proceso desconocido NO es automáticamente malicioso"
+    Ver un proceso con un nombre que no reconoces es normal: el sistema ejecuta decenas de procesos legítimos. La auditoría da **datos**, no veredictos. Antes de alarmarte, investiga (qué ejecutable es, qué usuario lo lanza).
+
+### Paso 4 · Apaga el laboratorio
+
+```bash title="Terminal"
+docker compose down
+```
+
+!!! success "Lo que has hecho"
+    Una auditoría básica del sistema: CPU, memoria y procesos. Es la primera capa de la monitorización, y has visto de paso que un contenedor está aislado del anfitrión.
+
+## 🧪 Lab 2 · Auditoría de la red del laboratorio
 
 **Objetivo.** Ponerte del lado del **auditor**: descubrir qué servicios tiene abiertos un servidor, averiguar su versión (**banner grabbing**) y cruzarla con una base de vulnerabilidades (la **NVD**) para generar un **informe de auditoría automático**.
 
 **Qué monta el laboratorio.** Dos contenedores en la misma red: un **servidor** (nginx con una versión concreta) y el **auditor** (tu script), que lo escanea.
 
 !!! tip "Ficheros del laboratorio"
-    Están en `labs/lab1/`: `auditor.py`, `Dockerfile` y `compose.yaml`. No tienes que copiar nada.
+    Están en `labs/lab2/`: `auditor.py`, `Dockerfile` y `compose.yaml`. No tienes que copiar nada.
 
 ### Paso 1 · Mira el objetivo y el auditor
 
 El `compose.yaml` define el servidor a auditar y el auditor:
 
-```yaml title="labs/lab1/compose.yaml"
+```yaml title="labs/lab2/compose.yaml"
 services:
   # Objetivo de la auditoría: un servidor web con una versión concreta de nginx
   servidor:
@@ -115,7 +202,7 @@ networks:
 
 El auditor hace tres cosas: **escanear** puertos, **leer el banner** (la versión que anuncia el servicio) y **cruzarlo** con la NVD.
 
-```python title="labs/lab1/auditor.py"
+```python title="labs/lab2/auditor.py"
 import socket
 import json
 
@@ -177,7 +264,7 @@ if __name__ == "__main__":
 
 ### Paso 3 · Levanta y ejecuta
 
-```bash title="Terminal (dentro de labs/lab1/)"
+```bash title="Terminal (dentro de labs/lab2/)"
 docker compose build
 docker compose run --rm auditor
 ```
@@ -206,18 +293,18 @@ docker compose down
 
 > **Si te sobra tiempo:** añade a `PUERTOS` el 443 y, en el auditor, lee también la cabecera `Strict-Transport-Security` para comprobar si la web fuerza HTTPS. Es otra comprobación típica de auditoría.
 
-## 🧪 Lab 2 · Monitorización y detección
+## 🧪 Lab 3 · Monitorización y detección
 
-**Objetivo.** Ahora te pones del lado del **defensor**. En el Lab 1 escaneaste y tanteaste un servidor; esas acciones **dejan rastro** en los registros. Aquí vas a **detectarlas** leyendo los logs y analizando el tráfico. Verás las **dos caras** de la misma acción.
+**Objetivo.** Ahora te pones del lado del **defensor**. En el Lab 2 escaneaste y tanteaste un servidor; esas acciones **dejan rastro** en los registros. Aquí vas a **detectarlas** leyendo los logs y analizando el tráfico. Verás las **dos caras** de la misma acción.
 
 !!! tip "Ficheros del laboratorio"
-    Están en `labs/lab2/`: `auth.log`, `web.log`, `detector.py`, `generar_captura.py`, `ids_red.py`, `Dockerfile` y `compose.yaml`.
+    Están en `labs/lab3/`: `auth.log`, `web.log`, `detector.py`, `generar_captura.py`, `ids_red.py`, `Dockerfile` y `compose.yaml`.
 
 ### Paso 1 · Los registros que dejó el atacante
 
-La IP `10.0.0.66` (el auditor del Lab 1) aparece en dos registros. En `auth.log`, intentando adivinar contraseñas:
+La IP `10.0.0.66` (el auditor del Lab 2) aparece en dos registros. En `auth.log`, intentando adivinar contraseñas:
 
-```text title="labs/lab2/auth.log"
+```text title="labs/lab3/auth.log"
 Failed password for root from 10.0.0.66 port 51000
 Failed password for root from 10.0.0.66 port 51002
 Failed password for admin from 10.0.0.66 port 51004
@@ -227,7 +314,7 @@ Accepted password for ana from 10.0.0.5 port 60000
 
 Y en `web.log`, probando rutas que no existen (buscando páginas de administración, backups…):
 
-```text title="labs/lab2/web.log"
+```text title="labs/lab3/web.log"
 10.0.0.66 - GET /index.html 200
 10.0.0.66 - GET /admin 404
 10.0.0.66 - GET /.env 404
@@ -241,7 +328,7 @@ Y en `web.log`, probando rutas que no existen (buscando páginas de administraci
 
 Lee ambos registros, cuenta por IP y lanza una **alerta** si se supera un umbral. Es un **mini-IDS**.
 
-```python title="labs/lab2/detector.py"
+```python title="labs/lab3/detector.py"
 import re
 from collections import Counter
 
@@ -286,9 +373,9 @@ if not hay:
 
 ### Paso 3 · El mini-IDS de red (con Scapy)
 
-El escaneo de puertos del Lab 1 también deja rastro en el **tráfico**. `generar_captura.py` recrea ese tráfico en un fichero PCAP, e `ids_red.py` lo analiza: una IP que toca **muchos puertos distintos** está escaneando.
+El escaneo de puertos del Lab 2 también deja rastro en el **tráfico**. `generar_captura.py` recrea ese tráfico en un fichero PCAP, e `ids_red.py` lo analiza: una IP que toca **muchos puertos distintos** está escaneando.
 
-```python title="labs/lab2/ids_red.py"
+```python title="labs/lab3/ids_red.py"
 from scapy.all import rdpcap, IP, TCP
 
 UMBRAL_PUERTOS = 5
@@ -311,7 +398,7 @@ for ip, puertos in puertos_por_ip.items():
 
 ### Paso 4 · Levanta y ejecuta
 
-```bash title="Terminal (dentro de labs/lab2/)"
+```bash title="Terminal (dentro de labs/lab3/)"
 docker compose build
 docker compose run --rm analista
 ```
@@ -338,7 +425,7 @@ docker compose down
 ```
 
 !!! success "Las dos caras de la moneda"
-    La misma IP (`10.0.0.66`) que en el Lab 1 era *tu auditor*, aquí aparece como *el atacante detectado*: por fuerza bruta en `auth.log`, por rastreo de rutas en `web.log` y por escaneo de puertos en el tráfico. **Atacar y detectar son la misma acción vista desde los dos lados.**
+    La misma IP (`10.0.0.66`) que en el Lab 2 era *tu auditor*, aquí aparece como *el atacante detectado*: por fuerza bruta en `auth.log`, por rastreo de rutas en `web.log` y por escaneo de puertos en el tráfico. **Atacar y detectar son la misma acción vista desde los dos lados.**
 
 > **Nota sobre falsos positivos.** Superar un umbral es un **patrón sospechoso que hay que verificar**, no una prueba de ataque: podría ser un script mal configurado. Un umbral muy bajo genera falsas alarmas; uno muy alto deja pasar ataques lentos.
 ## Actividades
@@ -557,7 +644,7 @@ print(dict(fallos))
 
 <details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Un umbral superado señala para investigar; podría ser también un script mal configurado o credenciales caducadas.</details>
 
-**14.** En el laboratorio, la IP `10.0.0.66` aparece como auditor (Lab 1) y como atacante detectado (Lab 2). ¿Qué ilustra esto?
+**14.** En el laboratorio, la IP `10.0.0.66` aparece como auditor (Lab 2) y como atacante detectado (Lab 3). ¿Qué ilustra esto?
 
 - A) Que hay dos atacantes distintos
 - B) Que atacar y detectar son la misma acción vista desde los dos lados
