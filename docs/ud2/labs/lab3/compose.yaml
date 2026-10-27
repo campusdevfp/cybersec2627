@@ -1,4 +1,3 @@
 services:
   analista:
     build: .
-    # Corre como root y permanece vivo para poder entrar y lanzar los scripts.

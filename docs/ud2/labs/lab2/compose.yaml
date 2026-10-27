@@ -2,10 +2,12 @@ services:
   # Objetivo de la auditoría: un servidor web con una versión concreta de nginx.
   servidor:
     image: nginx:1.18.0
+    ports:
+      - "8080:80"        # abre http://localhost:8080 en el navegador
     networks:
       - laboratorio
 
-  # El auditor escanea al servidor. Corre como root y permanece vivo.
+  # El auditor lleva nmap instalado. Corre como root y permanece vivo.
   auditor:
     build: .
     depends_on:

@@ -5,7 +5,7 @@
 | **Resultado de aprendizaje** | RA2 · Implanta mecanismos de seguridad activa |
 | **Trimestre** | 1.º — se evalúa con **examen tipo test** |
 | **Duración** | 16 horas |
-| **Herramientas** | Python 3 · `psutil` · `scapy` · Docker Compose |
+| **Herramientas** | Python 3 · `psutil` · `nmap` · Docker Compose |
 
 Esta unidad trata de **defender un sistema en marcha**: entender cómo se audita una red (qué equipos y servicios hay, si son vulnerables) y cómo se **detecta** un ataque leyendo lo que deja en los registros. Lo harás con **dos laboratorios** cortos y guiados paso a paso: primero te pones del lado del **auditor** (descubres y escaneas), y luego del lado del **defensor** (detectas en los logs lo que el auditor hizo). Son las dos caras de la misma moneda.
 
@@ -16,7 +16,7 @@ La evaluación es un **examen tipo test**; al final tienes un simulacro con el m
 ```mermaid
 flowchart LR
     B1["Teoría breve<br/>seguridad activa"] --> L1["🧪 Lab 1<br/>Auditoría del sistema"]
-    L1 --> L2["🧪 Lab 2<br/>Auditoría de red"]
+    L1 --> L2["🧪 Lab 2<br/>Auditoría con nmap"]
     L2 --> L3["🧪 Lab 3<br/>Monitorización y detección"]
     L3 --> T["📝 Simulacro de test"]
     style L1 fill:#d1fae5,color:#065f46,stroke:#10b981,stroke-width:2px
@@ -39,7 +39,6 @@ Los dos laboratorios traen todos sus ficheros en las carpetas `labs/lab2/` y `la
 
 ```text title="requirements.txt"
 psutil==5.9.8
-scapy==2.5.0
 ```
 
 ```bash
@@ -49,7 +48,7 @@ pip install -r requirements.txt
 ```
 
 !!! info "Solo una dependencia externa"
-    En esta unidad se instalan con `pip` dos librerías: **psutil** (para auditar el propio sistema) y **scapy** (para el mini-IDS del Lab 2). Todo lo demás — sockets, expresiones regulares, conteo, ficheros — es de la **biblioteca estándar** de Python, que ya viene incluida.
+    En esta unidad lo único que se instala con `pip` es **psutil** (Lab 1, auditoría del sistema). El Lab 2 usa **nmap**, la herramienta estándar de escaneo, que se instala dentro de su contenedor. El Lab 3 solo usa la **biblioteca estándar** de Python (expresiones regulares, conteo, ficheros).
 
 !!! info "Cómo se usan los laboratorios (resumen)"
     Cada laboratorio sigue siempre el mismo ciclo de tres comandos, desde la carpeta del lab:
@@ -181,155 +180,176 @@ docker compose down
 !!! success "Lo que has hecho"
     Una auditoría básica del sistema: CPU, memoria y procesos. Es la primera capa de la monitorización, y has visto de paso que un contenedor está aislado del anfitrión.
 
-## 🧪 Lab 2 · Auditoría de la red del laboratorio
+## 🧪 Lab 2 · Auditoría de la red con nmap
 
-**Objetivo.** Ponerte del lado del **auditor**: descubrir qué servicios tiene abiertos un servidor, averiguar su versión (**banner grabbing**) y cruzarla con una base de vulnerabilidades (la **NVD**) para generar un **informe de auditoría automático**.
+**Objetivo.** Ponerte del lado del **auditor** usando la herramienta real que se emplea en el mundo profesional: **nmap**, el escáner de puertos y servicios más usado. Descubrirás qué puertos tiene abiertos un servidor, qué software y versión corre en ellos, y cruzarás esa información con una base de vulnerabilidades (la **NVD**) para generar un informe.
 
-**Qué monta el laboratorio.** Dos contenedores en la misma red: un **servidor** (nginx con una versión concreta) y el **auditor** (tu script), que lo escanea.
+**Qué monta el laboratorio.** Dos contenedores en la misma red: un **servidor** (nginx) y el **auditor**, que lleva **nmap** ya instalado.
 
 !!! tip "Ficheros del laboratorio"
-    Están en `labs/lab2/`: `auditor.py`, `Dockerfile` y `compose.yaml`. No tienes que copiar nada.
+    Están en `labs/lab2/`: `informe.py`, `Dockerfile` y `compose.yaml`. El `Dockerfile` instala nmap por ti.
 
-### Paso 1 · Mira el objetivo y el auditor
+### Paso 1 · Mira el laboratorio
 
-El `compose.yaml` define el servidor a auditar y el auditor:
+El `compose.yaml` define el servidor y el auditor:
 
 ```yaml title="labs/lab2/compose.yaml"
 services:
-  # Objetivo de la auditoría: un servidor web con una versión concreta de nginx
+  # Objetivo de la auditoría: un servidor web con una versión concreta de nginx.
   servidor:
     image: nginx:1.18.0
+    ports:
+      - "8080:80"        # abre http://localhost:8080 en el navegador
     networks:
       - laboratorio
 
-  # El auditor escanea al servidor por su nombre de red
+  # El auditor lleva nmap instalado. Corre como root y permanece vivo.
   auditor:
     build: .
     depends_on:
       - servidor
     networks:
       - laboratorio
-    security_opt:
-      - no-new-privileges:true
 
 networks:
   laboratorio:
 ```
 
-### Paso 2 · Entiende el auditor
+El `Dockerfile` del auditor instala nmap:
 
-El auditor hace tres cosas: **escanear** puertos, **leer el banner** (la versión que anuncia el servicio) y **cruzarlo** con la NVD.
+```dockerfile title="labs/lab2/Dockerfile"
+FROM python:3.12-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends nmap \
+    && rm -rf /var/lib/apt/lists/*
+COPY informe.py .
+CMD ["sleep", "infinity"]
+```
 
-```python title="labs/lab2/auditor.py"
-import socket
-import json
+### Paso 2 · Levanta el laboratorio y entra en el auditor
 
-OBJETIVO = "servidor"          # nombre del contenedor objetivo en la red Docker
-PUERTOS = [22, 23, 80, 443, 3306, 8080]
+```bash title="Terminal (dentro de labs/lab2/)"
+docker compose up -d --build
+docker compose exec auditor bash
+```
+
+Ya estás **dentro del contenedor auditor**, como root y con nmap listo.
+
+### Paso 3 · Escanea con nmap
+
+**a) Descubrimiento de puertos.** Qué puertos tiene abiertos el servidor:
+
+```bash title="Dentro del contenedor auditor"
+nmap servidor
+```
+
+```text title="Salida (aproximada)"
+Nmap scan report for servidor (172.x.x.x)
+PORT   STATE SERVICE
+80/tcp open  http
+```
+
+nmap ha encontrado el puerto **80 abierto** (el servidor web). `servidor` es el nombre del contenedor en la red Docker.
+
+**b) Detección de versiones** (la clave de una auditoría). La opción `-sV` averigua **qué software y versión** corre en cada puerto:
+
+```bash title="Dentro del contenedor auditor"
+nmap -sV servidor
+```
+
+```text title="Salida (aproximada)"
+PORT   STATE SERVICE VERSION
+80/tcp open  http    nginx 1.18.0
+```
+
+Ahora sabemos no solo que hay un servidor web, sino que es **nginx 1.18.0**. Con esa versión exacta se pueden buscar sus vulnerabilidades.
+
+### Paso 4 · Genera el informe cruzando con la NVD
+
+nmap puede guardar su resultado en **XML** (`-oX`) para procesarlo con un programa. Lánzalo así y luego ejecuta el informe:
+
+```bash title="Dentro del contenedor auditor"
+nmap -sV -oX resultado.xml servidor
+python informe.py
+```
+
+El script `informe.py` lee ese XML y cruza cada versión con la NVD:
+
+```python title="labs/lab2/informe.py"
+import xml.etree.ElementTree as ET
 
 # "NVD local": versiones vulnerables conocidas (extracto, para el laboratorio)
 NVD_LOCAL = {
-    "nginx/1.18.0": "CVE-2021-23017 (resolver, gravedad alta)",
-    "Apache/2.4.49": "CVE-2021-41773 (path traversal, crítico)",
-    "OpenSSH_7.4": "CVE-2018-15473 (enumeración de usuarios)",
-    "vsftpd/2.3.4": "CVE-2011-2523 (puerta trasera, crítico)",
+    ("nginx", "1.18.0"): "CVE-2021-23017 (resolver, gravedad alta)",
+    ("Apache httpd", "2.4.49"): "CVE-2021-41773 (path traversal, crítico)",
+    ("OpenSSH", "7.4"): "CVE-2018-15473 (enumeración de usuarios)",
+    ("vsftpd", "2.3.4"): "CVE-2011-2523 (puerta trasera, crítico)",
 }
 
-def escanear(host, puerto):
-    """Devuelve (abierto, banner) para un puerto."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(1.0)
-    try:
-        if s.connect_ex((host, puerto)) != 0:
-            return False, ""
-        # Banner grabbing: pedimos algo y leemos lo que el servicio anuncia
-        try:
-            s.send(b"GET / HTTP/1.0\r\n\r\n")
-            respuesta = s.recv(2048).decode(errors="ignore")
-        except Exception:
-            respuesta = ""
-        banner = ""
-        for linea in respuesta.splitlines():
-            if linea.lower().startswith("server:"):
-                banner = linea.split(":", 1)[1].strip()
-        return True, banner
-    finally:
-        s.close()
+# nmap guardó el resultado del escaneo en este fichero XML
+arbol = ET.parse("resultado.xml")
 
-def auditar():
-    hallazgos = []
-    print(f"Auditando {OBJETIVO}...\n")
-    for puerto in PUERTOS:
-        abierto, banner = escanear(OBJETIVO, puerto)
-        if abierto:
-            cve = NVD_LOCAL.get(banner, "")
-            estado = f"VULNERABLE: {cve}" if cve else "sin vulnerabilidades conocidas"
-            print(f"  [ABIERTO] puerto {puerto:5}  {banner or '(sin banner)':20}  {estado}")
-            hallazgos.append({"puerto": puerto, "banner": banner, "vulnerabilidad": cve})
-    with open("informe_auditoria.json", "w", encoding="utf-8") as f:
-        json.dump(hallazgos, f, indent=2, ensure_ascii=False)
-    vulnerables = [h for h in hallazgos if h["vulnerabilidad"]]
-    print(f"\nResumen: {len(hallazgos)} servicios abiertos, {len(vulnerables)} vulnerables.")
-    print("Informe guardado en informe_auditoria.json")
+print("=== Informe de auditoría ===\n")
+vulnerables = 0
+for puerto in arbol.iter("port"):
+    estado = puerto.find("state").get("state")
+    if estado != "open":
+        continue
+    servicio = puerto.find("service")
+    producto = servicio.get("product", "") if servicio is not None else ""
+    version = servicio.get("version", "") if servicio is not None else ""
+    cve = NVD_LOCAL.get((producto, version), "")
+    marca = f"VULNERABLE: {cve}" if cve else "sin vulnerabilidades conocidas"
+    if cve:
+        vulnerables += 1
+    print(f"  Puerto {puerto.get('portid'):5}  {producto} {version:10}  {marca}")
 
-if __name__ == "__main__":
-    auditar()
+print(f"\nResumen: {vulnerables} servicio(s) con vulnerabilidades conocidas.")
 ```
 
-- **`connect_ex`** devuelve `0` si el puerto está abierto (sin lanzar error).
-- **Banner grabbing**: al pedir `GET / HTTP/1.0`, el servidor responde con una cabecera `Server:` que delata su versión exacta.
-- **Cruce con la NVD**: si esa versión está en la base de vulnerabilidades, se marca con su **CVE**.
+```text title="Salida"
+=== Informe de auditoría ===
 
-### Paso 3 · Levanta y ejecuta
+  Puerto 80     nginx 1.18.0      VULNERABLE: CVE-2021-23017 (resolver, gravedad alta)
 
-```bash title="Terminal (dentro de labs/lab2/)"
-# 1) Levanta el servidor y el auditor (quedan vivos en segundo plano)
-docker compose up -d --build
-
-# 2) Entra al contenedor del auditor (eres root)
-docker compose exec auditor bash
-
-# 3) Ya DENTRO del contenedor, ejecuta el script:
-python auditor.py
+Resumen: 1 servicio(s) con vulnerabilidades conocidas.
 ```
 
-**Salida esperada:**
+El informe ha detectado que nginx 1.18.0 tiene una vulnerabilidad conocida registrada en la NVD. **Eso es una auditoría**: descubrir → identificar versión → cruzar con vulnerabilidades.
+
+### Paso 5 · Mira la web desde el navegador
+
+El servidor que acabas de auditar es una web real. Como el `compose.yaml` publica su puerto, ábrela en tu navegador:
 
 ```text
-Auditando servidor...
-
-  [ABIERTO] puerto    80  nginx/1.18.0          VULNERABLE: CVE-2021-23017 (resolver, gravedad alta)
-
-Resumen: 1 servicios abiertos, 1 vulnerables.
-Informe guardado en informe_auditoria.json
+http://localhost:8080
 ```
 
-El auditor ha descubierto el servicio web, ha leído que es `nginx/1.18.0` y, al cruzarlo con la NVD, ha encontrado que esa versión tiene una vulnerabilidad conocida. El **informe** queda en `informe_auditoria.json`.
+Verás la página de bienvenida de nginx: es lo que había detrás del puerto 80 que nmap marcó como abierto.
 
-### Paso 4 · Apaga el laboratorio
+### Paso 6 · Apaga el laboratorio
 
 ```bash
-# Primero sal del contenedor (si estás dentro):
+# Sal del contenedor y detén todo:
 exit
-# Luego detén y elimina los contenedores:
 docker compose down
 ```
 
 !!! success "Lo que has hecho"
-    Una auditoría real en miniatura: descubrir → identificar versión → cruzar con vulnerabilidades → informe. Es exactamente lo que hacen herramientas como **nmap** + **Nessus/OpenVAS**, pero programado por ti.
+    Una auditoría real con **nmap**, la herramienta que usan los profesionales: descubrimiento de puertos, detección de versiones (`-sV`) y cruce con la NVD para un informe. Es lo mismo que hacen herramientas como **OpenVAS** o **Nessus**, en pequeño.
 
-> **Si te sobra tiempo:** añade a `PUERTOS` el 443 y, en el auditor, lee también la cabecera `Strict-Transport-Security` para comprobar si la web fuerza HTTPS. Es otra comprobación típica de auditoría.
+> **Si quieres ir más allá:** prueba `nmap -A servidor` (análisis agresivo: sistema operativo, scripts, versiones a la vez) y observa cuánta más información obtiene.
 
 ## 🧪 Lab 3 · Monitorización y detección
 
-**Objetivo.** Ahora te pones del lado del **defensor**. En el Lab 2 escaneaste y tanteaste un servidor; esas acciones **dejan rastro** en los registros. Aquí vas a **detectarlas** leyendo los logs y analizando el tráfico. Verás las **dos caras** de la misma acción.
+**Objetivo.** Ahora te pones del lado del **defensor**. En el Lab 2 escaneaste y tanteaste un servidor; esas acciones **dejan rastro** en los registros (*logs*). Aquí vas a **detectarlas** usando primero las herramientas de línea de comandos que usa todo administrador (`grep`, `awk`, `sort`, `uniq`) y luego un pequeño detector en Python. Verás las **dos caras** de la misma acción.
 
 !!! tip "Ficheros del laboratorio"
-    Están en `labs/lab3/`: `auth.log`, `web.log`, `detector.py`, `generar_captura.py`, `ids_red.py`, `Dockerfile` y `compose.yaml`.
+    Están en `labs/lab3/`: `auth.log`, `web.log`, `detector.py`, `Dockerfile` y `compose.yaml`.
 
 ### Paso 1 · Los registros que dejó el atacante
 
-La IP `10.0.0.66` (el auditor del Lab 2) aparece en dos registros. En `auth.log`, intentando adivinar contraseñas:
+La IP `10.0.0.66` aparece en dos registros. En `auth.log`, intentando adivinar contraseñas:
 
 ```text title="labs/lab3/auth.log"
 Failed password for root from 10.0.0.66 port 51000
@@ -348,12 +368,46 @@ Y en `web.log`, probando rutas que no existen (buscando páginas de administraci
 10.0.0.66 - GET /wp-login.php 404
 10.0.0.66 - GET /backup.zip 404
 10.0.0.5 - GET /index.html 200
-10.0.0.5 - GET /productos 200
 ```
 
-### Paso 2 · El detector de logs
+### Paso 2 · Levanta el laboratorio y entra
 
-Lee ambos registros, cuenta por IP y lanza una **alerta** si se supera un umbral. Es un **mini-IDS**.
+```bash title="Terminal (dentro de labs/lab3/)"
+docker compose up -d --build
+docker compose exec analista bash
+```
+
+### Paso 3 · Analiza los logs con herramientas de línea de comandos
+
+Así es como un administrador mira un log rápidamente, sin programar nada. Dentro del contenedor:
+
+**a) ¿Qué IPs han fallado al hacer login, y cuántas veces?**
+
+```bash title="Dentro del contenedor"
+grep "Failed password" auth.log | grep -oE "from [0-9.]+" | awk '{print $2}' | sort | uniq -c | sort -rn
+```
+
+```text title="Salida"
+      4 10.0.0.66
+```
+
+Cada orden hace una parte: `grep` filtra las líneas de fallo, `awk` saca la IP, y `sort | uniq -c` las cuenta. La IP `10.0.0.66` ha fallado **4 veces**: patrón de fuerza bruta.
+
+**b) ¿Qué IPs han provocado muchos errores 404 (rutas inexistentes)?**
+
+```bash title="Dentro del contenedor"
+grep " 404$" web.log | awk '{print $1}' | sort | uniq -c | sort -rn
+```
+
+```text title="Salida"
+      4 10.0.0.66
+```
+
+La misma IP ha pedido **4 rutas que no existen**: está rastreando el servidor buscando puntos de entrada.
+
+### Paso 4 · Automatiza la detección con Python
+
+Hacerlo a mano está bien para entender, pero conviene automatizarlo. `detector.py` hace lo mismo y lanza una **alerta** cuando se supera un umbral (un mini-IDS):
 
 ```python title="labs/lab3/detector.py"
 import re
@@ -361,30 +415,27 @@ from collections import Counter
 
 UMBRAL = 3
 
-def leer(ruta):
-    with open(ruta, encoding="utf-8") as f:
-        return f.read().splitlines()
-
 # 1) auth.log: contar fallos de login por IP
 fallos = Counter()
-for linea in leer("auth.log"):
-    m = re.search(r"Failed password for \S+ from (\d+\.\d+\.\d+\.\d+)", linea)
-    if m:
-        fallos[m.group(1)] += 1
+with open("auth.log", encoding="utf-8") as f:
+    for linea in f:
+        m = re.search(r"Failed password .* from (\d+\.\d+\.\d+\.\d+)", linea)
+        if m:
+            fallos[m.group(1)] += 1
 
-# 2) web.log: contar errores 404 por IP (rastreo de rutas que no existen)
+# 2) web.log: contar errores 404 por IP (rutas que no existen)
 rutas_404 = Counter()
-for linea in leer("web.log"):
-    m = re.search(r"(\d+\.\d+\.\d+\.\d+).* 404$", linea)
-    if m:
-        rutas_404[m.group(1)] += 1
+with open("web.log", encoding="utf-8") as f:
+    for linea in f:
+        m = re.search(r"(\d+\.\d+\.\d+\.\d+).* 404$", linea.strip())
+        if m:
+            rutas_404[m.group(1)] += 1
 
 print("Fallos de login por IP:", dict(fallos))
 print("Errores 404 por IP:    ", dict(rutas_404))
 
-# 3) mini-IDS: una IP es sospechosa si supera el umbral en login O en rutas
+# 3) Alertas: IP que supera el umbral en login o en rutas
 print("\n--- ALERTAS ---")
-hay = False
 for ip in sorted(set(fallos) | set(rutas_404)):
     motivos = []
     if fallos[ip] >= UMBRAL:
@@ -392,80 +443,35 @@ for ip in sorted(set(fallos) | set(rutas_404)):
     if rutas_404[ip] >= UMBRAL:
         motivos.append(f"rastreo de rutas ({rutas_404[ip]} rutas inexistentes)")
     if motivos:
-        hay = True
         print(f"  [ALERTA] {ip}: " + " + ".join(motivos))
-if not hay:
-    print("  (ninguna)")
 ```
 
-### Paso 3 · El mini-IDS de red (con Scapy)
+Ejecútalo:
 
-El escaneo de puertos del Lab 2 también deja rastro en el **tráfico**. `generar_captura.py` recrea ese tráfico en un fichero PCAP, e `ids_red.py` lo analiza: una IP que toca **muchos puertos distintos** está escaneando.
-
-```python title="labs/lab3/ids_red.py"
-from scapy.all import rdpcap, IP, TCP
-
-UMBRAL_PUERTOS = 5
-
-paquetes = rdpcap("captura.pcap")
-
-# Una IP que envía SYN a muchos puertos distintos está escaneando.
-puertos_por_ip = {}
-for p in paquetes:
-    if p.haslayer(TCP) and p[TCP].flags == "S":
-        puertos_por_ip.setdefault(p[IP].src, set()).add(p[TCP].dport)
-
-print("--- Mini-IDS de red (escaneo de puertos) ---")
-for ip, puertos in puertos_por_ip.items():
-    if len(puertos) >= UMBRAL_PUERTOS:
-        print(f"  [ALERTA] {ip}: escaneo de puertos ({len(puertos)} puertos distintos)")
-    else:
-        print(f"  {ip}: {len(puertos)} puerto(s) contactado(s), normal")
-```
-
-### Paso 4 · Levanta y ejecuta
-
-```bash title="Terminal (dentro de labs/lab3/)"
-# 1) Levanta el contenedor (queda vivo en segundo plano)
-docker compose up -d --build
-
-# 2) Entra al contenedor (eres root)
-docker compose exec analista bash
-
-# 3) Ya DENTRO del contenedor, ejecuta los scripts:
+```bash title="Dentro del contenedor"
 python detector.py
-python generar_captura.py
-python ids_red.py
 ```
 
-**Salida esperada:**
-
-```text
+```text title="Salida"
 Fallos de login por IP: {'10.0.0.66': 4}
 Errores 404 por IP:     {'10.0.0.66': 4}
 
 --- ALERTAS ---
   [ALERTA] 10.0.0.66: fuerza bruta (4 fallos de login) + rastreo de rutas (4 rutas inexistentes)
-
-captura.pcap creada con 7 paquetes
---- Mini-IDS de red (escaneo de puertos) ---
-  [ALERTA] 10.0.0.66: escaneo de puertos (6 puertos distintos)
-  10.0.0.5: 1 puerto(s) contactado(s), normal
 ```
 
 ### Paso 5 · Apaga el laboratorio
 
 ```bash
-# Primero sal del contenedor (si estás dentro):
 exit
-# Luego detén y elimina los contenedores:
 docker compose down
 ```
 
 !!! success "Las dos caras de la moneda"
-    La misma IP (`10.0.0.66`) que en el Lab 2 era *tu auditor*, aquí aparece como *el atacante detectado*: por fuerza bruta en `auth.log`, por rastreo de rutas en `web.log` y por escaneo de puertos en el tráfico. **Atacar y detectar son la misma acción vista desde los dos lados.**
+    La misma IP (`10.0.0.66`) que en el Lab 2 era *tu auditor*, aquí aparece como *el atacante detectado*: por fuerza bruta en `auth.log` y por rastreo de rutas en `web.log`. **Auditar y detectar son la misma acción vista desde los dos lados.** En el mundo real, herramientas como **fail2ban** hacen esto automáticamente: leen los logs y bloquean la IP que supera un umbral de fallos.
 
 > **Nota sobre falsos positivos.** Superar un umbral es un **patrón sospechoso que hay que verificar**, no una prueba de ataque: podría ser un script mal configurado. Un umbral muy bajo genera falsas alarmas; uno muy alto deja pasar ataques lentos.
+
 ## Actividades
 
 > Practica con lo visto en la unidad. Usa solo lo que ya conoces: **variables**, **operadores**, condicionales **`if` / `elif` / `else`** y acceso a **diccionarios**. No necesitas escribir bucles ni definir funciones. Intenta cada una **antes** de abrir la solución.
@@ -482,12 +488,12 @@ else:
 ```
 </details>
 
-**2 · 🟢 ¿Puerto abierto?** `connect_ex` devuelve `0` cuando un puerto está abierto. Dado `resultado = 0`, imprime `"ABIERTO"` si es 0 y `"cerrado"` en otro caso.
+**2 · 🟢 ¿Puerto abierto?** nmap marca cada puerto con un estado. Dado `estado = "open"`, imprime `"ABIERTO"` si el estado es `"open"` y `"cerrado"` en otro caso.
 <details class="sol"><summary>Solución</summary>
 
 ```python
-resultado = 0
-if resultado == 0:
+estado = "open"
+if estado == "open":
     print("ABIERTO")
 else:
     print("cerrado")
@@ -593,23 +599,23 @@ Los laboratorios no puntúan: son tu forma de entender la materia y de llegar pr
 
 <details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Un CVE (p. ej. CVE-2021-23017) identifica de forma única una vulnerabilidad registrada en la NVD.</details>
 
-**5.** El **banner grabbing** consiste en:
+**5.** La **detección de versiones** (el `-sV` de nmap) sirve para:
 
 - A) Borrar los registros de un servidor
-- B) Leer la información (versión del servicio) que un puerto abierto anuncia
+- B) Averiguar qué software y versión corre en un puerto, para buscar sus vulnerabilidades
 - C) Cifrar el tráfico de red
 - D) Bloquear una IP
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Al conectarse a un servicio, este suele anunciar su software y versión (p. ej. <code>Server: nginx/1.18.0</code>), lo que permite buscar sus vulnerabilidades.</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Saber que un puerto corre, por ejemplo, <code>nginx 1.18.0</code> permite cruzar esa versión con la NVD y ver si tiene vulnerabilidades conocidas.</details>
 
-**6.** En el escáner, `connect_ex((host, puerto))` devuelve **0**. ¿Qué significa?
+**6.** ¿Qué hace la opción `-sV` de nmap?
 
-- A) El puerto está cerrado
-- B) El puerto está abierto
-- C) Hubo un error de red
-- D) El host no existe
+- A) Escanea más rápido
+- B) Detecta el software y la versión que corre en cada puerto
+- C) Oculta el escaneo
+- D) Cierra los puertos abiertos
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>connect_ex</code> devuelve <code>0</code> cuando la conexión tiene éxito, es decir, el puerto está abierto (y no lanza excepción).</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>-sV</code> (version detection) averigua qué servicio y versión hay en cada puerto, que es lo que permite buscar sus vulnerabilidades.</details>
 
 **7.** ¿Para qué sirve la **NVD** (National Vulnerability Database)?
 
@@ -655,14 +661,14 @@ print(dict(fallos))
 
 <details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> <code>Counter</code> cuenta repeticiones: <code>1.1.1.1</code> aparece dos veces y <code>2.2.2.2</code> una.</details>
 
-**11.** En el mini-IDS de red, una IP que envía SYN a **muchos puertos distintos** indica:
+**11.** Al analizar un log web, muchas peticiones con código **404** desde la misma IP indican que el atacante está:
 
-- A) Una descarga normal
-- B) Un escaneo de puertos
-- C) Una consulta DNS
-- D) Un acceso HTTPS
+- A) Descargando ficheros grandes
+- B) Rastreando rutas que no existen, buscando puntos de entrada
+- C) Haciendo una copia de seguridad
+- D) Navegando con normalidad
 
-<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Tocar muchos puertos distintos en poco tiempo es la huella del escaneo de puertos (reconocimiento).</details>
+<details class="sol"><summary>Ver respuesta</summary><b>Correcta: B.</b> Pedir muchas rutas inexistentes (/admin, /.env, /backup.zip…) es típico de quien busca por dónde entrar; cada intento fallido deja un 404.</details>
 
 **12.** ¿Por qué el detector usa un **umbral** antes de lanzar una alerta?
 
