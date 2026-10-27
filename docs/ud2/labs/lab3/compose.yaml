@@ -1,5 +1,4 @@
 services:
   analista:
     build: .
-    security_opt:
-      - no-new-privileges:true
+    # Corre como root y permanece vivo para poder entrar y lanzar los scripts.

@@ -1,6 +1,4 @@
 services:
   auditor:
     build: .
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
+    # Sin usuario sin privilegios ni read_only: corre como root y permanece vivo.

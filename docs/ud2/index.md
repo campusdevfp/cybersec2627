@@ -51,6 +51,15 @@ pip install -r requirements.txt
 !!! info "Solo una dependencia externa"
     En esta unidad se instalan con `pip` dos librerías: **psutil** (para auditar el propio sistema) y **scapy** (para el mini-IDS del Lab 2). Todo lo demás — sockets, expresiones regulares, conteo, ficheros — es de la **biblioteca estándar** de Python, que ya viene incluida.
 
+!!! info "Cómo se usan los laboratorios (resumen)"
+    Cada laboratorio sigue siempre el mismo ciclo de tres comandos, desde la carpeta del lab:
+
+    - **Arrancar:** `docker compose up -d --build` — construye y deja el contenedor vivo en segundo plano.
+    - **Entrar y trabajar:** `docker compose exec <servicio> bash` — abres una terminal **como root** dentro del contenedor; ahí ejecutas los scripts (`python ...`) y, si quieres, instalas paquetes con `apt-get`.
+    - **Parar:** `exit` para salir del contenedor y `docker compose down` para detenerlo y eliminarlo.
+
+    El nombre del `<servicio>` es `auditor` en los labs 1 y 2, y `analista` en el lab 3 (lo ves en el `compose.yaml`). Los contenedores quedan **rulando** hasta que hagas `docker compose down`.
+
 !!! danger "Norma de uso"
     Todo esto se practica **solo** dentro de los contenedores del laboratorio o en tu propia máquina. Escanear o auditar equipos ajenos sin permiso es delito. Ver [Uso ético y legal](../recursos/uso-etico.md).
 
@@ -122,8 +131,14 @@ Tres detalles importantes:
 ### Paso 2 · Levanta y ejecuta
 
 ```bash title="Terminal (dentro de labs/lab1/)"
-docker compose build
-docker compose run --rm auditor
+# 1) Construye la imagen y levanta el contenedor (queda vivo en segundo plano)
+docker compose up -d --build
+
+# 2) Entra al contenedor (eres root: puedes instalar con apt si quieres)
+docker compose exec auditor bash
+
+# 3) Ya DENTRO del contenedor, ejecuta el script:
+python auditor_sistema.py
 ```
 
 **Salida esperada** (los números varían según tu máquina):
@@ -156,7 +171,10 @@ Verás **muchos más procesos**. ¿Por qué? Porque un contenedor está **aislad
 
 ### Paso 4 · Apaga el laboratorio
 
-```bash title="Terminal"
+```bash
+# Primero sal del contenedor (si estás dentro):
+exit
+# Luego detén y elimina los contenedores:
 docker compose down
 ```
 
@@ -265,8 +283,14 @@ if __name__ == "__main__":
 ### Paso 3 · Levanta y ejecuta
 
 ```bash title="Terminal (dentro de labs/lab2/)"
-docker compose build
-docker compose run --rm auditor
+# 1) Levanta el servidor y el auditor (quedan vivos en segundo plano)
+docker compose up -d --build
+
+# 2) Entra al contenedor del auditor (eres root)
+docker compose exec auditor bash
+
+# 3) Ya DENTRO del contenedor, ejecuta el script:
+python auditor.py
 ```
 
 **Salida esperada:**
@@ -284,7 +308,10 @@ El auditor ha descubierto el servicio web, ha leído que es `nginx/1.18.0` y, al
 
 ### Paso 4 · Apaga el laboratorio
 
-```bash title="Terminal"
+```bash
+# Primero sal del contenedor (si estás dentro):
+exit
+# Luego detén y elimina los contenedores:
 docker compose down
 ```
 
@@ -399,8 +426,16 @@ for ip, puertos in puertos_por_ip.items():
 ### Paso 4 · Levanta y ejecuta
 
 ```bash title="Terminal (dentro de labs/lab3/)"
-docker compose build
-docker compose run --rm analista
+# 1) Levanta el contenedor (queda vivo en segundo plano)
+docker compose up -d --build
+
+# 2) Entra al contenedor (eres root)
+docker compose exec analista bash
+
+# 3) Ya DENTRO del contenedor, ejecuta los scripts:
+python detector.py
+python generar_captura.py
+python ids_red.py
 ```
 
 **Salida esperada:**
@@ -420,7 +455,10 @@ captura.pcap creada con 7 paquetes
 
 ### Paso 5 · Apaga el laboratorio
 
-```bash title="Terminal"
+```bash
+# Primero sal del contenedor (si estás dentro):
+exit
+# Luego detén y elimina los contenedores:
 docker compose down
 ```
 
